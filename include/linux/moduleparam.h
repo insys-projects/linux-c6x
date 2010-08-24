@@ -19,10 +19,17 @@
 #ifdef MODULE
 #define ___module_cat(a,b) __mod_ ## a ## b
 #define __module_cat(a,b) ___module_cat(a,b)
+#ifdef __TI_TOOL_WRAPPER__
+#define __MODULE_INFO(tag, name, info)					  \
+char __module_cat(name,__LINE__)[]				  \
+  __used								  \
+  __attribute__((section(".modinfo"))) = __stringify(tag) "=" info
+#else
 #define __MODULE_INFO(tag, name, info)					  \
 static const char __module_cat(name,__LINE__)[]				  \
   __used								  \
   __attribute__((section(".modinfo"),unused)) = __stringify(tag) "=" info
+#endif
 #else  /* !MODULE */
 #define __MODULE_INFO(tag, name, info)
 #endif
@@ -83,6 +90,18 @@ struct kparam_array
    parameters.  perm sets the visibility in sysfs: 000 means it's
    not there, read bits mean it's readable, write bits mean it's
    writable. */
+#ifdef __TI_TOOL_WRAPPER__
+#define __module_param_call(prefix, name, set, get, arg, isbool, perm)	\
+	/* Default value instead of permissions? */			\
+	static int __param_perm_check_##name =				\
+	BUILD_BUG_ON_ZERO((perm) < 0 || (perm) > 0777 || ((perm) & 2))	\
+	+ BUILD_BUG_ON_ZERO(sizeof(""prefix) > MAX_PARAM_PREFIX_LEN);	\
+	static char __param_str_##name[] = prefix #name;		\
+	static struct kernel_param __moduleparam_const __param_##name	\
+    __attribute__ ((__section__ ("__param")))				\
+	= { __param_str_##name, perm, isbool ? KPARAM_ISBOOL : 0,	\
+	    set, get, { arg } }
+#else
 #define __module_param_call(prefix, name, set, get, arg, isbool, perm)	\
 	/* Default value instead of permissions? */			\
 	static int __param_perm_check_##name __attribute__((unused)) =	\
@@ -94,6 +113,7 @@ struct kparam_array
     __attribute__ ((unused,__section__ ("__param"),aligned(sizeof(void *)))) \
 	= { __param_str_##name, perm, isbool ? KPARAM_ISBOOL : 0,	\
 	    set, get, { arg } }
+#endif
 
 #define module_param_call(name, set, get, arg, perm)			      \
 	__module_param_call(MODULE_PARAM_PREFIX,			      \

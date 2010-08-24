@@ -900,3 +900,10 @@ int __weak arch_init_chip_data(struct irq_desc *desc, int node)
 {
 	return 0;
 }
+
+#ifdef CONFIG_TMS320C6X
+asm(" .weak early_irq_init");
+asm(" .weak arch_probe_nr_irqs");
+asm(" .weak arch_early_irq_init");
+asm(" .weak arch_init_chip_data");
+#endif

@@ -20,12 +20,14 @@ static void __init error(char *x)
 
 #define N_ALIGN(len) ((((len) + 1) & ~3) + 2)
 
-static __initdata struct hash {
+struct hash {
 	int ino, minor, major;
 	mode_t mode;
 	struct hash *next;
 	char name[N_ALIGN(PATH_MAX)];
-} *head[32];
+};
+static __initdata struct hash *head[32];
+
 
 static inline int hash(int major, int minor, int ino)
 {
@@ -152,7 +154,7 @@ static void __init parse_header(char *s)
 
 /* FSM */
 
-static __initdata enum state {
+enum state {
 	Start,
 	Collect,
 	GotHeader,
@@ -161,7 +163,8 @@ static __initdata enum state {
 	CopyFile,
 	GotSymlink,
 	Reset
-} state, next_state;
+};
+static __initdata enum state  state, next_state;
 
 static __initdata char *victim;
 static __initdata unsigned count;

@@ -164,8 +164,8 @@ static void rpcb_map_release(void *data)
 
 static const struct sockaddr_in rpcb_inaddr_loopback = {
 	.sin_family		= AF_INET,
-	.sin_addr.s_addr	= htonl(INADDR_LOOPBACK),
-	.sin_port		= htons(RPCBIND_PORT),
+	.sin_addr.s_addr	= __constant_htonl(INADDR_LOOPBACK),
+	.sin_port		= __constant_htons(RPCBIND_PORT),
 };
 
 static DEFINE_MUTEX(rpcb_create_local_mutex);

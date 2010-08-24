@@ -1506,4 +1506,22 @@ config SERIAL_GRLIB_GAISLER_APBUART_CONSOLE
 	help
 	Support for running a console on the GRLIB APBUART
 
+config SERIAL_SC16IS7XX
+	tristate "NXP SC16IS7XX I2C UART bridge support"
+	depends on I2C
+	select SERIAL_CORE
+	---help---
+	  This selects whether you want to include the driver for the NXP SC16IS7XX
+	  I2C UART  bridge.
+
+config SERIAL_SC16IS7XX_CONSOLE
+	bool "Console on sc16is7xx serial port"
+	depends on SERIAL_SC16IS7XX=y
+	select SERIAL_CORE_CONSOLE
+	help
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode).
+
 endmenu

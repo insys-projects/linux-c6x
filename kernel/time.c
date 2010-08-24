@@ -377,12 +377,20 @@ void set_normalized_timespec(struct timespec *ts, time_t sec, s64 nsec)
 		 * optimising this loop into a modulo operation. See
 		 * also __iter_div_u64_rem() in include/linux/time.h
 		 */
+#ifdef __TI_TOOL_WRAPPER__
+		asm("");
+#else
 		asm("" : "+rm"(nsec));
+#endif
 		nsec -= NSEC_PER_SEC;
 		++sec;
 	}
 	while (nsec < 0) {
+#ifdef __TI_TOOL_WRAPPER__
+		asm("");
+#else
 		asm("" : "+rm"(nsec));
+#endif
 		nsec += NSEC_PER_SEC;
 		--sec;
 	}

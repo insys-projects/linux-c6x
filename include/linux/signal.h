@@ -74,6 +74,7 @@ static inline int sigfindinword(unsigned long word)
 static inline int sigisemptyset(sigset_t *set)
 {
 	extern void _NSIG_WORDS_is_unsupported_size(void);
+#ifdef __GNU__
 	switch (_NSIG_WORDS) {
 	case 4:
 		return (set->sig[3] | set->sig[2] |
@@ -86,6 +87,18 @@ static inline int sigisemptyset(sigset_t *set)
 		_NSIG_WORDS_is_unsupported_size();
 		return 0;
 	}
+#else
+# if _NSIG_WORDS == 4
+	return (set->sig[3] | set->sig[2] |
+		set->sig[1] | set->sig[0]) == 0;
+# elif _NSIG_WORDS == 2
+	return (set->sig[1] | set->sig[0]) == 0;
+# elif _NSIG_WORDS == 1
+	return set->sig[0] == 0;
+# else
+	_NSIG_WORDS_is_unsupported_size();
+# endif
+#endif
 }
 
 #define sigmask(sig)	(1UL << ((sig) - 1))

@@ -1067,6 +1067,7 @@ typedef enum {
 } mechtype_t;
 
 typedef struct {
+#ifndef __TI_C6X_COMPILER__
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 ps			: 1;
 	__u8 reserved1		: 1;
@@ -1100,14 +1101,25 @@ typedef struct {
 	__u8 data_block_type	: 4;
 	__u8 reserved3		: 4;
 #endif
+#else
+	__u8 x_page_code;
+        __u8 page_length;
+	__u8 x_write_type;
+	__u8 x_track_mode;
+	__u8 x_data_block_type;
+#endif
 	__u8 link_size;
 	__u8 reserved4;
+#ifndef __TI_C6X_COMPILER__
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved5		: 2;
 	__u8 app_code		: 6;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8 app_code		: 6;
 	__u8 reserved5		: 2;
+#endif
+#else
+	__u8 x_app_code;
 #endif
 	__u8 session_format;
 	__u8 reserved6;
@@ -1141,6 +1153,7 @@ typedef struct {
 	__u16 report_key_length;
 	__u8 reserved1;
 	__u8 reserved2;
+#ifndef __TI_C6X_COMPILER__
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 type_code			: 2;
 	__u8 vra			: 3;
@@ -1149,6 +1162,9 @@ typedef struct {
 	__u8 ucca			: 3;
 	__u8 vra			: 3;
 	__u8 type_code			: 2;
+#endif
+#else
+	__u8 x_ucca_vra_type;
 #endif
 	__u8 region_mask;
 	__u8 rpc_scheme;
@@ -1157,6 +1173,7 @@ typedef struct {
 
 struct event_header {
 	__be16 data_len;
+#ifndef __TI_C6X_COMPILER__
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 nea		: 1;
 	__u8 reserved1		: 4;
@@ -1166,10 +1183,14 @@ struct event_header {
 	__u8 reserved1		: 4;
 	__u8 nea		: 1;
 #endif
+#else
+	__u8 x_nea_notification;
+#endif
 	__u8 supp_event_class;
 };
 
 struct media_event_desc {
+#ifndef __TI_C6X_COMPILER__
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved1		: 4;
 	__u8 media_event_code	: 4;
@@ -1182,6 +1203,10 @@ struct media_event_desc {
 	__u8 door_open		: 1;
 	__u8 media_present	: 1;
 	__u8 reserved2		: 6;
+#endif
+#else
+	__u8 x_media_event_code;
+	__u8 x_door_media;
 #endif
 	__u8 start_slot;
 	__u8 end_slot;

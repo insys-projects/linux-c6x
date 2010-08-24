@@ -1319,7 +1319,11 @@ static int nfs_sillyrename(struct inode *dir, struct dentry *dentry)
 	static unsigned int sillycounter;
 	const int      fileidsize  = sizeof(NFS_FILEID(dentry->d_inode))*2;
 	const int      countersize = sizeof(sillycounter)*2;
+#ifdef __TI_TOOL_WRAPPER__
+#define	slen   (5+16+8-1)
+#else
 	const int      slen        = sizeof(".nfs")+fileidsize+countersize-1;
+#endif
 	char           silly[slen+1];
 	struct qstr    qsilly;
 	struct dentry *sdentry;

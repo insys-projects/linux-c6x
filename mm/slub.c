@@ -247,12 +247,12 @@ static inline struct kmem_cache_node *get_node(struct kmem_cache *s, int node)
 static inline int check_valid_pointer(struct kmem_cache *s,
 				struct page *page, const void *object)
 {
-	void *base;
+	char *base;
 
 	if (!object)
 		return 1;
 
-	base = page_address(page);
+	base = (char *)page_address(page);
 	if (object < base || object >= base + page->objects * s->size ||
 		(object - base) % s->size) {
 		return 0;

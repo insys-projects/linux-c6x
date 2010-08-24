@@ -2,6 +2,9 @@
  *
  * Copyright 2002       by Kai Germaschewski
  *
+ * Hacked to support Texas Instruments' C6X Assembler
+ * by Mark Salter (msalter@redhat.com)
+ *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
@@ -249,11 +252,20 @@ static void read_map(FILE *in)
 
 static void output_label(char *label)
 {
+#ifdef TI_ASM
+	if (symbol_prefix_char)
+		printf("\t.global %c%s\n", symbol_prefix_char, label);
+	else
+		printf("\t.global %s\n", label);
+	printf("\t.align 4\n");
+#else
 	if (symbol_prefix_char)
 		printf(".globl %c%s\n", symbol_prefix_char, label);
 	else
 		printf(".globl %s\n", label);
 	printf("\tALGN\n");
+#endif
+
 	if (symbol_prefix_char)
 		printf("%c%s:\n", symbol_prefix_char, label);
 	else
@@ -294,6 +306,10 @@ static void write_src(void)
 	unsigned int *markers;
 	char buf[KSYM_NAME_LEN];
 
+#ifdef TI_ASM
+	printf("\t.ref\t_text\n");
+	printf("\t.sect \".rodata\",ALLOC\n");
+#else
 	printf("#include <asm/types.h>\n");
 	printf("#if BITS_PER_LONG == 64\n");
 	printf("#define PTR .quad\n");
@@ -304,6 +320,7 @@ static void write_src(void)
 	printf("#endif\n");
 
 	printf("\t.section .rodata, \"a\"\n");
+#endif
 
 	/* Provide proper symbols relocatability by their '_text'
 	 * relativeness.  The symbol names cannot be used to construct
@@ -314,6 +331,18 @@ static void write_src(void)
 	 */
 	output_label("kallsyms_addresses");
 	for (i = 0; i < table_cnt; i++) {
+#ifdef TI_ASM
+		if (toupper(table[i].sym[0]) != 'A') {
+			if (_text <= table[i].addr)
+				printf("\t.long\t_text + 0%llxh\n",
+					table[i].addr - _text);
+			else
+				printf("\t.long\t_text - 0%llxh\n",
+					_text - table[i].addr);
+		} else {
+			printf("\t.long\t0%llxh\n", table[i].addr);
+		}
+#else
 		if (toupper(table[i].sym[0]) != 'A') {
 			if (_text <= table[i].addr)
 				printf("\tPTR\t_text + %#llx\n",
@@ -324,11 +353,16 @@ static void write_src(void)
 		} else {
 			printf("\tPTR\t%#llx\n", table[i].addr);
 		}
+#endif
 	}
 	printf("\n");
 
 	output_label("kallsyms_num_syms");
+#ifdef TI_ASM
+	printf("\t.long\t%d\n", table_cnt);
+#else
 	printf("\tPTR\t%d\n", table_cnt);
+#endif
 	printf("\n");
 
 	/* table of offset markers, that give the offset in the compressed stream
@@ -346,9 +380,17 @@ static void write_src(void)
 		if ((i & 0xFF) == 0)
 			markers[i >> 8] = off;
 
+#ifdef TI_ASM
+		printf("\t.byte 0%02xh", table[i].len);
+#else
 		printf("\t.byte 0x%02x", table[i].len);
+#endif
 		for (k = 0; k < table[i].len; k++)
+#ifdef TI_ASM
+			printf(", 0%02xh", table[i].sym[k]);
+#else
 			printf(", 0x%02x", table[i].sym[k]);
+#endif
 		printf("\n");
 
 		off += table[i].len + 1;
@@ -357,7 +399,11 @@ static void write_src(void)
 
 	output_label("kallsyms_markers");
 	for (i = 0; i < ((table_cnt + 255) >> 8); i++)
+#ifdef TI_ASM
+		printf("\t.long\t%d\n", markers[i]);
+#else
 		printf("\tPTR\t%d\n", markers[i]);
+#endif
 	printf("\n");
 
 	free(markers);
@@ -367,7 +413,11 @@ static void write_src(void)
 	for (i = 0; i < 256; i++) {
 		best_idx[i] = off;
 		expand_symbol(best_table[i], best_table_len[i], buf);
+#ifdef TI_ASM
+		printf("\t.string\t\"%s\",0\n", buf);
+#else
 		printf("\t.asciz\t\"%s\"\n", buf);
+#endif
 		off += strlen(buf) + 1;
 	}
 	printf("\n");

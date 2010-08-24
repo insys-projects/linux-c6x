@@ -488,7 +488,7 @@ void crypto_destroy_tfm(void *mem, struct crypto_tfm *tfm);
 
 static inline void crypto_free_tfm(struct crypto_tfm *tfm)
 {
-	return crypto_destroy_tfm(tfm, tfm);
+	crypto_destroy_tfm(tfm, tfm);
 }
 
 int alg_test(const char *driver, const char *alg, u32 type, u32 mask);

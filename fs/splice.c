@@ -1595,6 +1595,7 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 	struct pipe_inode_info *pipe;
 	struct page *pages[PIPE_BUFFERS];
 	struct partial_page partial[PIPE_BUFFERS];
+#ifndef __TI_TOOL_WRAPPER__
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
@@ -1602,6 +1603,16 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 		.ops = &user_page_pipe_buf_ops,
 		.spd_release = spd_release_page,
 	};
+#else
+	struct splice_pipe_desc spd;
+
+	spd.pages = pages;
+	spd.partial = partial;
+	spd.nr_pages = 0;
+	spd.flags = flags;
+	spd.ops = &user_page_pipe_buf_ops;
+	spd.spd_release = spd_release_page;
+#endif
 
 	pipe = pipe_info(file->f_path.dentry->d_inode);
 	if (!pipe)

@@ -222,7 +222,11 @@ bool each_symbol(bool (*fn)(const struct symsearch *arr, struct module *owner,
 			    unsigned int symnum, void *data), void *data)
 {
 	struct module *mod;
+#ifdef __TI_TOOL_WRAPPER__
+	struct symsearch arr[] = {
+#else
 	const struct symsearch arr[] = {
+#endif
 		{ __start___ksymtab, __stop___ksymtab, __start___kcrctab,
 		  NOT_GPL_ONLY, false },
 		{ __start___ksymtab_gpl, __stop___ksymtab_gpl,
@@ -2011,7 +2015,7 @@ static noinline struct module *load_module(void __user *umod,
 				  const char __user *uargs)
 {
 	Elf_Ehdr *hdr;
-	Elf_Shdr *sechdrs;
+	Elf_Shdr *sechdrs = NULL;
 	char *secstrings, *args, *modmagic, *strtab = NULL;
 	char *staging;
 	unsigned int i;
@@ -2054,7 +2058,17 @@ static noinline struct module *load_module(void __user *umod,
 		goto truncated;
 
 	/* Convenience variables */
+#ifdef __TI_TOOL_WRAPPER__
+	/* TI compiler doesn't align sechdrs in the file */
+	sechdrs = vmalloc(sizeof(Elf_Shdr) * hdr->e_shnum);
+	if (sechdrs == NULL) {
+		err = -ENOMEM;
+		goto free_hdr;
+	}
+	memcpy(sechdrs, (void *)hdr + hdr->e_shoff, hdr->e_shnum * sizeof(Elf_Shdr));
+#else
 	sechdrs = (void *)hdr + hdr->e_shoff;
+#endif
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 	sechdrs[0].sh_addr = 0;
 
@@ -2444,6 +2458,9 @@ static noinline struct module *load_module(void __user *umod,
 	add_notes_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 
 	/* Get rid of temporary copy */
+#ifdef __TI_TOOL_WRAPPER__
+	vfree(sechdrs);
+#endif
 	vfree(hdr);
 
 	trace_module_load(mod);
@@ -2476,6 +2493,9 @@ static noinline struct module *load_module(void __user *umod,
 	kfree(args);
 	kfree(strmap);
  free_hdr:
+#ifdef __TI_TOOL_WRAPPER__
+	vfree(sechdrs);
+#endif
 	vfree(hdr);
 	return ERR_PTR(err);
 

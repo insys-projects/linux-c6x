@@ -106,7 +106,7 @@ typedef struct elf_prpsinfo prpsinfo_t;
 static inline void elf_core_copy_regs(elf_gregset_t *elfregs, struct pt_regs *regs)
 {
 #ifdef ELF_CORE_COPY_REGS
-	ELF_CORE_COPY_REGS((*elfregs), regs)
+	ELF_CORE_COPY_REGS((*elfregs), regs);
 #else
 	BUG_ON(sizeof(*elfregs) != sizeof(*regs));
 	*(struct pt_regs *)elfregs = *regs;

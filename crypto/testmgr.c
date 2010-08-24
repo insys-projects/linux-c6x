@@ -1428,6 +1428,7 @@ static int alg_test_crc32c(const struct alg_test_desc *desc,
 	}
 
 	do {
+#ifndef __TI_TOOL_WRAPPER__
 		struct {
 			struct shash_desc shash;
 			char ctx[crypto_shash_descsize(tfm)];
@@ -1438,6 +1439,24 @@ static int alg_test_crc32c(const struct alg_test_desc *desc,
 
 		*(u32 *)sdesc.ctx = le32_to_cpu(420553207);
 		err = crypto_shash_final(&sdesc.shash, (u8 *)&val);
+#else
+		struct {
+			struct shash_desc shash;
+			char ctx[0];
+		} *sdesc;
+
+
+		sdesc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
+		if (sdesc) {
+			sdesc->shash.tfm = tfm;
+			sdesc->shash.flags = 0;
+
+			*(u32 *)sdesc->ctx = le32_to_cpu(420553207);
+			err = crypto_shash_final(&sdesc->shash, (u8 *)&val);
+			kfree(sdesc);
+		} else
+			err = -ENOMEM;
+#endif
 		if (err) {
 			printk(KERN_ERR "alg: crc32c: Operation failed for "
 			       "%s: %d\n", driver, err);

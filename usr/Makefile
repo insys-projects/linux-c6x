@@ -18,6 +18,17 @@ suffix_$(CONFIG_INITRAMFS_COMPRESSION_LZMA)   = .lzma
 # Generate builtin.o based on initramfs_data.o
 obj-$(CONFIG_BLK_DEV_INITRD) := initramfs_data$(suffix_y).o
 
+ifdef CONFIG_TMS320C6X
+ifdef CONFIG_CPU_BIG_ENDIAN
+C6X_ENDIAN = -mbig-endian
+else
+C6X_ENDIAN = -mlittle-endian
+endif
+
+$(obj)/initramfs_data$(suffix_y).o: $(obj)/initramfs_data$(suffix_y).s
+	$(Q) c6x-elf-as -march=c64x+ $(C6X_ENDIAN) -o $@ $<
+endif
+
 # initramfs_data.o contains the compressed initramfs_data.cpio image.
 # The image is included using .incbin, a dependency which is not
 # tracked automatically.

@@ -15,8 +15,14 @@
  * happens, handle that and return -EFAULT.
  */
 
+#ifndef CONFIG_TMS320C6X
 long __weak probe_kernel_read(void *dst, void *src, size_t size)
     __attribute__((alias("__probe_kernel_read")));
+#else
+asm("\t.global probe_kernel_read\n" \
+    "\t.weak probe_kernel_read\n"  \
+    "probe_kernel_read .set __probe_kernel_read\n");
+#endif
 
 long __probe_kernel_read(void *dst, void *src, size_t size)
 {
@@ -43,8 +49,15 @@ EXPORT_SYMBOL_GPL(probe_kernel_read);
  * Safely write to address @dst from the buffer at @src.  If a kernel fault
  * happens, handle that and return -EFAULT.
  */
+#ifndef CONFIG_TMS320C6X
 long __weak probe_kernel_write(void *dst, void *src, size_t size)
     __attribute__((alias("__probe_kernel_write")));
+#else
+asm("\t.global probe_kernel_write\n" \
+    "\t.weak probe_kernel_write\n"  \
+    "probe_kernel_write .set __probe_kernel_write\n");
+#endif
+
 
 long __probe_kernel_write(void *dst, void *src, size_t size)
 {

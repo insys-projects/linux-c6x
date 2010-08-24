@@ -357,6 +357,8 @@ struct dst_entry *inet_csk_route_req(struct sock *sk,
 	struct rtable *rt;
 	const struct inet_request_sock *ireq = inet_rsk(req);
 	struct ip_options *opt = inet_rsk(req)->opt;
+	struct net *net = sock_net(sk);
+#ifndef __TI_TOOL_WRAPPER__
 	struct flowi fl = { .oif = sk->sk_bound_dev_if,
 			    .mark = sk->sk_mark,
 			    .nl_u = { .ip4_u =
@@ -370,7 +372,19 @@ struct dst_entry *inet_csk_route_req(struct sock *sk,
 			    .uli_u = { .ports =
 				       { .sport = inet_sk(sk)->inet_sport,
 					 .dport = ireq->rmt_port } } };
-	struct net *net = sock_net(sk);
+#else
+	struct flowi fl;
+
+	fl.oif = sk->sk_bound_dev_if;
+	fl.mark = sk->sk_mark;
+	fl.nl_u.ip4_u.daddr = (opt && opt->srr) ? opt->faddr : ireq->rmt_addr;
+	fl.nl_u.ip4_u.saddr = ireq->loc_addr;
+	fl.nl_u.ip4_u.tos = RT_CONN_FLAGS(sk);
+	fl.proto = sk->sk_protocol;
+	fl.flags = inet_sk_flowi_flags(sk);
+	fl.uli_u.ports.sport = inet_sk(sk)->inet_sport;
+	fl.uli_u.ports.dport = ireq->rmt_port;
+#endif
 
 	security_req_classify_flow(req, &fl);
 	if (ip_route_output_flow(net, &rt, &fl, sk, 0))

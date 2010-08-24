@@ -113,12 +113,20 @@ static inline void ipv6_copy_dscp(unsigned int dscp, struct ipv6hdr *inner)
 static inline int INET_ECN_set_ce(struct sk_buff *skb)
 {
 	switch (skb->protocol) {
+#ifdef __TI_TOOL_WRAPPER__
+	case __constant_cpu_to_be16(ETH_P_IP):
+#else
 	case cpu_to_be16(ETH_P_IP):
+#endif
 		if (skb->network_header + sizeof(struct iphdr) <= skb->tail)
 			return IP_ECN_set_ce(ip_hdr(skb));
 		break;
 
+#ifdef __TI_TOOL_WRAPPER__
+	case __constant_cpu_to_be16(ETH_P_IPV6):
+#else
 	case cpu_to_be16(ETH_P_IPV6):
+#endif
 		if (skb->network_header + sizeof(struct ipv6hdr) <= skb->tail)
 			return IP6_ECN_set_ce(ipv6_hdr(skb));
 		break;

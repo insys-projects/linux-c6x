@@ -415,6 +415,7 @@ enum perf_event_type {
 	PERF_RECORD_MAX,			/* non-ABI */
 };
 
+#ifdef __GNU__
 enum perf_callchain_context {
 	PERF_CONTEXT_HV			= (__u64)-32,
 	PERF_CONTEXT_KERNEL		= (__u64)-128,
@@ -425,7 +426,18 @@ enum perf_callchain_context {
 	PERF_CONTEXT_GUEST_USER		= (__u64)-2560,
 
 	PERF_CONTEXT_MAX		= (__u64)-4095,
+
 };
+#else
+#define	PERF_CONTEXT_HV			((__u64)-32)
+#define	PERF_CONTEXT_KERNEL		((__u64)-128)
+#define	PERF_CONTEXT_USER		((__u64)-512)
+#define	PERF_CONTEXT_GUEST		((__u64)-2048)
+#define	PERF_CONTEXT_GUEST_KERNEL	((__u64)-2176)
+#define	PERF_CONTEXT_GUEST_USER		((__u64)-2560)
+#define	PERF_CONTEXT_MAX		((__u64)-4095)
+#endif
+
 
 #define PERF_FLAG_FD_NO_GROUP	(1U << 0)
 #define PERF_FLAG_FD_OUTPUT	(1U << 1)

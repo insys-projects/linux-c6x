@@ -15,11 +15,19 @@
 #include <linux/lockd/xdr.h>
 
 /* error codes new to NLMv4 */
+#ifdef __TI_TOOL_WRAPPER__
+#define	nlm4_deadlock		__constant_cpu_to_be32(NLM_DEADLCK)
+#define	nlm4_rofs		__constant_cpu_to_be32(NLM_ROFS)
+#define	nlm4_stale_fh		__constant_cpu_to_be32(NLM_STALE_FH)
+#define	nlm4_fbig		__constant_cpu_to_be32(NLM_FBIG)
+#define	nlm4_failed		__constant_cpu_to_be32(NLM_FAILED)
+#else
 #define	nlm4_deadlock		cpu_to_be32(NLM_DEADLCK)
 #define	nlm4_rofs		cpu_to_be32(NLM_ROFS)
 #define	nlm4_stale_fh		cpu_to_be32(NLM_STALE_FH)
 #define	nlm4_fbig		cpu_to_be32(NLM_FBIG)
 #define	nlm4_failed		cpu_to_be32(NLM_FAILED)
+#endif
 
 
 

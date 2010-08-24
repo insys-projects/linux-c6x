@@ -1269,8 +1269,8 @@ static void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
 	va_end(args2);
 	if (len > 0)
 		skb_put(skb, len);
-out:
 	return;
+#endif
 }
 
 /**

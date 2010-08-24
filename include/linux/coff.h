@@ -9,6 +9,8 @@
    set is documented here because I received the full set. If you wish
    more information about COFF, then O'Reilly has a very excellent book.
 */
+#ifndef _COFF_H_
+#define _COFF_H_
 
 #define  E_SYMNMLEN  8   /* Number of characters in a symbol name         */
 #define  E_FILNMLEN 14   /* Number of characters in a file name           */
@@ -31,6 +33,18 @@
 				 ((unsigned long)((unsigned char)ps[1])<<8)  |\
 				 ((unsigned long)((unsigned char)ps[0])))))
  
+#define COFF_BUF_FROM_SHORT_L(buf, l) do { \
+    buf[0] = (l) & 0x00ff; \
+    buf[1] = ((l) & 0xff00) >> 8; \
+    } while(0);
+
+#define COFF_BUF_FROM_LONG_L(buf, l) do { \
+    buf[0] = (l) & 0x000000ff; \
+    buf[1] = ((l) & 0x0000ff00) >> 8; \
+    buf[2] = ((l) & 0x00ff0000) >> 16; \
+    buf[3] = ((l) & 0xff000000) >> 24; \
+    } while(0);
+
 /* Load a short int from the following tables with big-endian formats */
 #define COFF_SHORT_H(ps) ((short)(((unsigned short)((unsigned char)ps[0])<<8)|\
 				  ((unsigned short)((unsigned char)ps[1]))))
@@ -41,6 +55,13 @@
 				 ((unsigned long)((unsigned char)ps[2])<<8)  |\
 				 ((unsigned long)((unsigned char)ps[3])))))
 
+#define COFF_BUF_FROM_LONG_H(buf, l) do { \
+    buf[3] = (l) & 0x000000ff; \
+    buf[2] = ((l) & 0x0000ff00) >> 8; \
+    buf[1] = ((l) & 0x00ff0000) >> 16; \
+    buf[0] = ((l) & 0xff000000) >> 24; \
+    } while(0);
+
 /* These may be overridden later by brain dead implementations which generate
    a big-endian header with little-endian data. In that case, generate a
    replacement macro which tests a flag and uses either of the two above
@@ -48,6 +69,9 @@
 
 #define COFF_LONG(v)   COFF_LONG_L(v)
 #define COFF_SHORT(v)  COFF_SHORT_L(v)
+
+#define COFF_BUF_FROM_LONG(buf, l) COFF_BUF_FROM_LONG_L(buf, l)
+#define COFF_BUF_FROM_SHORT(buf, l) COFF_BUF_FROM_SHORT_L(buf, l)
 
 /*** coff information for Intel 386/486.  */
 
@@ -61,6 +85,9 @@ struct COFF_filehdr {
 	char f_nsyms[4];	/* number of symtab entries	*/
 	char f_opthdr[2];	/* sizeof(optional hdr)		*/
 	char f_flags[2];	/* flags			*/
+#ifdef CONFIG_TMS320C6X
+	char f_targetID[2];	/* target ID (= 0099h) 		*/
+#endif
 };
 
 /*
@@ -96,7 +123,8 @@ struct COFF_filehdr {
 #define  COFF_F_AR32WR		0000400
 #define  COFF_F_AR32W		0001000
 #define  COFF_F_PATCH		0002000
-#define  COFF_F_NODF		0002000
+#define  COFF_F_NODF		0002000 /* 0x0400 */
+#define  COFF_F_COMPR       0100000 /* 0x8000 for zlib compression */
 
 #define	COFF_I386MAGIC	        0x14c   /* Linux's system    */
 
@@ -109,6 +137,11 @@ struct COFF_filehdr {
 #else
 #define COFF_I386BADMAG(x) (COFF_SHORT((x).f_magic) != COFF_I386MAGIC)
 #endif
+
+#define	COFF_C6XMAGIC	        0x00C2  /* TMS320 C6x's system    */
+#define COFF_C6XBADMAG(x)       (COFF_SHORT((x).f_magic) != COFF_C6XMAGIC)
+#define	COFF_C6XMAGICTARGID     0x0099  /* TMS320 C6x's system    */
+#define COFF_C6XBADMAGTARGID(x) (COFF_SHORT((x).f_targetID) != COFF_C6XMAGICTARGID)
 
 #define	COFF_FILHDR	struct COFF_filehdr
 #define	COFF_FILHSZ	sizeof(COFF_FILHDR)
@@ -158,9 +191,17 @@ struct COFF_scnhdr {
   char		s_scnptr[4];	/* file ptr to raw data for section */
   char		s_relptr[4];	/* file ptr to relocation	    */
   char		s_lnnoptr[4];	/* file ptr to line numbers	    */
+#ifdef CONFIG_TMS320C6X
+  char		s_nreloc[4];	/* number of relocation entries	    */
+  char		s_nlnno[4];	/* number of line number entries    */
+  char		s_flags[4];	/* flags			    */
+  char          s_reserved[2];  /* reserved 2 bytes                 */
+  char          s_page[2];      /* memory page id                   */
+#else
   char		s_nreloc[2];	/* number of relocation entries	    */
   char		s_nlnno[2];	/* number of line number entries    */
   char		s_flags[4];	/* flags			    */
+#endif
 };
 
 #define	COFF_SCNHDR	struct COFF_scnhdr
@@ -193,6 +234,23 @@ struct COFF_scnhdr {
 #define COFF_STYP_INFO   0x200 /* .comment section                         */
 #define COFF_STYP_OVER   0x400 /* overlay section                          */
 #define COFF_STYP_LIB    0x800 /* library section                          */
+#define COFF_STYP_BLOCK 0x1000 /* use alignment as blocking factor         */
+#define COFF_STYP_PASS  0x2000 /* Pass section through unchanged           */
+#define COFF_STYP_CLINK 0x4000 /* Conditionally link section               */
+
+#define COFF_STYP_COMPR 0x8000
+
+#define COFF_ALIGN_MASK  0xF00 /* mask for alignment factor                */
+#define COFF_ALIGN_SIZE(s_flag) (1 << (((unsigned int)s_flag & COFF_ALIGN_MASK) >> 8))
+
+#define IS_BSS(sptr)   ((COFF_LONG(sptr->s_flags) & COFF_STYP_BSS) && \
+		         !strcmp(sptr->s_name, ".bss"))
+#define IS_FAR(sptr)   ((COFF_LONG(sptr->s_flags) & COFF_STYP_BSS) && \
+                         !strcmp(sptr->s_name, ".far"))
+#define IS_STACK(sptr) ((COFF_LONG(sptr->s_flags) & COFF_STYP_BSS) && \
+                         !strcmp(sptr->s_name, ".stack"))
+#define IS_CINIT(sptr) ((COFF_LONG(sptr->s_flags) & COFF_STYP_COPY) && \
+			 !strcmp(sptr->s_name, ".cinit"))
 
 /*
  * Shared libraries have the following section header in the data field for
@@ -337,11 +395,14 @@ union COFF_auxent {
 struct COFF_reloc {
   char r_vaddr[4];        /* Virtual address of item    */
   char r_symndx[4];       /* Symbol index in the symtab */
+#ifdef CONFIG_TMS320C6X
+  char r_disp[2];         /* additional bits for addr calc */
+#endif
   char r_type[2];         /* Relocation type            */
 };
 
 #define COFF_RELOC struct COFF_reloc
-#define COFF_RELSZ 10
+#define COFF_RELSZ (sizeof(COFF_RELOC))
 
 #define COFF_DEF_DATA_SECTION_ALIGNMENT  4
 #define COFF_DEF_BSS_SECTION_ALIGNMENT   4
@@ -349,3 +410,78 @@ struct COFF_reloc {
 
 /* For new sections we haven't heard of before */
 #define COFF_DEF_SECTION_ALIGNMENT       4
+
+/* Relocation types */
+#define R_ABS          0x0000     /* absolute address - no relocation     */
+#define R_RELBYTE      0x000F     /* 8 bits, direct                       */
+#define R_RELWORD      0x0010     /* 16 bits, direct                      */
+#define R_RELLONG      0x0011     /* 32 bits, direct                      */
+
+/* Relocation type (C6x): */
+#define R_C6XBASE      0x0050  	  /* C6x: Data Page Pointer Based Offset  */
+#define R_C6XDIR15     0x0051     /* C6x: LD/ST long Displacement         */
+#define R_C6XPCR21     0x0052     /* C6x: 21-bit Packet PC Relative       */
+#define R_C6XLO16      0x0054     /* C6x: MVK Low Half Register           */
+#define R_C6XHI16      0x0055     /* C6x: MVKH/MVKLH High Half Register   */
+
+/*---------------------------------------------------------------------------*/
+/* GENERIC relocation types for complex relocation expressions.              */
+/* *** NOTE: This range of relocation types exists above 0x4000 ***          */
+/* *** NOTE: Top bit of relocation type field used as SEGVALUE flag ***      */
+/*---------------------------------------------------------------------------*/
+#define RE_ADD          0x4000  /* Operator Instructions: +                  */
+#define RE_SUB          0x4001  /*                        -                  */
+#define RE_NEG          0x4002  /*                        unary -            */
+#define RE_MPY          0x4003  /*                        *                  */
+#define RE_DIV          0x4004  /*                        /                  */
+#define RE_MOD          0x4005  /*                        %                  */
+
+#define RE_SR           0x4006  /*                        >>u                */
+#define RE_ASR          0x4007  /*                        >>s                */
+#define RE_SL           0x4008  /*                        <<                 */
+
+#define RE_AND          0x4009  /*                        &                  */
+#define RE_OR           0x400a  /*                        |                  */
+#define RE_XOR          0x400b  /*                        ^                  */
+#define RE_NOTB         0x400c  /*                        ~                  */
+
+#define RE_ULDFLD       0x400d  /* unsigned relocation field load            */
+#define RE_SLDFLD       0x400e  /* signed relocation field load              */
+#define RE_USTFLD       0x400f  /* unsigned relocation field store           */
+#define RE_SSTFLD       0x4010  /* signed relocation field store             */
+#define RE_XSTFLD       0x4016  /* signedness is irrelevant                  */
+
+#define RE_PUSH         0x4011  /* push symbol on the stack                  */
+#define RE_PUSHSV       0xc011  /* push symbol: SEGVALUE flag set            */
+#define RE_PUSHSK       0x4012  /* push signed constant on the stack         */
+#define RE_PUSHUK       0x4013  /* push unsigned constant on the stack       */
+#define RE_PUSHPC       0x4014  /* push current section PC on the stack      */
+#define RE_DUP          0x4015  /* duplicate tos and push copy               */
+
+#define isunary(x)      ((x) == RE_NEG || (x) == RE_NOTB)
+#define isbinary(x)     (ismathrel(x) && !isunary(x))
+#define issymrel(x)     ((x) == RM_OBJ    || (x) == RE_PUSH || \
+                               (x) == RE_PUSHSV || (x) < 0x4000)
+#define ismathrel(x)    ((x) >= RE_ADD && (x) <= RE_NOTB)
+#define ispushrel(x)    (((x) >= RE_PUSH && (x) <= RE_PUSHPC) || ((x) == RE_DUP))
+#define isldfldrel(x)   ((x) == RE_ULDFLD || (x) == RE_SLDFLD)
+#define isstfldrel(x)   ((x) == RE_USTFLD || (x) == RE_SSTFLD || (x) == RE_XSTFLD )         
+
+/****************************************************************************/
+/* Complex Relocation Expression Stack                                      */
+/****************************************************************************/
+typedef struct relocation_stack {
+	unsigned int *stack;    /* bottom of the stack                      */
+	int          index;     /* stack pointer                            */
+	int          size;      /* stack size                               */
+} relocation_stack;
+
+extern int coff_rel_push(COFF_SYMENT *sym,
+			 COFF_RELOC *creloc,
+			 unsigned int reloc_amount,
+			 relocation_stack *relstk);
+
+extern int coff_rel_math(COFF_RELOC *creloc, relocation_stack *relstk);
+extern int coff_rel_stfld(unsigned int *addr, COFF_RELOC *creloc, relocation_stack *relstk);
+
+#endif /* _COFF_H_ */

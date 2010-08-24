@@ -288,6 +288,7 @@ void zlib_tr_stored_type_only (deflate_state *);
  * method would use a table)
  * IN assertion: 1 <= len <= 15
  */
+#ifndef __TI_C6X_COMPILER__
 static inline unsigned bi_reverse(unsigned code, /* the value to invert */
 				  int len)       /* its bit length */
 {
@@ -298,6 +299,18 @@ static inline unsigned bi_reverse(unsigned code, /* the value to invert */
     } while (--len > 0);
     return res >> 1;
 }
+#else
+static inline unsigned bi_reverse(unsigned value, /* the value to invert */
+				  int length)       /* its bit length */
+{
+    register unsigned res = 0;
+    do {
+        res |= value & 1;
+        value >>= 1, res <<= 1;
+    } while (--length > 0);
+    return res >> 1;
+}
+#endif
 
 /* ===========================================================================
  * Flush the bit buffer, keeping at most 7 bits in it.

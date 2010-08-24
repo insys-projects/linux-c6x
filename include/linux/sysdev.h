@@ -133,7 +133,7 @@ sysdev_create_files(struct sys_device *d, struct sysdev_attribute **a)
 static inline void
 sysdev_remove_files(struct sys_device *d, struct sysdev_attribute **a)
 {
-	return sysfs_remove_files(&d->kobj, (const struct attribute **)a);
+	sysfs_remove_files(&d->kobj, (const struct attribute **)a);
 }
 
 struct sysdev_ext_attribute {

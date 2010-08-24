@@ -220,12 +220,22 @@ void __init fork_init(unsigned long mempages)
 		init_task.signal->rlim[RLIMIT_NPROC];
 }
 
+#ifdef __TI_TOOL_WRAPPER__
+int arch_dup_task_struct(struct task_struct *dst,
+			 struct task_struct *src)
+{
+	*dst = *src;
+	return 0;
+}
+asm(" .weak arch_dup_task_struct\n");
+#else
 int __attribute__((weak)) arch_dup_task_struct(struct task_struct *dst,
 					       struct task_struct *src)
 {
 	*dst = *src;
 	return 0;
 }
+#endif
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
@@ -1323,11 +1333,20 @@ fork_out:
 	return ERR_PTR(retval);
 }
 
+#ifdef __TI_TOOL_WRAPPER__
+noinline struct pt_regs * __cpuinit idle_regs(struct pt_regs *regs)
+{
+	memset(regs, 0, sizeof(struct pt_regs));
+	return regs;
+}
+asm(" .weak idle_regs\n");
+#else
 noinline struct pt_regs * __cpuinit __attribute__((weak)) idle_regs(struct pt_regs *regs)
 {
 	memset(regs, 0, sizeof(struct pt_regs));
 	return regs;
 }
+#endif
 
 struct task_struct * __cpuinit fork_idle(int cpu)
 {

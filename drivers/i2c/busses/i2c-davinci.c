@@ -123,15 +123,29 @@ static struct davinci_i2c_platform_data davinci_i2c_platform_data_default = {
 	.bus_delay	= 0,
 };
 
+#if defined(CONFIG_TMS320C6X)
+#define I2C_DAVINCI_USE_32BIT
+#else
+#define I2C_DAVINCI_USE_16BIT
+#endif
+
+#if defined(I2C_DAVINCI_USE_16BIT)
+#define RAW_WRITE __raw_writew
+#define RAW_READ  __raw_readw
+#else
+#define RAW_WRITE __raw_writel
+#define RAW_READ  __raw_readl
+#endif
+
 static inline void davinci_i2c_write_reg(struct davinci_i2c_dev *i2c_dev,
 					 int reg, u16 val)
 {
-	__raw_writew(val, i2c_dev->base + reg);
+	RAW_WRITE(val, i2c_dev->base + reg);
 }
 
 static inline u16 davinci_i2c_read_reg(struct davinci_i2c_dev *i2c_dev, int reg)
 {
-	return __raw_readw(i2c_dev->base + reg);
+	return RAW_READ(i2c_dev->base + reg);
 }
 
 /*
@@ -598,7 +612,7 @@ static int davinci_i2c_remove(struct platform_device *pdev)
 	dev->clk = NULL;
 
 	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, 0);
-	free_irq(IRQ_I2C, dev);
+	free_irq(dev->irq, dev);
 	kfree(dev);
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);

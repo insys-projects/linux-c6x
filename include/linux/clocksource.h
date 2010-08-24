@@ -290,8 +290,8 @@ clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec);
 static inline void
 clocksource_calc_mult_shift(struct clocksource *cs, u32 freq, u32 minsec)
 {
-	return clocks_calc_mult_shift(&cs->mult, &cs->shift, freq,
-				      NSEC_PER_SEC, minsec);
+	clocks_calc_mult_shift(&cs->mult, &cs->shift, freq,
+			       NSEC_PER_SEC, minsec);
 }
 
 #ifdef CONFIG_GENERIC_TIME_VSYSCALL

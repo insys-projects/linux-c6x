@@ -540,8 +540,16 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 
 	return cfi_intelext_setup(mtd);
 }
+#ifdef __TI_TOOL_WRAPPER__
+struct mtd_info *cfi_cmdset_0003(struct map_info *map, int primary);
+asm("cfi_cmdset_0003 .set cfi_cmdset_0001\n");
+struct mtd_info *cfi_cmdset_0200(struct map_info *map, int primary);
+asm("cfi_cmdset_0200 .set cfi_cmdset_0001\n");
+#else
 struct mtd_info *cfi_cmdset_0003(struct map_info *map, int primary) __attribute__((alias("cfi_cmdset_0001")));
 struct mtd_info *cfi_cmdset_0200(struct map_info *map, int primary) __attribute__((alias("cfi_cmdset_0001")));
+#endif
+
 EXPORT_SYMBOL_GPL(cfi_cmdset_0001);
 EXPORT_SYMBOL_GPL(cfi_cmdset_0003);
 EXPORT_SYMBOL_GPL(cfi_cmdset_0200);

@@ -1,0 +1,40 @@
+
+config SOC_TMS320C6455
+	bool "TMS320C6455"
+	default n
+	select TMS320C64XPLUS
+	select PLL_TCI648X
+	select TIMER_TCI648X
+
+config SOC_TMS320C6472
+	bool "TMS320C6472"
+	default n
+	select TMS320C64XPLUS
+	select PLL_TCI648X
+	select TIMER_TCI648X
+
+config SOC_TMS320C6474
+	bool "TMS320C6474"
+	default n
+	select TMS320C64XPLUS
+	select PLL_TCI648X
+	select TIMER_TCI648X
+
+comment "Board Selection"
+choice
+	prompt "Board"
+	help
+	  This option specifies the specific board for which the kernel will be
+	  compiled.
+	
+config ARCH_BOARD_EVM6472
+	bool "EVM6472"
+	select SOC_TMS320C6472
+
+config ARCH_BOARD_DSK6455
+	bool "DSK6455"
+	select SOC_TMS320C6455
+
+endchoice
+
+

@@ -52,6 +52,7 @@ static int hmac_setkey(struct crypto_shash *parent,
 	struct hmac_ctx *ctx = align_ptr(opad + ss,
 					 crypto_tfm_ctx_alignment());
 	struct crypto_shash *hash = ctx->hash;
+#ifndef __TI_TOOL_WRAPPER__
 	struct {
 		struct shash_desc shash;
 		char ctx[crypto_shash_descsize(hash)];
@@ -87,6 +88,50 @@ static int hmac_setkey(struct crypto_shash *parent,
 	       crypto_shash_init(&desc.shash) ?:
 	       crypto_shash_update(&desc.shash, opad, bs) ?:
 	       crypto_shash_export(&desc.shash, opad);
+#else
+	struct {
+		struct shash_desc shash;
+		char ctx[0];
+	} *desc;
+	unsigned int i;
+
+	desc = kmalloc(sizeof(struct shash_desc) + crypto_shash_descsize(hash), GFP_KERNEL);
+	if (desc == NULL)
+		return -ENOMEM;
+
+	desc->shash.tfm = hash;
+	desc->shash.flags = crypto_shash_get_flags(parent) &
+			    CRYPTO_TFM_REQ_MAY_SLEEP;
+
+	if (keylen > bs) {
+		int err;
+
+		err = crypto_shash_digest(&desc->shash, inkey, keylen, ipad);
+		if (err)
+			return err;
+
+		keylen = ds;
+	} else
+		memcpy(ipad, inkey, keylen);
+
+	memset(ipad + keylen, 0, bs - keylen);
+	memcpy(opad, ipad, bs);
+
+	for (i = 0; i < bs; i++) {
+		ipad[i] ^= 0x36;
+		opad[i] ^= 0x5c;
+	}
+
+	i =    crypto_shash_init(&desc->shash) ?:
+	       crypto_shash_update(&desc->shash, ipad, bs) ?:
+	       crypto_shash_export(&desc->shash, ipad) ?:
+	       crypto_shash_init(&desc->shash) ?:
+	       crypto_shash_update(&desc->shash, opad, bs) ?:
+	       crypto_shash_export(&desc->shash, opad);
+
+	kfree(desc);
+	return i;
+#endif
 }
 
 static int hmac_export(struct shash_desc *pdesc, void *out)

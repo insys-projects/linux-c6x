@@ -41,6 +41,10 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
 					* (NSEC_PER_SEC / HZ);
 }
+#if 1
+/* TI compiler doesn't support __attribute__((weak)) */
+asm(" .weak sched_clock");
+#endif
 
 static __read_mostly int sched_clock_running;
 

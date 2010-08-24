@@ -185,19 +185,42 @@ void *__symbol_get_gpl(const char *symbol);
 #ifdef CONFIG_MODVERSIONS
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
+#ifdef __TI_TOOL_WRAPPER__
+/* TI compiler doesn't have "used" attribute and will throw out
+   static data unless it is referenced. */
+#define __CRC_SYMBOL(sym, sec)					\
+	extern void *__crc_##sym __attribute__((weak));		\
+	const unsigned long __kcrctab_##sym		\
+	__used							\
+	__attribute__((section("__kcrctab" sec), unused))	\
+	= (unsigned long) &__crc_##sym;
+#else
 #define __CRC_SYMBOL(sym, sec)					\
 	extern void *__crc_##sym __attribute__((weak));		\
 	static const unsigned long __kcrctab_##sym		\
 	__used							\
 	__attribute__((section("__kcrctab" sec), unused))	\
 	= (unsigned long) &__crc_##sym;
+#endif
 #else
 #define __CRC_SYMBOL(sym, sec)
 #endif
 
 /* For every exported symbol, place a struct in the __ksymtab section */
+#ifdef __TI_TOOL_WRAPPER__
+/* TI compiler doesn't have "used" attribute and will throw out
+   static data unless it is referenced. */
 #define __EXPORT_SYMBOL(sym, sec)				\
-	extern typeof(sym) sym;					\
+	__CRC_SYMBOL(sym, sec)					\
+	const char __kstrtab_##sym[]			\
+	__attribute__((section("__ksymtab_strings"), aligned(1))) \
+	= MODULE_SYMBOL_PREFIX #sym;                    	\
+	const struct kernel_symbol __ksymtab_##sym	\
+	__used							\
+	__attribute__((section("__ksymtab" sec), unused))	\
+	= { (unsigned long)&sym, __kstrtab_##sym }
+#else
+#define __EXPORT_SYMBOL(sym, sec)				\
 	__CRC_SYMBOL(sym, sec)					\
 	static const char __kstrtab_##sym[]			\
 	__attribute__((section("__ksymtab_strings"), aligned(1))) \
@@ -206,6 +229,7 @@ void *__symbol_get_gpl(const char *symbol);
 	__used							\
 	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
+#endif
 
 #define EXPORT_SYMBOL(sym)					\
 	__EXPORT_SYMBOL(sym, "")

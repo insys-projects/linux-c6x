@@ -71,7 +71,11 @@
  * but that can only take up to, say, 4-byte variables. jiffies being part of
  * an 8-byte variable may not be correctly accessed unless we force the issue
  */
+#ifdef __GNU__
 #define __jiffy_data  __attribute__((section(".data")))
+#else
+#define __jiffy_data
+#endif
 
 /*
  * The 64-bit value is not atomic - you MUST NOT read it

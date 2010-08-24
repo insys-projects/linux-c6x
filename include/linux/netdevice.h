@@ -924,11 +924,19 @@ struct net_device {
 	       NETREG_UNREGISTERED,	/* completed unregister todo */
 	       NETREG_RELEASED,		/* called free_netdev */
 	       NETREG_DUMMY,		/* dummy device for NAPI poll */
+#ifdef __TI_TOOL_WRAPPER__
+		/* force enum to be 16 bits */
+	       NETREG_TI_TOOL_DUMMY = 0x7fff,
+#endif
 	} reg_state:16;
 
 	enum {
 		RTNL_LINK_INITIALIZED,
 		RTNL_LINK_INITIALIZING,
+#ifdef __TI_TOOL_WRAPPER__
+		/* force enum to be 16 bits */
+		RTNL_LINK_TI_TOOL_DUMMY = 0x7fff,
+#endif
 	} rtnl_link_state:16;
 
 	/* Called from unregister, can be used to call free_netdev */

@@ -409,6 +409,10 @@ static inline int dma_maxpq(struct dma_device *dma, enum dma_ctrl_flags flags)
 	else if (dmaf_continue(flags))
 		return dma_dev_to_maxpq(dma) - 3;
 	BUG();
+#ifdef __TI_TOOL_WRAPPER__
+	/* this is never reached, but quiets a bogus warning from the tools */
+	return 0;
+#endif
 }
 
 /* --- public DMA engine API --- */

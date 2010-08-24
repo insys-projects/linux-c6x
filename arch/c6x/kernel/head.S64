@@ -1,0 +1,118 @@
+; 
+;  linux/arch/c6x/kernel/head.s
+;
+;  Port on Texas Instruments TMS320C6x architecture
+;
+;  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+;  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+; 
+;  This program is free software; you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License version 2 as
+;  published by the Free Software Foundation.
+; 
+	.include	"cnames.inc"
+	.include	"c6x_defs.inc"
+
+	.ref    current_ksp
+	.ref	start_kernel
+	.ref	_bss_start
+	.ref	_bss_end
+	.ref	c6x_tags_pointer
+	.ref	c6x_mtd_early_init
+	.global	_c_int00
+
+	.include	"c6x_config.inc"
+
+	.if (CONFIG_NK == 1)
+	.ref	_nkctx
+	.endif
+	
+_c_int00:
+	;; Save tag magic and pointer
+	MV 	A4,A10
+	MV 	B4,B10
+
+	;; Set the stack pointer
+	MVKL	current_ksp,B0
+	MVKH	current_ksp,B0
+	LDW	*B0,B15
+	NOP	4
+	AND	~7,B15,B15
+
+	.if (CONFIG_MTD_UCLINUX == 1)
+	MVKL	c6x_mtd_early_init,B0
+	MVKH	c6x_mtd_early_init,B0
+	B	B0
+	ADDKPC	_ret_from_mtd_early_init,B3,4
+
+_ret_from_mtd_early_init:
+	.endif
+
+	;; Set global page pointer in B14
+	MVKL	_bss_start,B14
+	MVKH	_bss_start,B14
+
+	;; Clear bss area
+	MVKL	_bss_start,A4
+	MVKH	_bss_start,A4
+	MVKL	_bss_end,A6
+	MVKH	_bss_end,A6
+
+        CMPLTU.L1 A4,A6,A1
+ [!A1]  B.S1    __bss_done
+        ZERO.L2 B4
+        SUB.L1  A6,A4,A5
+        SHR.S1  A5,2,A3
+        NOP     2
+
+        SUB.L2X A3,1,B0
+  ||    MV.L1X  B4,A3
+
+__bss_loop:
+        STW.D1T1  A3,*A4++
+|| [ B0] B.S1     __bss_loop
+|| [ B0] SUB.L2   B0,1,B0
+
+__bss_done:
+
+	;; Clear GIE and PGIE
+	MVC.S2	CSR,B2
+	CLR	B2,0,1,B2
+	MVC.S2	B2,CSR
+	.if	(CONFIG_TMS320C64XPLUS == 1)
+	MVC.S2	TSR,B2
+	CLR	B2,0,1,B2
+	MVC.S2	B2,TSR
+	MVC.S2	ITSR,B2
+	CLR	B2,0,1,B2
+	MVC.S2	B2,ITSR
+	MVC.S2	NTSR,B2
+	CLR	B2,0,1,B2
+	MVC.S2	B2,NTSR
+	.endif
+
+	.if (CONFIG_NK == 1)
+	;; Save NK2 OS context pointer given in B4
+	MVKL	_nkctx,A0
+	MVKH	_nkctx,A0
+	STW	B4,*A0
+	.endif
+
+	MVKL	TAGS_MAGIC,B0
+	MVKH	TAGS_MAGIC,B0
+	CMPEQ   A10,A0,A0
+	MVKL	c6x_tags_pointer,B1
+	MVKH	c6x_tags_pointer,B1
+  [!A0] MVK	0,B10
+	STW	B10,*B1
+
+	;; Jump to Linux init
+$1:	MVKL	start_kernel,A0
+	MVKH	start_kernel,A0
+	B	A0
+	MVKL	$2,B3
+	MVKH	$2,B3
+	NOP	3
+$2:	B	B3
+	NOP	5
+

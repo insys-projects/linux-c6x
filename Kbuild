@@ -51,11 +51,21 @@ targets += arch/$(SRCARCH)/kernel/asm-offsets.s
 
 
 # Default sed regexp - multiline due to syntax constraints
+ifneq ($(SRCARCH),c6x)
 define sed-y
 	"/^->/{s:->#\(.*\):/* \1 */:; \
 	s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; \
 	s:->::; p;}"
 endef
+else
+# Need special pattern for TI c6x non-gnu toolchain
+define sed-y
+	"/^->/{s:->#\(.*\):/* \1 */:; \
+	s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; \
+	s:->::; p;}; \
+	s/[\t][.]field[\t]\([0-9]*\),[0-9]*.*__xx__\([a-zA-Z_]*[a-zA-Z_0-9]*\)__xx__[ ]*.*/#define \2 \1/p"
+endef
+endif
 
 quiet_cmd_offsets = GEN     $@
 define cmd_offsets

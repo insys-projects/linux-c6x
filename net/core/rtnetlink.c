@@ -1256,7 +1256,11 @@ replay:
 	}
 
 	if (1) {
+#ifdef __TI_TOOL_WRAPPER__
+		struct nlattr *attr[32], **data = NULL;
+#else
 		struct nlattr *attr[ops ? ops->maxtype + 1 : 0], **data = NULL;
+#endif
 		struct net *dest_net;
 
 		if (ops) {

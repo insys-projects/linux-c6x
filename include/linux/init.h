@@ -285,6 +285,30 @@ void __init parse_early_options(char *cmdline);
 #define security_initcall(fn)		module_init(fn)
 
 /* Each module must use one module_init(). */
+#ifdef __TI_TOOL_WRAPPER__
+#define module_init(initfn)					\
+	static inline initcall_t __inittest(void)		\
+	{ return initfn; }					\
+	static int initfn (void) __attribute__((used)); 	\
+	asm(" .global init_module\n"				\
+            "init_module:\n"					\
+	    " MVKL " #initfn ",A4\n"				\
+	    " MVKH " #initfn ",A4\n"				\
+	    " BNOP A4,5\n"					\
+	    " NOP\n NOP\n NOP\n NOP\n NOP\n");
+
+/* This is only required if you want to be unloadable. */
+#define module_exit(exitfn)					\
+	static inline exitcall_t __exittest(void)		\
+	{ return exitfn; }					\
+	static void exitfn (void) __attribute__((used));	\
+	asm(" .global cleanup_module\n"				\
+            "cleanup_module:\n"					\
+	    " MVKL " #exitfn ",A4\n"				\
+	    " MVKH " #exitfn ",A4\n"				\
+	    " BNOP A4,5\n"					\
+	    " NOP\n NOP\n NOP\n NOP\n NOP\n");
+#else
 #define module_init(initfn)					\
 	static inline initcall_t __inittest(void)		\
 	{ return initfn; }					\
@@ -295,6 +319,7 @@ void __init parse_early_options(char *cmdline);
 	static inline exitcall_t __exittest(void)		\
 	{ return exitfn; }					\
 	void cleanup_module(void) __attribute__((alias(#exitfn)));
+#endif
 
 #define __setup_param(str, unique_id, fn)	/* nothing */
 #define __setup(str, func) 			/* nothing */

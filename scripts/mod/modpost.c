@@ -282,6 +282,11 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 		s = new_symbol(name, mod, export);
 	} else {
 		if (!s->preloaded) {
+#ifdef CONFIG_TMS320C6X
+			/* The TI compiler will create symbols for section names.
+			   Ignore those. */
+			if (strcmp(name,"gpl") && strcmp(name,"strings"))
+#endif
 			warn("%s: '%s' exported twice. Previous export "
 			     "was in %s%s\n", mod->name, name,
 			     s->module->name,

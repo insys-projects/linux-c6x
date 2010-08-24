@@ -107,6 +107,7 @@ struct pppoe_tag {
 #define PTT_GEN_ERR  	__cpu_to_be16(0x0203)
 
 struct pppoe_hdr {
+#ifndef __TI_C6X_COMPILER__
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8 ver : 4;
 	__u8 type : 4;
@@ -115,6 +116,9 @@ struct pppoe_hdr {
 	__u8 ver : 4;
 #else
 #error	"Please fix <asm/byteorder.h>"
+#endif
+#else
+	__u8 x_ver_type;
 #endif
 	__u8 code;
 	__be16 sid;

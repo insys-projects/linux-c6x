@@ -135,8 +135,8 @@ extern void clockevents_handle_noop(struct clock_event_device *dev);
 static inline void
 clockevents_calc_mult_shift(struct clock_event_device *ce, u32 freq, u32 minsec)
 {
-	return clocks_calc_mult_shift(&ce->mult, &ce->shift, NSEC_PER_SEC,
-				      freq, minsec);
+	clocks_calc_mult_shift(&ce->mult, &ce->shift, NSEC_PER_SEC,
+			       freq, minsec);
 }
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS

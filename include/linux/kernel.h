@@ -294,7 +294,11 @@ static inline void log_buf_kexec_setup(void)
 extern int printk_needs_cpu(int cpu);
 extern void printk_tick(void);
 
+#ifndef __TI_TOOL_WRAPPER__
 extern void asmlinkage __attribute__((format(printf, 1, 2)))
+#else
+extern void asmlinkage
+#endif
 	early_printk(const char *fmt, ...);
 
 unsigned long int_sqrt(unsigned long);

@@ -1,0 +1,265 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
+mainmenu "Linux Kernel Configuration"
+
+config TMS320C6X
+	bool
+	default y
+
+config MMU
+	bool
+	default n
+
+config ZONE_DMA
+	bool
+	default y
+
+config NO_FORK
+	bool
+	default y
+
+config SBUS
+	bool
+	default n
+
+config FPU
+	bool
+	default n
+
+config HIGHMEM
+	def_bool n
+
+config NUMA
+	def_bool n
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default n
+
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
+config GENERIC_FIND_NEXT_BIT
+	def_bool y
+
+config GENERIC_HWEIGHT
+	def_bool y
+
+config GENERIC_TIME
+	def_bool y
+
+config GENERIC_CLOCKEVENTS
+	def_bool y
+
+config GENERIC_CLOCKEVENTS_BUILD
+	def_bool y
+	depends on GENERIC_CLOCKEVENTS
+
+config GENERIC_CLOCKEVENTS_BROADCAST
+	bool
+
+config GENERIC_BUG
+	def_bool y
+
+# Use the generic interrupt handling code in kernel/irq/
+config GENERIC_HARDIRQS
+	def_bool y
+
+config GENERIC_HARDIRQS_NO__DO_IRQ
+	def_bool y
+
+config COMMON_CLKDEV
+	def_bool y
+
+mainmenu "Texas Instruments C64X DSP Kernel Configuration"
+
+source "init/Kconfig"
+
+source "kernel/Kconfig.freezer"
+
+config CMDLINE
+	string "Kernel command line"
+	default "console=ttyS0,57600"
+
+config RAM_ATTACHED_ROMFS
+	bool "m68knommu-style attached romfs in RAM support"
+
+config CPU_BIG_ENDIAN
+	bool "Build big-endian kernel"
+	help
+	  Say Y if you plan on running a kernel in big-endian mode.
+	  Note that your board must be properly built and your board
+	  port must properly enable any big-endian related features
+	  of your chipset/board/processor.
+
+menu "Processor type and features"
+
+config TMS320C64X
+	bool "TMS320C64X"
+
+config TMS320C64XPLUS
+	bool "TMS320C64X+"
+	select SERIAL_CORE
+
+config HPI_CONSOLE
+       bool "Host Port Interface Console"
+       help
+         Say Y if you want a write-only console on the Host Port Interface.
+         This is only useful for running kernels from a debugger or simulator.
+
+config TMS320C6X_MHZ
+	int "CPU frequency (Mhz) (600)"
+	default 600
+
+config PLL_TCI648X
+	bool "PLL_TCI648X"
+	depends on COMMON_CLKDEV
+
+config TIMER_TCI648X
+	bool "TIMER_TCI648X"
+
+source "arch/c6x/platforms/Kconfig"
+
+config USE_RT_TIMER
+	bool "Compensate for lost ticks"
+	default n
+
+config SGMII
+	bool
+	default n
+
+config TMS320C6X_EMAC
+	bool "Ethernet (EMAC/MDIO interface)"
+	default n
+
+config TMS320C64X_GEMAC
+	bool "Ethernet (GEMAC/MDIO interface)"
+	default n
+
+config TMS320C64X_GEMAC_0
+	bool "First Ethernet interface"
+	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
+	default y
+
+config TMS320C64X_GEMAC_1
+	bool "Second Ethernet interface"
+	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
+	default n
+
+config DAVINCI_MCBSP
+	bool "DaVinci McBSP Driver"
+	depends on TMS320DM644X || TMS320DM643X
+	default y
+	help
+	  DaVinci McBSP driver.  Auto-enabled by sound driver.
+
+config TMS320C6X_CACHES_ON
+	bool "L2 cache support"
+	default y
+
+config TMS320C6X_SYSCALL_COMPAT
+	bool "Compatibility with C6x binaries"
+	depends on TMS320C64XPLUS_CORE
+	default n
+
+config LARGE_ALLOCS
+	bool "Allow allocating large blocks (> 1MB) of memory"
+	help
+	  Allow the slab memory allocator to keep chains for very large
+	  memory sizes - upto 32MB. You may need this if your system has
+	  a lot of RAM, and you need to able to allocate very large
+	  contiguous chunks. If unsure, say N.
+
+config CONTIGUOUS_PAGE_ALLOC
+	bool "Non Power of two page allocator"
+
+config PGCACHE_LIMIT
+	bool "page cache limit"
+	depends on CONTIGUOUS_PAGE_ALLOC
+
+config IDLE_LED
+       bool "Use LED activity indicator based on idle loop"
+       default n
+
+source "mm/Kconfig"
+
+source "kernel/Kconfig.preempt"
+
+source "kernel/Kconfig.hz"
+source "kernel/time/Kconfig"
+
+endmenu
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+config PCI
+	bool "PCI support"
+	help
+	  Support for PCI bus.
+
+# source "drivers/pci/Kconfig"
+
+# source "drivers/pcmcia/Kconfig"
+
+endmenu
+
+menu "Executable file formats"
+
+config BINFMT_COFF
+	bool "Kernel support for COFF binaries"
+
+config BINFMT_COFF_INFLATE
+	bool "Support for compressed COFF binaries"
+	depends on BINFMT_COFF
+	select ZLIB_INFLATE
+	default n
+
+config BINFMT_COFF_USE_SHLIBS
+    bool "Support for COFF shared and dynamic libraries"
+    depends on BINFMT_COFF
+    default n
+
+source "fs/Kconfig.binfmt"
+
+endmenu
+
+menu "Power management options"
+
+config PM
+	bool "Power Management support"
+	help
+	  Support processor power management modes
+
+endmenu
+
+source "net/Kconfig"
+
+menu "Device Drivers"
+
+source "drivers/Kconfig"
+
+
+endmenu
+
+source "fs/Kconfig"
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
+source "lib/Kconfig.debug"
+

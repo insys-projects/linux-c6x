@@ -1,0 +1,36 @@
+/*
+ *  linux/include/asm-c6x/shm.h
+ *
+ *  Port on Texas Instruments TMS320C6x architecture
+ *
+ *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ */
+#ifndef __ASM_C6X_SHM_H
+#define __ASM_C6X_SHM_H
+
+/* format of page table entries that correspond to shared memory pages
+   currently out in swap space (see also mm/swap.c):
+   bits 0-1 (PAGE_PRESENT) is  = 0
+   bits 8..2 (SWP_TYPE) are = SHM_SWP_TYPE
+   bits 31..9 are used like this:
+   bits 15..9 (SHM_ID) the id of the shared memory segment
+   bits 30..16 (SHM_IDX) the index of the page within the shared memory segment
+                    (actually only bits 25..16 get used since SHMMAX is so low)
+   bit 31 (SHM_READ_ONLY) flag whether the page belongs to a read-only attach
+*/
+/* on the C6x both bits 0 and 1 must be zero */
+
+#define SHM_ID_SHIFT	9
+#define _SHM_ID_BITS	7
+#define SHM_ID_MASK	((1<<_SHM_ID_BITS)-1)
+
+#define SHM_IDX_SHIFT	(SHM_ID_SHIFT+_SHM_ID_BITS)
+#define _SHM_IDX_BITS	15
+#define SHM_IDX_MASK	((1<<_SHM_IDX_BITS)-1)
+
+#endif /* __ASM_C6X_SHM_H */

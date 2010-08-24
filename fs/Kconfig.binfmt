@@ -40,6 +40,13 @@ config BINFMT_ELF_FDPIC
 
 	  It is also possible to run FDPIC ELF binaries on MMU linux also.
 
+config BINFMT_ELF_DSBT
+	bool "Kernel support for DSBT ELF binaries"
+	default y
+	depends on (TMS320C6X && !MMU)
+	help
+	  ELF DSBT binaries are based on ELF, but designed for no MMU.
+
 config CORE_DUMP_DEFAULT_ELF_HEADERS
 	bool "Write ELF core dumps with partial segments"
 	default n

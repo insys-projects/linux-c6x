@@ -100,6 +100,35 @@ MODULE_PARM_DESC(write_timeout, "Time (in ms) to try writes (default 25)");
 
 #define AT24_BITMASK(x) (BIT(x) - 1)
 
+#ifdef __TI_C6X_COMPILER__
+/* create non-zero magic value for given eeprom parameters */
+#define AT24_DEVICE_MAGIC(_len, _flags) 		\
+	((1 << AT24_SIZE_FLAGS | (_flags)) 		\
+	    << AT24_SIZE_BYTELEN | (_len))
+
+static const struct i2c_device_id at24_ids[] = {
+	/* needs 8 addresses as A0-A2 are ignored */
+	{ "24c00", AT24_DEVICE_MAGIC(4, AT24_FLAG_TAKE8ADDR) },
+	/* old variants can't be handled with this generic entry! */
+	{ "24c01", AT24_DEVICE_MAGIC(7, 0) },
+	{ "24c02", AT24_DEVICE_MAGIC(8, 0) },
+	/* spd is a 24c02 in memory DIMMs */
+	{ "spd", AT24_DEVICE_MAGIC(8,
+		AT24_FLAG_READONLY | AT24_FLAG_IRUGO) },
+	{ "24c04", AT24_DEVICE_MAGIC(9, 0) },
+	/* 24rf08 quirk is handled at i2c-core */
+	{ "24c08", AT24_DEVICE_MAGIC(10, 0) },
+	{ "24c16", AT24_DEVICE_MAGIC(11, 0) },
+	{ "24c32", AT24_DEVICE_MAGIC(12, AT24_FLAG_ADDR16) },
+	{ "24c64", AT24_DEVICE_MAGIC(13, AT24_FLAG_ADDR16) },
+	{ "24c128", AT24_DEVICE_MAGIC(14, AT24_FLAG_ADDR16) },
+	{ "24c256", AT24_DEVICE_MAGIC(15, AT24_FLAG_ADDR16) },
+	{ "24c512", AT24_DEVICE_MAGIC(16, AT24_FLAG_ADDR16) },
+	{ "24c1024", AT24_DEVICE_MAGIC(17, AT24_FLAG_ADDR16) },
+	{ "at24", 0 },
+	{ /* END OF LIST */ }
+};
+#else
 /* create non-zero magic value for given eeprom parameters */
 #define AT24_DEVICE_MAGIC(_len, _flags) 		\
 	((1 << AT24_SIZE_FLAGS | (_flags)) 		\
@@ -127,6 +156,7 @@ static const struct i2c_device_id at24_ids[] = {
 	{ "at24", 0 },
 	{ /* END OF LIST */ }
 };
+#endif
 MODULE_DEVICE_TABLE(i2c, at24_ids);
 
 /*-------------------------------------------------------------------------*/

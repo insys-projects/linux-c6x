@@ -48,9 +48,16 @@
 /*
  * Architectures can override it:
  */
+#ifdef __TI_TOOL_WRAPPER__
+void asmlinkage early_printk(const char *fmt, ...)
+{
+}
+asm(" .weak early_printk\n");
+#else
 void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 {
 }
+#endif
 
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 

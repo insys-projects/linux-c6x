@@ -1,0 +1,57 @@
+/*
+ *  linux/include/asm-c6x/timex.h
+ *
+ *  Port on Texas Instruments TMS320C6x architecture
+ *
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+ *
+ *  Modified for 2.6.34: Mark Salter <msalter@redhat.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ */
+#ifndef __ASM_C6X_TIMEX_H
+#define __ASM_C6X_TIMEX_H
+
+
+#ifdef CONFIG_TMS320C645X
+#define CLOCK_TICK_RATE ((CONFIG_TMS320C6X_MHZ * 1000000UL) / 6)
+#else
+#define CLOCK_TICK_RATE ((CONFIG_TMS320C6X_MHZ * 1000000UL) / 8)
+#endif
+
+#ifdef CONFIG_TMS320C64XPLUS
+/* 64-bit timestamp */
+typedef unsigned long long cycles_t;
+#else
+typedef unsigned long cycles_t;
+#endif
+
+extern cycles_t cacheflush_time;
+
+static inline cycles_t get_cycles (void)
+{
+#ifdef CONFIG_TMS320C64XPLUS
+	unsigned l, h;
+
+	__dint();
+	l = TSCL;
+	h = TSCH;
+	__rint();
+
+	return ((cycles_t)h << 32) | l;
+#else
+	/* FIXME */
+	return 0;
+#endif
+}
+
+#ifdef CONFIG_TMS320C64XPLUS
+extern int init_tsc_clocksource(void);
+extern unsigned int timer_clock_divisor;
+extern int init_timer64_clocksource(void);
+#endif
+
+#endif /* __ASM_C6X_TIMEX_H */
