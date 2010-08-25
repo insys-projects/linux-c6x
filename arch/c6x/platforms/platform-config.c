@@ -104,16 +104,20 @@ static void init_pll(void)
 	pll1_set_reg(PLLPREDIV, PLLPREDIV_VAL(10) | PLLPREDIV_EN);
 	*/
 
+	pll1_wait_gostat();
+
 	/* Wait until GOSTAT bit is cleared*/
-	while(pll1_get_reg(PLL_PLLSTAT) & PLLSTAT_GOSTAT);
+//	while(pll1_get_reg(PLL_PLLSTAT) & PLLSTAT_GOSTAT);
 	
-	pll1_set_reg(PLLDIV11, PLLDIV_VAL(10) | PLLDIV_EN);
-	pll1_set_reg(PLLDIV13, PLLDIV_VAL(6)  | PLLDIV_EN);
+	pll1_set_reg(PLLDIV11, PLLDIV_RATIO(10) | PLLDIV_EN);
+	pll1_set_reg(PLLDIV13, PLLDIV_RATIO(6)  | PLLDIV_EN);
 	
 	pll1_setbit_reg(PLLCMD, PLLCMD_GOSTAT);
+
+	pll1_wait_gostat();
 	
 	/* Wait until GOSTAT bit is cleared*/
-	while(pll1_get_reg(PLLSTAT) & PLLSTAT_GOSTAT);
+//	while(pll1_get_reg(PLLSTAT) & PLLSTAT_GOSTAT);
 
 	for (i = 0 ; i < 1000 ; i++);
 

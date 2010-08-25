@@ -59,7 +59,7 @@
 #define GPIO_FALLING_EDGE    0x02
 #endif /* CONFIG_TMS320DM644X || CONFIG_TMS320DM643X || CONFIG_TMS320DM648 */
 
-#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6455)
+#if defined(CONFIG_SOC_TMS320C6472) ||  defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6455)
 #define GPIO_BINTEN          0x08 /* GPIO interrupt per bank enable register */
 #define GPIO_GPDIR           0x10 /* GPIO direction register */
 #define GPIO_GPOUTDATA       0x14 /* GPIO output data register */
@@ -95,7 +95,7 @@
 #define GPIO_PIN14           0x0000000eu
 #define GPIO_PIN15           0x0000000fu
 
-#if !(defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6455)) || defined(CONFIG_TMS320DM648)
+#if !(defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6455)) || defined(CONFIG_TMS320DM648)
 #define GPIO_PIN16           0x00000010u
 #define GPIO_PIN17           0x00000011u
 #define GPIO_PIN18           0x00000012u
@@ -219,7 +219,7 @@
 #endif /* CONFIG_TMS320DM64X || CONFIG_TMS320C641X */
 
 #if (defined(CONFIG_TMS320DM644X) || defined(CONFIG_SOC_TMS320C6455) \
-	|| defined(CONFIG_TMS320DM643X) || defined(CONFIG_SOC_TMS320C6472) \
+	|| defined(CONFIG_TMS320DM643X) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) \
 	|| defined(CONFIG_TMS320DM648))
 #define GPIO_INPUT           1
 #define GPIO_OUTPUT          0
@@ -257,7 +257,7 @@
 
 #ifndef __ASSEMBLY__
 
-#if !(defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6455))
+#if !(defined(CONFIG_SOC_TMS320C6472) ||  defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6455))
 static inline void gpio_pin_enable(unsigned int id)
 {
 #if (defined(CONFIG_TMS320DM64X) || defined(CONFIG_TMS320C641X))
