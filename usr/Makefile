@@ -19,20 +19,27 @@ suffix_$(CONFIG_INITRAMFS_COMPRESSION_LZMA)   = .lzma
 obj-$(CONFIG_BLK_DEV_INITRD) := initramfs_data$(suffix_y).o
 
 ifdef CONFIG_TMS320C6X
+include $(srctree)/arch/c6x/Makefile.lib
+
 ifdef CONFIG_CPU_BIG_ENDIAN
 C6X_ENDIAN = -mbig-endian
 else
 C6X_ENDIAN = -mlittle-endian
 endif
 
-$(obj)/initramfs_data$(suffix_y).o: $(obj)/initramfs_data$(suffix_y).s
-	$(Q) c6x-elf-as -march=c64x+ $(C6X_ENDIAN) -o $@ $<
-endif
+$(obj)/initramfs_data$(suffix_y).o: $(obj)/initramfs_data$(suffix_y).S64
+
+$(obj)/initramfs_data$(suffix_y).S64: $(obj)/initramfs_data.cpio$(suffix_y)
+	$(srctree)/arch/c6x/tools/bin2tiasm.plx --section-name=.init.ramfs --output-file=$@ $<
+
+else
 
 # initramfs_data.o contains the compressed initramfs_data.cpio image.
 # The image is included using .incbin, a dependency which is not
 # tracked automatically.
 $(obj)/initramfs_data$(suffix_y).o: $(obj)/initramfs_data.cpio$(suffix_y) FORCE
+
+endif
 
 #####
 # Generate the initramfs cpio archive
