@@ -44,7 +44,9 @@ SECTIONS
 {
   .vectors	>	VECS
 
-  GROUP {
+  GROUP : TEXTADDR {
+    .cmdline : ALIGN(4096)
+
     /* read-only */
     .text {
         _stext = .;
@@ -80,6 +82,7 @@ SECTIONS
 
     .const
     .switch
+    .exitcall.exit
 
     NOTES
 
@@ -343,7 +346,7 @@ SECTIONS
     .ram {
          __ramstart = . ;
     }
-  } > BMEMe0
+  }
 
   .eram {
      VMLINUX_SYMBOL(_ramend) = . ;

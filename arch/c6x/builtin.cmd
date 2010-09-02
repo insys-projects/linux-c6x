@@ -4,6 +4,7 @@
 SECTIONS
 {
     .vectors
+    .cmdline
     .head.text
     .text.hot
     .text

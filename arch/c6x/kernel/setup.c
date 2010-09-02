@@ -61,7 +61,7 @@ unsigned int memory_start, memory_end;
 unsigned int c6x_early_uart_cons = 0;
 extern unsigned long zone_dma_start, zone_dma_size;
 static char c6x_command_line[COMMAND_LINE_SIZE];
-static char default_command_line[CL_SIZE] __initdata = CONFIG_CMDLINE;
+static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
 static const char *cpu_name, *cpu_rev, *cpu_voltage, *mmu, *fpu;
 static char __cpu_rev[4];
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
@@ -337,6 +337,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned int memory_size;
 	int bootmap_size;
 	struct tag_cmdline *tcmd;
+	char tmp_command_line[COMMAND_LINE_SIZE];
 #if defined(CONFIG_MTD_UCLINUX)
 	unsigned long romfs_size;
 #endif
@@ -422,20 +423,22 @@ void __init setup_arch(char **cmdline_p)
 	/* Initialize command line */
 	mach_progress(4, "Initialize command line");
 
+	strlcpy(tmp_command_line, default_command_line, COMMAND_LINE_SIZE);
+
 #ifdef CONFIG_NK
 	/* Get eventually the command line given by the primary OS */
 	if (private->cmdline[0])
 		*cmdline_p = (char *) &(private->cmdline);
 	else
-		*cmdline_p = default_command_line;
+		*cmdline_p = tmp_command_line;
 #else
-	*cmdline_p = default_command_line;
+	*cmdline_p = tmp_command_line;
 #endif /* CONFIG_NK */
 
 	/* Let cmdline passed through tag array override CONFIG_CMDLINE */
 	tcmd = c6x_tag_find(c6x_tags_pointer, TAG_CMDLINE);
 	if (tcmd)
-		strlcpy(default_command_line, tcmd->cmdline, COMMAND_LINE_SIZE);
+		strlcpy(tmp_command_line, tcmd->cmdline, COMMAND_LINE_SIZE);
 
 	strcpy(boot_command_line, *cmdline_p);
 	parse_cmdline_early(cmdline_p);

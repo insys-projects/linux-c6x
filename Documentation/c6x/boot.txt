@@ -1,0 +1,60 @@
+                        Booting C6X Linux
+                        =================
+
+Booting c6x Linux requires a boot loader or debugger support. The boot loader
+and debugger are expected to minimally initialize hardware, call the Linux
+kernel, and pass information to the kernel.
+
+Essentially, the boot loader should:
+
+   1) Initialize system RAM
+   2) Setup other hardware as needed
+   3) Setup information to pass to kernel
+   4) Jump to the kernel entry point
+
+
+Tagged List
+-----------
+
+The boot loader may create and initialize a kernel tagged list which is used
+to pass information from boot loader to kernel. Each entry in the tagged list
+has the following strucuture:
+
+         +------------+
+Word 0   | Tag Type   |  |
+         +------------+  |
+Word 1   | Tag Size   |  v increasing addresses
+         +------------+
+Word 2   : Tag Data 1 :
+         +    ...     +
+         : Tag Data N :
+         +------------+
+Word 2+N | Tag Type   |
+         +   ...      +
+
+Where:
+  Tag Type is a unique value for each tag
+  Tag Size is size of tag data in bytes
+  Tag Data is data appropriate for tag type
+
+NB: Tag size is in bytes, but actual space used by tag data is an integral
+    number of 32-bit words to maintain alignment for the following tag.
+
+A tagged list must begin with a TAG_SOL tag and end with a TAG_EOL tag. Lists
+may contain any number of tags. The tagged list must be placed in a region of
+memory where neither the kernel decompressor nor RAM-based filesystem images
+will overwrite it. Before jumping to the kernel entry point, a boot loader
+using a tagged list must put a "magic" number (0x54694265) in register A4 and
+a pointer to the list in register B4.
+
+Definitions and code used to access the tagged list can be found in
+arch/c6x/kernel/tags.[ch]
+
+
+Passing a command line to kernel
+--------------------------------
+A bootloader may pass a command line to the kernel by using a tagged list and
+TAG_CMDLINE. Alternatively, a boot loader may copy a NULL terminated command
+line to offset 0x1000 of the kernel image. Maximum length of this command line
+is 1024 bytes including terminating NULL.
+

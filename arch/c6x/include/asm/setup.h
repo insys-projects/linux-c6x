@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -15,8 +15,7 @@
 
 #include <asm/hardware.h>
 
-#define CL_SIZE	            (500)
-#define COMMAND_LINE_SIZE   CL_SIZE
+#define COMMAND_LINE_SIZE   1024
 
 /* Internal, cat on the end of kernel, or separate fixed address romfs. */
 #define FIXED_ROMARRAY      0x80400000
