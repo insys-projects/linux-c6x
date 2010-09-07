@@ -83,7 +83,6 @@ static unsigned long _hex_strtoul (const char* str, const char** end)
 	return ul;
 }
 
-#ifndef EMAC_ARCH_HAS_MAC_ADDR
 static int __init get_mac_addr_from_cmdline(char *str)
 {
 	const char *start = (const char *) str;
@@ -102,7 +101,6 @@ static int __init get_mac_addr_from_cmdline(char *str)
 }
 
 __setup("emac_addr=", get_mac_addr_from_cmdline);
-#endif
 
 /*
  * Get the device statistic
@@ -1574,9 +1572,12 @@ static int __init emac_probe(struct platform_device *pdev)
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
-	if (!emac_arch_get_mac_addr(i2c_emac_addr)) {
-		for (i = 0; i <= 5; i++)
-			config.enetaddr[i] = (char)i2c_emac_addr[i] & 0xff;
+	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
+	    config.enetaddr[2] == 0 && config.enetaddr[3] == 0 &&
+	    config.enetaddr[4] == 0 && config.enetaddr[5] == 0) {
+		if (!emac_arch_get_mac_addr(i2c_emac_addr))
+			for (i = 0; i <= 5; i++)
+				config.enetaddr[i] = i2c_emac_addr[i] & 0xff;
 	}
 #endif
 
