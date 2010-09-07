@@ -31,7 +31,12 @@
  */
 #include <asm/unaligned.h>
 
+#ifdef __TI_TOOL_WRAPPER__
+/* cilly bug with get_unaligned macro */
+#define SYS_IND(p)	p->sys_ind
+#else
 #define SYS_IND(p)	get_unaligned(&p->sys_ind)
+#endif
 
 static inline sector_t nr_sects(struct partition *p)
 {

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -16,6 +16,7 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <asm/pgtable.h>
+#include <asm/unaligned.h>
 
 /* platform dependent support */
 struct pt_regs;
@@ -125,3 +126,18 @@ EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);
+
+/*
+ * unaligned access
+ *
+ * These should really be macros or inline asm but the
+ * TI toolchain doesn't have good enough asm() support.
+ */ 
+EXPORT_SYMBOL(get_unaligned_le64);
+EXPORT_SYMBOL(get_unaligned_be64);
+EXPORT_SYMBOL(get_unaligned_le32);
+EXPORT_SYMBOL(get_unaligned_be32);
+EXPORT_SYMBOL(put_unaligned_le64);
+EXPORT_SYMBOL(put_unaligned_be64);
+EXPORT_SYMBOL(put_unaligned_le32);
+EXPORT_SYMBOL(put_unaligned_be32);

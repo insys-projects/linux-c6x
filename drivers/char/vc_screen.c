@@ -418,7 +418,12 @@ vcs_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 			while (this_round > 1) {
 				unsigned short w;
 
+#ifdef __TI_TOOL_WRAPPER__
+/* cilly bug with get_unaligned macro */
+				w = get_unaligned16(((unsigned short *)con_buf0));
+#else
 				w = get_unaligned(((unsigned short *)con_buf0));
+#endif
 				vcs_scr_writew(vc, w, org++);
 				con_buf0 += 2;
 				this_round -= 2;
