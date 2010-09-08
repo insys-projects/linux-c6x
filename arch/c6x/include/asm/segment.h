@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -39,20 +39,10 @@ typedef unsigned long mm_segment_t;
  * Get/set the SFC/DFC registers for MOVES instructions
  */
 
-static inline mm_segment_t get_fs(void)
-{
-    return USER_DS;
-}
+#define get_fs()	(current_thread_info()->addr_limit)
+#define set_fs(x)	(current_thread_info()->addr_limit = (x))
 
-static inline mm_segment_t get_ds(void)
-{
-    /* return the supervisor data space code */
-    return KERNEL_DS;
-}
-
-static inline void set_fs(mm_segment_t val)
-{
-}
+#define get_ds()	KERNEL_DS
 
 #define segment_eq(a,b) ((a) == (b))
 

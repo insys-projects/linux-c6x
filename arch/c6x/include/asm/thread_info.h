@@ -37,12 +37,13 @@
  * low level task data.
  */
 struct thread_info {
-	struct task_struct *task;		/* main task structure */
-	struct exec_domain *exec_domain;	/* execution domain */
-	unsigned long	   flags;		/* low level flags */
-	int		   cpu;			/* cpu we're on */
-	int		   preempt_count;	/* 0 => preemptable, <0 => BUG */
-	struct restart_block restart_block;
+	struct task_struct	*task;		/* main task structure */
+	struct exec_domain	*exec_domain;	/* execution domain */
+	unsigned long		flags;		/* low level flags */
+	int			cpu;		/* cpu we're on */
+	int			preempt_count;	/* 0 => preemptable, <0 => BUG */
+	mm_segment_t		addr_limit;	/* thread address space */
+	struct restart_block	restart_block;
 };
 
 /*
@@ -57,6 +58,7 @@ struct thread_info {
 	.flags		= 0,			\
 	.cpu		= 0,			\
 	.preempt_count	= INIT_PREEMPT_COUNT,	\
+	.addr_limit	= KERNEL_DS,		\
 	.restart_block	= {			\
 		.fn = do_no_restart_syscall,	\
 	},					\

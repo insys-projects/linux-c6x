@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -182,13 +182,9 @@ static ssize_t ram_proc_write(struct file* file,
 	if ((*ppos + count) > (size_t) data->size)
 		count = (size_t) data->size - *ppos;
 
-	/* Check source address */
-	res =  verify_area(0, src_buf, count);
-	if (res)
-		return res;
-
 	/* Because Faraday doesn't include MMU, user buffer is contiguous */
-	copy_from_user(data->start + (u32) *ppos, src_buf, count);
+	if (copy_from_user(data->start + (u32) *ppos, src_buf, count))
+		return -EFAULT;
 
 	/* Sync cache for DDR case */
 	if (data->start == RAM_MEMORY_START)
@@ -219,13 +215,10 @@ static ssize_t ram_proc_read(struct file* file,
 	if ((*ppos + count) > (size_t) data->size)
 		count = (size_t) data->size - *ppos;
 
-	/* Check destination address */
-	res =  verify_area(0, dest_buf, count);
-	if (res)
-		return res;
-	
 	/* Because Faraday doesn't include MMU, user buffer is contiguous */
-	copy_to_user(dest_buf, data->start + (u32) *ppos, count);
+	if (copy_to_user(dest_buf, data->start + (u32) *ppos, count))
+		return -EFAULT;
+
 	*ppos += (u64) count;
 	dest_buf += count;
 

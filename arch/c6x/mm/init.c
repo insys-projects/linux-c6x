@@ -112,7 +112,7 @@ void paging_init(void)
 	/*
 	 * Set up user data space
 	 */
-	set_fs(USER_DS);
+	set_fs(KERNEL_DS);
 
 	/*
 	 * Define the DMA and non-DMA zones

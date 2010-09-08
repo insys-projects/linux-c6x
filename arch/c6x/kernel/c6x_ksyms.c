@@ -127,6 +127,10 @@ EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);
 
+/* minimal access checks for no-mmu */
+extern int _access_ok(unsigned long addr, unsigned long size);
+EXPORT_SYMBOL(_access_ok);
+
 /*
  * unaligned access
  *

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -23,20 +23,13 @@
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
 
-/* We let the MMU do all checking */
-#define access_ok(type,addr,size) 1
+#define access_ok(type, addr, size) _access_ok((unsigned long)(addr), (size))
 
-extern unsigned int memory_end;
-extern int text_start;
-
-static inline int verify_area(int type, const void * addr, unsigned long size)
-{
-	if ((unsigned long) addr > (unsigned long) memory_end) {
-		printk("Bad verify_area: %lx\n", (unsigned long) addr);
-		return -EFAULT;
-	}
-	return 0;
-}
+#ifndef CONFIG_ACCESS_CHECK
+static inline int _access_ok(unsigned long addr, unsigned long size) { return 1; }
+#else
+extern int _access_ok(unsigned long addr, unsigned long size);
+#endif
 
 /*
  * The exception table consists of pairs of addresses: the first is the
@@ -61,6 +54,8 @@ struct exception_table_entry
  */
 static inline int __generic_put_user(unsigned long x, void *y, int size)
 {
+	if (!access_ok(VERIFY_WRITE, y, size))
+		return -EFAULT;
         switch (size) {
                 case 1:
                         *((unsigned char *) y) = (unsigned char) x;
@@ -81,6 +76,8 @@ static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 {
         unsigned long result;
 
+	if (!access_ok(VERIFY_READ, y, size))
+		return -EFAULT;
         switch (size) {
                 case 1:
                         *(unsigned char *)x = *(unsigned char *) y;
@@ -104,12 +101,16 @@ static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 
 static inline int __copy_from_user(void *to, const void *from, unsigned long n)
 {
+	if (!access_ok(VERIFY_READ, from, n))
+		return n;
 	memcpy(to, from, n);
 	return 0;
 }
 
 static inline int __copy_to_user(void *to, const void *from, unsigned long n)
 {
+	if (!access_ok(VERIFY_WRITE, to, n))
+		return n;
 	memcpy(to, from, n);
 	return 0;
 }
@@ -120,7 +121,7 @@ static inline int __copy_to_user(void *to, const void *from, unsigned long n)
 #define copy_from_user(to, from, n) \
     (__copy_from_user((void *)(to), (const void *)(from), (unsigned long)(n)))
 #define copy_to_user(to, from, n) \
-    (__copy_from_user((void *)(to), (const void *)(from), (unsigned long)(n)))
+    (__copy_to_user((void *)(to), (const void *)(from), (unsigned long)(n)))
 
 /*
  * Copy a null terminated string from userspace.
@@ -129,6 +130,8 @@ static inline long
 strncpy_from_user(char *dst, const char *src, long count)
 {
 	char *tmp;
+	if (!access_ok(VERIFY_READ, src, 1))
+		return -EFAULT;
 	strncpy(dst, src, count);
 	for (tmp = dst; *tmp && count > 0; tmp++, count--)
 		;
@@ -142,6 +145,8 @@ strncpy_from_user(char *dst, const char *src, long count)
  */
 static inline long strnlen_user(const char *src, long n)
 {
+	if (!access_ok(VERIFY_READ, src, 1))
+		return 0;
 	return(strlen(src) + 1);
 }
 
@@ -153,6 +158,8 @@ static inline long strnlen_user(const char *src, long n)
 static inline unsigned long
 clear_user(void *to, unsigned long n)
 {
+	if (!access_ok(VERIFY_WRITE, to, n))
+		return n;
 	memset(to, 0, n);
 	return(0);
 }

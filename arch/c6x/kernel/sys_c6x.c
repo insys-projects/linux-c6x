@@ -28,6 +28,7 @@
 #include <linux/utsname.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include <linux/mtd/map.h>
 
 #include <asm/setup.h>
 #include <asm/segment.h>
@@ -35,6 +36,29 @@
 #include <asm/ipc.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
+
+#ifdef CONFIG_ACCESS_CHECK
+int _access_ok(unsigned long addr, unsigned long size)
+{
+	if (!size)
+		return 1;
+
+	if (!addr || addr > (0xffffffffUL - (size - 1)))
+		goto _bad_access;
+
+	if (segment_eq(get_fs(), KERNEL_DS))
+		return 1;
+
+	if (memory_start <= addr && (addr + size) < memory_end)
+		return 1;
+
+_bad_access:
+#if 0
+	printk(KERN_CRIT "**Bad access attempt: pid[%d] addr[%p] size[0x%x]\n", current->pid, addr, size);
+#endif
+	return 0;
+}
+#endif
 
 unsigned long get_fb_unmapped_area(struct file *filp,
 				   unsigned long orig_addr,
