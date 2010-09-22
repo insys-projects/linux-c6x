@@ -964,11 +964,11 @@ static int find_unmapped_sections(struct elf_dsbt_params *params, struct unmappe
 		/* look for this offset in code segment */
 		p = &params->code_seg;
 		if (p->p_offset <= d->d_un.d_ptr &&
-		    (p->p_offset + p->p_filesz) > d->d_un.d_ptr)
+		    (p->p_offset + p->p_memsz) > d->d_un.d_ptr)
 			continue;
 		p = &params->data_seg;
 		if (p->p_offset <= d->d_un.d_ptr &&
-		    (p->p_offset + p->p_filesz) > d->d_un.d_ptr)
+		    (p->p_offset + p->p_memsz) > d->d_un.d_ptr)
 			continue;
 
 		s = find_section_by_offset(params, d->d_un.d_ptr);
@@ -1290,13 +1290,14 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	params->code_seg.p_vaddr  = code_phdr->p_vaddr;
 	params->code_seg.p_offset = code_phdr->p_offset;
 	params->code_seg.p_memsz  = code_phdr->p_memsz;
+	params->code_seg.p_filesz = code_phdr->p_filesz;
 
 	top_vaddr = top_phdr->p_vaddr + top_phdr->p_memsz;
 	top_offset = top_phdr->p_offset + top_phdr->p_filesz;
 
 	params->data_seg.p_vaddr = base_phdr->p_vaddr;
 	params->data_seg.p_offset = base_phdr->p_offset;
-	params->data_seg.p_memsz = 
+	params->data_seg.p_memsz = params->data_seg.p_filesz =
 		top_phdr->p_vaddr + top_phdr->p_memsz - base_phdr->p_vaddr;
 
 	kdebug("base_phdr: vaddr[%x] offset[%x] memsz[%x] filesz[%x]",
@@ -1317,7 +1318,6 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	kdebug("code_seg: vaddr[%x] offset[%x] memsz[%x] filesz[%x]!",
 	       code_phdr->p_vaddr, code_phdr->p_offset, code_phdr->p_memsz, code_phdr->p_filesz);
 
-#if 0
 	/* map code segment */
 	flags = MAP_PRIVATE | MAP_DENYWRITE;
 	if (params->flags & ELF_DSBT_FLAG_EXECUTABLE)
@@ -1345,25 +1345,6 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	params->data_seg.addr = mapped_addr + ELF_PAGEOFFSET(params->data_seg.p_vaddr);
 
 	kdebug("mapped data seg from %08x to %08x", params->data_seg.p_vaddr, params->data_seg.addr);
-#else
-       /* this goes away with a tool fix for far DP-relative accesses to const data */
-       {
-               struct elf32_dsbt_seg xseg;
-
-               xseg.p_vaddr = params->code_seg.p_vaddr;
-               xseg.p_offset = params->code_seg.p_offset;
-               xseg.p_filesz = params->data_seg.p_offset + params->data_seg.p_filesz - xseg.p_offset;
-               xseg.p_memsz = params->data_seg.p_offset + params->data_seg.p_memsz - xseg.p_offset;
-
-               mapped_addr = elf_dsbt_map(file, xseg.p_vaddr, &xseg,
-                                          PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE);
-       }
-       if (BAD_ADDR(mapped_addr))
-               return (int) mapped_addr;
-
-       params->code_seg.addr = mapped_addr + ELF_PAGEOFFSET(params->code_seg.p_vaddr);
-       params->data_seg.addr = params->code_seg.addr + (params->data_seg.p_vaddr - params->code_seg.p_vaddr); 
-#endif
 
 	/* clear any bss area */
 	bss_len = params->data_seg.p_memsz - params->data_seg.p_filesz;
