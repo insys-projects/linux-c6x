@@ -46,7 +46,7 @@ static inline void __put_unaligned_be16(u16 val, u8 *p)
 
 static inline u16 get_unaligned_le16(const void *p)
 {
-	return __get_unaligned_le16((const u16 *)p);
+	return __get_unaligned_le16((const u8 *)p);
 }
 
 static inline u16 get_unaligned_be16(const void *p)
