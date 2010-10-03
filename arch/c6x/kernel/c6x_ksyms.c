@@ -21,15 +21,9 @@
 /* platform dependent support */
 struct pt_regs;
 struct user;
-extern void dump_thread(struct pt_regs * regs, struct user * dump);
 extern void *alloca (size_t size);
 extern unsigned int csum_partial(const unsigned char * buff,int len, unsigned int sum);
 extern unsigned int ip_fast_csum(unsigned char *iph, unsigned int ihl);
-
-/*
- * libcl6x functions - functions that are used internally by the
- * compiler...
- */
 
 /* consistent area handling */
 extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle);

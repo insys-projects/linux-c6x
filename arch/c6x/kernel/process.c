@@ -360,25 +360,6 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 }
 
 /*
- * fill in the user structure for a core dump..
- */
-void dump_thread(struct pt_regs * regs, struct user * dump)
-{
-	/* changed the size calculations - should hopefully work better. lbt */
-	dump->magic = CMAGIC;
-	dump->start_code = 0;
-	dump->start_stack = regs->sp & ~(PAGE_SIZE - 1);
-	dump->u_tsize = ((unsigned long) current->mm->end_code) >> PAGE_SHIFT;
-	dump->u_dsize = ((unsigned long) (current->mm->brk +
-					  (PAGE_SIZE-1))) >> PAGE_SHIFT;
-	dump->u_dsize -= dump->u_tsize;
-	dump->u_ssize = 0;
-	dump->u_ar0 = (struct pt_regs *)(((int)(&dump->regs)) - ((int)(dump)));
-	dump->regs = *regs;
-	dump->regs2 = ((struct switch_stack *)regs)[-1];
-}
-
-/*
  * c6x_execve() executes a new program.
  */
 extern int do_execve(char *, char **, char **, struct pt_regs *);
