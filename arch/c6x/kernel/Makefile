@@ -13,9 +13,9 @@ obj-y 	 := process.o traps.o irq.o signal.o ptrace.o \
 obj-$(CONFIG_MODULES)          += module.o
 obj-$(CONFIG_COMMON_CLKDEV)    += clkdev.o
 
-$(obj)/unaligned.o: $(src)/unaligned.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc $(src)/../include/asm/cnames.inc
-$(obj)/entry.o:    $(src)/entry.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc $(src)/../include/asm/cnames.inc
-$(obj)/head.o:     $(src)/head.S64 $(obj)/c6x_config.inc $(src)/../include/asm/cnames.inc
+$(obj)/unaligned.o: $(src)/unaligned.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
+$(obj)/entry.o:    $(src)/entry.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
+$(obj)/head.o:     $(src)/head.S64 $(obj)/c6x_config.inc
 
 config-preempt-y += "CONFIG_PREEMPT    		.set 1"
 config-preempt-  += "CONFIG_PREEMPT    		.set 0"

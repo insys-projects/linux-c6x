@@ -10,7 +10,6 @@
 ;  it under the terms of the GNU General Public License version 2 as
 ;  published by the Free Software Foundation.
 ; 
-	.include	"cnames.inc"
 	.include	"c6x_defs.inc"
 
 	.ref    current_ksp

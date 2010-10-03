@@ -8,8 +8,6 @@
 ;  published by the Free Software Foundation.
 ; 
 
-	.include "cnames.inc"
-
 	.global  memcpy
 	.text
 

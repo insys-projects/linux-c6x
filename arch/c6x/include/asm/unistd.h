@@ -508,13 +508,9 @@ static inline pid_t wait(int * wait_stat)
 
 #define cond_syscall(name) \
 	asm(" .text\n" \
-	    " .if    __TI_EABI__ \n" \
-	    " .asg   "#name", _"#name "\n" \
-	    " .asg   sys_ni_syscall, _sys_ni_syscall\n" \
-	    " .endif\n" \
-	    " .global _"#name "\n" \
-	    " .weak _"#name "\n" \
-	    "_"#name " .set _sys_ni_syscall\n")
+	    " .global "#name "\n" \
+	    " .weak "#name "\n" \
+	    #name " .set sys_ni_syscall\n")
 
 #endif /* __ASM_C6x_UNISTD_H_ */
 
