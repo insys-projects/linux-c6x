@@ -33,7 +33,6 @@
 #include <asm/setup.h>
 #include <asm/segment.h>
 #include <asm/traps.h>
-#include <asm/ipc.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
 
