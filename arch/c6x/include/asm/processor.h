@@ -102,11 +102,8 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 /*
  * Return saved PC of a blocked thread.
  */
-static inline unsigned int thread_saved_pc(struct thread_struct *t)
-{
-	unsigned long frame = ((struct switch_stack *)t->ksp)->retpc;
-	return frame;
-}
+#define thread_saved_pc(tsk) \
+	((tsk)->thread.ksp? ((struct switch_stack *)(tsk)->thread.ksp)->retpc: 0)
 
 extern unsigned long get_wchan(struct task_struct *p);
 extern unsigned long __kstk_eip(struct task_struct *p);
