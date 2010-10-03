@@ -11,8 +11,6 @@
 ;  published by the Free Software Foundation.
 ; 
 
-	.include "cnames.inc"
-
  	.sect	".text"
 	.global	_c6x_delay
 	

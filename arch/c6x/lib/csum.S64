@@ -11,8 +11,6 @@
 ;  published by the Free Software Foundation.
 ; 
 
-	.include "cnames.inc"
-
 ;
 ;unsigned int csum_partial(const unsigned char * buff,int len, unsigned int sum)
 ;{	

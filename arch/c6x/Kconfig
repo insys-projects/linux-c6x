@@ -217,20 +217,6 @@ endmenu
 
 menu "Executable file formats"
 
-config BINFMT_COFF
-	bool "Kernel support for COFF binaries"
-
-config BINFMT_COFF_INFLATE
-	bool "Support for compressed COFF binaries"
-	depends on BINFMT_COFF
-	select ZLIB_INFLATE
-	default n
-
-config BINFMT_COFF_USE_SHLIBS
-    bool "Support for COFF shared and dynamic libraries"
-    depends on BINFMT_COFF
-    default n
-
 source "fs/Kconfig.binfmt"
 
 endmenu

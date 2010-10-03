@@ -14,7 +14,6 @@
 
 		.include	"c6x_defs.inc"
 		.include	"c6x_config.inc"
-		.include	"cnames.inc"
 
 	;; Registers naming
 DP			.set	B14
@@ -1065,23 +1064,13 @@ set_sp:
 	;; System calls table
 	;;
 SYSCALL_ENTRY .macro handler
-	.if __TI_EABI__
 	.ref   handler
 	.word  handler
-	.else
-	.ref   _:handler:
-	.word  _:handler:
-	.endif
 	.endm
 
 SYSCALL_NI .macro
-	.if __TI_EABI__
 	.ref   sys_ni_syscall
 	.word  sys_ni_syscall
-	.else
-	.ref   _sys_ni_syscall
-	.word  _sys_ni_syscall
-	.endif
 	.endm
 	
 SYSCALL_LOCAL .macro handler

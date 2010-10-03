@@ -234,7 +234,6 @@ CONFIG_HIGH_RES_TIMERS=y
 #
 # Executable file formats
 #
-# CONFIG_BINFMT_COFF is not set
 CONFIG_BINFMT_ELF_DSBT=y
 # CONFIG_BINFMT_FLAT is not set
 # CONFIG_HAVE_AOUT is not set
