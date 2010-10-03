@@ -18,8 +18,6 @@
  * The C64x+ can do unaligned word and dword accesses in hardware
  * using special load/store instructions. This should be rewritten
  * to use inline assembly where appropriate when building with gcc.
- * For TI toolchain, the cilly wrapper has a bug which makes the
- * __get_unaligned_be/__get_unaligned_le unusable.
  */
 
 static inline u16 __get_unaligned_le16(const u8 *p)
@@ -77,22 +75,22 @@ extern void put_unaligned_be64(u64 val, void *p);
  * Cause a link-time error if we try an unaligned access other than
  * 1,2,4 or 8 bytes long
  */
-extern void __bad_unaligned_access_size(void);
+extern int __bad_unaligned_access_size(void);
 
-#define __get_unaligned_le(ptr) (typeof(*(ptr)))({		\
-	sizeof(*(ptr)) == 1 ? *(ptr) :				\
-	(sizeof(*(ptr)) == 2 ? get_unaligned_le16((ptr)) :	\
-	(sizeof(*(ptr)) == 4 ? get_unaligned_le32((ptr)) :	\
-	(sizeof(*(ptr)) == 8 ? get_unaligned_le64((ptr)) :	\
-	 __bad_unaligned_access_size())));			\
+#define __get_unaligned_le(ptr) (typeof(*(ptr)))({			\
+	sizeof(*(ptr)) == 1 ? *(ptr) :					\
+	  (sizeof(*(ptr)) == 2 ? get_unaligned_le16((ptr)) :		\
+	     (sizeof(*(ptr)) == 4 ? get_unaligned_le32((ptr)) :		\
+		(sizeof(*(ptr)) == 8 ? get_unaligned_le64((ptr)) :	\
+		   __bad_unaligned_access_size())));			\
 	})
 
 #define __get_unaligned_be(ptr) (__force typeof(*(ptr)))({	\
-	sizeof(*(ptr)) == 1 ? *(ptr) :				\
-	(sizeof(*(ptr)) == 2 ? get_unaligned_be16((ptr)) :	\
-	(sizeof(*(ptr)) == 4 ? get_unaligned_be32((ptr)) :	\
-	(sizeof(*(ptr)) == 8 ? get_unaligned_be64((ptr)) :	\
-	 __bad_unaligned_access_size())));			\
+	sizeof(*(ptr)) == 1 ? *(ptr) :					\
+	  (sizeof(*(ptr)) == 2 ? get_unaligned_be16((ptr)) :		\
+	     (sizeof(*(ptr)) == 4 ? get_unaligned_be32((ptr)) :		\
+		(sizeof(*(ptr)) == 8 ? get_unaligned_be64((ptr)) :	\
+		   __bad_unaligned_access_size())));			\
 	})
 
 #define __put_unaligned_le(val, ptr) ({					\

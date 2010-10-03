@@ -13,6 +13,7 @@
 #ifndef __ASM_C6X_UACCESS_H_
 #define __ASM_C6X_UACCESS_H_
 
+#include <linux/string.h>
 #include <asm/segment.h>
 #include <asm/errno.h>
 #include <asm/setup.h>
@@ -74,8 +75,6 @@ static inline int __generic_put_user(unsigned long x, void *y, int size)
 
 static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 {
-        unsigned long result;
-
 	if (!access_ok(VERIFY_READ, y, size))
 		return -EFAULT;
         switch (size) {
