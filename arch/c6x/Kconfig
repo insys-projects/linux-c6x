@@ -96,6 +96,11 @@ config CMDLINE
 config RAM_ATTACHED_ROMFS
 	bool "m68knommu-style attached romfs in RAM support"
 
+config TI_C6X_LINKER
+       bool "Build using Texas Instruments linker"
+       help
+	  Say Y if you are using the Texas Instruments linker rather than GCC.
+
 config CPU_BIG_ENDIAN
 	bool "Build big-endian kernel"
 	help

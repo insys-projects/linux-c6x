@@ -17,13 +17,11 @@ DEFINES		+= -D__TI_C6X_COMPILER__
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
 
-ifeq ($(ABI),coff)
-LINKFLAGS_ABI  := -Wl,-b
-JIFFIES64      := _jiffies_64
-else
+ifeq ($(CONFIG_TI_C6X_LINKER),y)
 LINKFLAGS_ABI  := -Wl,--unused_section_elimination=off
-JIFFIES64      := jiffies_64
 endif
+
+JIFFIES64      := jiffies_64
 
 ifeq ($(CONFIG_TMS320C64XPLUS),y)
 DEFINES         += -D__TMS320C6XPLUS__
@@ -44,11 +42,8 @@ else
 KBUILD_CFLAGS   += $(DEFINES) -O2
 endif
 
-REAL_LD		 = $(CROSS_COMPILE)gcc -nostdlib $(LINKFLAGS_ABI)
-ifeq ($(ABI),coff)
-LD		 = perl -X $(TOPDIR)/arch/c6x/tools/c6x-linux-preld.plx $(REAL_LD)
-else
-LD		 = $(REAL_LD)
+ifeq ($(CONFIG_TI_C6X_LINKER),y)
+LD		 = $(CROSS_COMPILE)gcc -nostdlib $(LINKFLAGS_ABI)
 endif
 AS		 = $(CROSS_COMPILE)gcc -c
 
@@ -80,18 +75,18 @@ KBUILD_CFLAGS	+= $(arch-y)
 KBUILD_AFLAGS	+= $(arch-y) -Wa,-d__NK__=$(nk-flags-$(CONFIG_NK)) \
                    -Wa,-d__BIG_ENDIAN__=$(be-flags-$(CONFIG_CPU_BIG_ENDIAN))
 
+ifeq ($(CONFIG_TI_C6X_LINKER),y)
+MODULESCRIPT := $(srctree)/arch/c6x/modules.cmd
+export MODULESCRIPT
 LDFLAGS_MODULE = $(MODULESCRIPT)
 
 # Flags used for the final link
 LDFLAGS_vmlinux	:= --final-script=arch/c6x/vmlinux.cmd \
 		   -Wl,-m,arch/c6x/vmlinux.map -Wl,--reread_libs
 
-ifneq ($(ABI),coff)
 # FIXME. Why isn't the elf linker getting this from --final-script ?
 LDFLAGS_vmlinux	+= -Wl,arch/c6x/vmlinux.cmd
 endif
-
-LIBGCC = $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)
 
 head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/
@@ -101,13 +96,15 @@ ifeq ($(CONFIG_NK),y)
 core-y         	+= arch/c6x/nkernel/
 endif
 
-TI_LDSCRIPT := $(obj)/arch/c6x/vmlinux.cmd
-BUILTINSCRIPT := $(srctree)/arch/c6x/builtin.cmd
-MODULESCRIPT := $(srctree)/arch/c6x/modules.cmd
+LIBGCC = $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)
+libs-y		+= $(LIBGCC)
+
 LDSCRIPT = $(obj)/arch/c6x/kernel/vmlinux.lds
 
+ifeq ($(CONFIG_TI_C6X_LINKER),y)
+TI_LDSCRIPT := $(obj)/arch/c6x/vmlinux.cmd
+BUILTINSCRIPT := $(srctree)/arch/c6x/builtin.cmd
 export BUILTINSCRIPT
-export MODULESCRIPT
 
 .tmp_vmlinux1: $(TI_LDSCRIPT)
 
@@ -124,6 +121,7 @@ cmd_vmlinux__ = $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $@ \
 cmd_vmlinux-modpost = $(LD) $(LDFLAGS) $(BUILTINSCRIPT) -r -o $@         \
 	 $(vmlinux-init) --start-group $(vmlinux-main) --end-group       \
 	 $(filter-out $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
+endif
 
 include $(srctree)/arch/c6x/Makefile.lib
 
@@ -131,6 +129,8 @@ HOSTCFLAGS_kallsyms.o += -DTI_ASM
 export HOSTCFLAGS_kallsyms.o
 
 #CLEAN_FILES =
-MRPROPER_FILES = arch/c6x/vmlinux.cmd arch/c6x/vmlinux.map arch/c6x/kernel/c6x_config.inc arch/c6x/kernel/c6x_defs.inc
-
+MRPROPER_FILES = arch/c6x/kernel/c6x_config.inc arch/c6x/kernel/c6x_defs.inc
+ifeq ($(CONFIG_TI_C6X_LINKER),y)
+MRPROPER_FILES += arch/c6x/vmlinux.cmd arch/c6x/vmlinux.map
+endif
 #archclean:

@@ -10,6 +10,8 @@
 #include <asm/page.h>
 #include <mach/board.h>
 
+#ifdef CONFIG_TI_C6X_LINKER
+
 #define AT(x)
 
 /* The TI linker doesn't get the order right without explicitly naming files... */
@@ -352,3 +354,81 @@ SECTIONS
      VMLINUX_SYMBOL(_ramend) = . ;
   } > eBMEMe0
 }
+
+#else /* CONFIG_TI_C6X_LINKER */
+
+ENTRY(_c_int00)
+
+_ramend = RAMEND;
+
+#ifdef CONFIG_CPU_BIG_ENDIAN
+jiffies = jiffies_64 + 4;
+#else
+jiffies = jiffies_64;
+#endif
+
+SECTIONS
+{
+  . = VECTADDR;
+  .vectors : { *(.vectors) }
+
+  . = TEXTADDR;
+  . = ALIGN(0x1000);
+  .cmdline : { *(.cmdline) }
+
+  /* read-only */
+  _stext = .;
+  _text = .;
+  .text : {
+      HEAD_TEXT
+      TEXT_TEXT
+      SCHED_TEXT
+      LOCK_TEXT
+      KPROBES_TEXT
+      *(.fixup)
+      *(.gnu.warning)
+  }
+
+  _etext = .;
+
+
+  EXCEPTION_TABLE(16)
+  NOTES
+
+  _sdata = .;
+  RO_DATA_SECTION(32)
+  .rodata_c6x : {
+    *(.const)
+    *(.switch)
+  }
+  RW_DATA_SECTION(32, PAGE_SIZE, THREAD_SIZE)
+  _edata = .;
+
+  /* will be freed after init */
+  . = ALIGN(PAGE_SIZE);		/* Init code and data */
+  __init_begin = .;
+  INIT_TEXT_SECTION(PAGE_SIZE)
+  INIT_DATA_SECTION(16)
+
+  PERCPU(32)
+  . = ALIGN(PAGE_SIZE);
+  __init_end = .;
+
+  VMLINUX_SYMBOL(_bss_start) = .;
+  SBSS(32)
+  BSS(PAGE_SIZE)
+  . = ALIGN(32);
+  .far : { *(.far) }
+  . = ALIGN(32);
+  VMLINUX_SYMBOL(__bss_stop) = .;
+  VMLINUX_SYMBOL(_bss_end) = .;
+  VMLINUX_SYMBOL(_ebss) = .;
+
+  _end = . ;
+
+  __ramstart = . ;
+
+  DISCARDS
+}
+
+#endif /* CONFIG_TI_C6X_LINKER */
