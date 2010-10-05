@@ -99,7 +99,6 @@ EXPORT_SYMBOL(_c6x_delay);
 /* platform dependent support */
 EXPORT_SYMBOL(current_text_addr);
 EXPORT_SYMBOL(irq_IER);
-EXPORT_SYMBOL(get_current);
 EXPORT_SYMBOL(alloca);
 EXPORT_SYMBOL(__current_thread_info);
 EXPORT_SYMBOL(csum_partial);
