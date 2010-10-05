@@ -289,10 +289,17 @@ $(sort $(subdir-obj-y)): $(subdir-ym) ;
 ifdef builtin-target
 quiet_cmd_link_o_target = LD      $@
 # If the list of objects to link is empty, just create an empty built-in.o
+ifdef CONFIG_TI_C6X_LINKER
 cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(ld_flags) $(if $(wildcard $(srctree)/$(src)/builtin.cmd),$(srctree)/$(src)/builtin.cmd,$(BUILTINSCRIPT)) -r -o $@ $(filter $(obj-y), $^) \
 		      $(cmd_secanalysis),\
 		      rm -f $@; $(AR) rcs $@)
+else
+cmd_link_o_target = $(if $(strip $(obj-y)),\
+		      $(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^) \
+		      $(cmd_secanalysis),\
+		      rm -f $@; $(AR) rcs $@)
+endif
 
 $(builtin-target): $(obj-y) FORCE
 	$(call if_changed,link_o_target)
