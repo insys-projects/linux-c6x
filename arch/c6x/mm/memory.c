@@ -25,20 +25,6 @@
 #include <asm/virtconvert.h>
 
 /*
- * The following two routines map from a physical address to a kernel
- * virtual address and vice versa.
- */
-unsigned long mm_vtop (unsigned long vaddr)
-{
-	return vaddr;
-}
-
-unsigned long mm_ptov (unsigned long paddr)
-{
-	return paddr;
-}
-
-/*
  * cache_clear() semantics: Clear any cache entries for the area in question,
  * without writing back dirty entries first. This is useful if the data will
  * be overwritten anyway, e.g. by DMA to memory. The range is defined by a
@@ -78,11 +64,6 @@ void cache_push_v (unsigned long vaddr, int len)
 #ifdef CONFIG_TMS320C6X_CACHES_ON
 	L2_cache_block_writeback_invalidate((u32) vaddr, (u32) vaddr + len);
 #endif
-}
-
-unsigned long mm_phys_to_virt (unsigned long addr)
-{
-    return mm_ptov(addr);
 }
 
 /* Map some physical address range into the kernel address space. The
