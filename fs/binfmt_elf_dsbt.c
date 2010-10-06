@@ -570,10 +570,10 @@ static int load_elf_dsbt_binary(struct linux_binprm *bprm,
 	 */
 	if (interp_params.dynamic_addr) {
 		dynaddr = interp_params.dynamic_addr;
-		dsbt_table = interp_params.loadmap->dsbt_table;
+		dsbt_table = (unsigned long)interp_params.loadmap->dsbt_table;
 	} else {
 		dynaddr = exec_params.dynamic_addr;
-		dsbt_table = exec_params.loadmap->dsbt_table;
+		dsbt_table = (unsigned long)exec_params.loadmap->dsbt_table;
 	}
 
 	kdebug("exec_params.map_addr[%x]", exec_params.map_addr);
@@ -910,14 +910,13 @@ static unsigned long elf_dsbt_map(struct file *filep, unsigned long addr,
 static unsigned long elf_dsbt_map_anon_mem(void *mem, int size, int offset)
 {
 	unsigned long map_addr;
-	int i, retval;
 	int msize = ELF_PAGEALIGN(size);
 
 	if (!size)
 		return -EINVAL;
 
 	down_write(&current->mm->mmap_sem);
-	map_addr = do_mmap(NULL, NULL, msize, PROT_READ | PROT_WRITE, MAP_PRIVATE, 0);
+	map_addr = do_mmap(NULL, 0, msize, PROT_READ | PROT_WRITE, MAP_PRIVATE, 0);
 	if (BAD_ADDR(map_addr))
 		kdebug("mmap anon for offset %x failed!", offset);
 	else {
@@ -947,7 +946,7 @@ static int find_unmapped_sections(struct elf_dsbt_params *params, struct unmappe
 {
 	elf_dyn *d;
 	struct elf_shdr *s;
-	dt_tag_t *t;
+	const dt_tag_t *t;
 	struct elf32_dsbt_seg *p;
 	struct unmapped_sects *usects;
 
@@ -978,7 +977,7 @@ static int find_unmapped_sections(struct elf_dsbt_params *params, struct unmappe
 			return -EINVAL;
 		}
 		if (s->sh_size) {
-			usects->sections[usects->num].valp = &d->d_un.d_ptr;
+			usects->sections[usects->num].valp = (unsigned long *)&d->d_un.d_ptr;
 			usects->sections[usects->num++].shdr = s;
 		}
 	}
@@ -1143,7 +1142,7 @@ int do_linker_workarounds(struct file *filep, struct elf_dsbt_params *params, co
 		ph->p_filesz = ph->p_memsz = strlen(interp) + 1;
 		ph->p_flags = PF_R;
 		ph->p_align = 1;
-		strcpy(addr + params->dynsize, interp);
+		strcpy((char *)addr + params->dynsize, interp);
 		++ph;
 	}
 
@@ -1170,7 +1169,7 @@ int do_linker_workarounds(struct file *filep, struct elf_dsbt_params *params, co
 
 	kfree(new_phdrs);
 
-	for (i = 0, ph = addr; i < params->hdr.e_phnum; i++, ph++) {
+	for (i = 0, ph = (struct elf32_phdr *)addr; i < params->hdr.e_phnum; i++, ph++) {
 		kdebug("phdr%d: type[%d] vaddr[0x%x] memsize[0x%x]", 
 		       i, ph->p_type, ph->p_vaddr, ph->p_memsz);
 	}
@@ -1207,7 +1206,7 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	struct elf32_dsbt_loadmap *loadmap;
 	struct elf32_dsbt_loadseg *seg;
 	elf_dyn *dyn;
-	unsigned long mapped_addr, bss_len, dseg_offset, offset;
+	unsigned long mapped_addr, bss_len, dseg_offset = 0, offset;
 	unsigned long top_vaddr,  top_offset;
 	int loop, ret, flags, ndseg;
 
@@ -1445,7 +1444,7 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	params->loadmap = loadmap;
 
 	loadmap->version = ELF_DSBT_LOADMAP_VERSION;
-	loadmap->dsbt_table = params->dsbt_base;
+	loadmap->dsbt_table = (unsigned *)params->dsbt_base;
 	loadmap->dsbt_size = params->dsbt_size;
 	loadmap->dsbt_index = params->dsbt_index;
 
