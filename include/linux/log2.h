@@ -82,6 +82,14 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
  *
  * selects the appropriately-sized optimised version depending on sizeof(n)
  */
+#ifdef CONFIG_TI_C6X_COMPILER
+#define ilog2(n)				\
+(						\
+	(sizeof(n) <= 4) ?			\
+	__ilog2_u32(n) :			\
+	__ilog2_u64(n)				\
+ )
+#else
 #define ilog2(n)				\
 (						\
 	__builtin_constant_p(n) ? (		\
@@ -156,6 +164,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
 	__ilog2_u32(n) :			\
 	__ilog2_u64(n)				\
  )
+#endif
 
 /**
  * roundup_pow_of_two - round the given value up to nearest power of two

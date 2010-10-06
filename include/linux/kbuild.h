@@ -1,7 +1,7 @@
 #ifndef __LINUX_KBUILD_H
 #define __LINUX_KBUILD_H
 
-#ifdef _TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 #define __CONCAT1(a, b) __CONCAT2(b, a, b)
 #define __CONCAT2(a, b, c) a ## b ## c
 
