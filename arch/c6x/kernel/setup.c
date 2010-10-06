@@ -62,8 +62,8 @@ unsigned int c6x_early_uart_cons = 0;
 extern unsigned long zone_dma_start, zone_dma_size;
 static char c6x_command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
-static const char *cpu_name, *cpu_rev, *cpu_voltage, *mmu, *fpu;
-static char __cpu_rev[4];
+static const char *cpu_name, *cpu_voltage, *mmu, *fpu;
+static char __cpu_rev[4], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
 #ifdef CONFIG_TMS320C64XPLUS
 static unsigned int cpu_num = 0;
@@ -103,13 +103,13 @@ static unsigned long dummy_gettimeoffset(void)
 
 unsigned long (*mach_gettimeoffset)(void) = dummy_gettimeoffset;;
 
-void get_cpuinfo()
+void get_cpuinfo(void)
 {
-	extern cregister volatile unsigned int CSR;
-	unsigned long cpu_id, rev_id;
+	unsigned cpu_id, rev_id, csr;
 
-	cpu_id = CSR >> 24;
-	rev_id = (CSR >> 16) & 0xff;
+	csr = get_creg(CSR);
+	cpu_id = csr >> 24;
+	rev_id = (csr >> 16) & 0xff;
 
 	mmu         = "none";
 	cpu_voltage = "unknown";
@@ -184,7 +184,7 @@ void get_cpuinfo()
 	printk("CPU: %s revision %s core voltage %s\n",
 	       cpu_name, cpu_rev, cpu_voltage);
 #else
-	cpu_num = (unsigned int) (DNUM & 0xff);
+	cpu_num = get_creg(DNUM) & 0xff;
 	printk("CPU: %s revision %s core voltage %s core number %d\n",
 	       cpu_name, cpu_rev, cpu_voltage, cpu_num);
 #endif

@@ -20,10 +20,8 @@
 #define PWRD_PD3         0x1c
 #define PWRD_IDLE        0xff
 
-extern cregister volatile unsigned int CSR; /* Control Status Register */
-
-#define pwrd_set(pwrd)   (CSR |= ((pwrd) & 0xff) << 10)
-#define do_idle()        asm(" IDLE")
+#define pwrd_set(pwrd)   or_creg(CSR, ((pwrd) & 0xff) << 10))
+#define do_idle()        asm(" IDLE\n")
 
 #define PWR_PDCTL_BASE   0x019c0200
 

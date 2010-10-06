@@ -230,7 +230,7 @@ void __init init_IRQ(void)
 int __init __weak arch_early_irq_init(void)
 {
 	/* clear interrupt flags */
-	ICR = 0xfff0;
+	set_creg(ICR, 0xfff0);
 	local_irq_disable();
 	return 0;
 }
