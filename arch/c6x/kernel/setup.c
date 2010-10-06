@@ -194,7 +194,7 @@ void get_cpuinfo(void)
 /*
  * L1 and L2 caches configuration
  */
-static void cache_init()
+static void cache_init(void)
 {
 	/* Set L2 caches on the the whole L2 SRAM memory */
 	L2_cache_set_mode(L2MODE_SIZE);
@@ -224,6 +224,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			goto next_char;
 
 		if (!memcmp(from, "mem=", 4)) {
+			unsigned long mem_size;
+
 			if (to != c6x_command_line)
 				to--;
 			
@@ -232,8 +234,6 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			 * that size. mem=number can be used to
 			 * trim the existing memory map.
 			 */
-			unsigned long mem_size;
-			
 			mem_size = (unsigned long) memparse(from+4, &from);
 			memory_end = PAGE_ALIGN(memory_start + mem_size);
 			userdef = 1;
@@ -444,7 +444,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set(&_stext, memory_end);
+	cache_set((unsigned long)&_stext, memory_end);
 
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the
@@ -469,7 +469,7 @@ void __init setup_arch(char **cmdline_p)
 		if (c6x_platram_start < (memory_start + bootmap_size) ||
 		    (c6x_platram_start + c6x_platram_size) > memory_end) {
 			printk(KERN_ERR "Invalid platram= argument. Out of range %p - %p!\n",
-			       memory_start, memory_end);
+			       (void *)memory_start, (void *)memory_end);
 			c6x_platram_size = 0;
 		} else
 			reserve_bootmem(c6x_platram_start, c6x_platram_size, BOOTMEM_DEFAULT);
@@ -484,10 +484,10 @@ void __init setup_arch(char **cmdline_p)
 		}
 		else {
 			printk(KERN_ERR "initrd is not contained in normal memory\n"
-			       "initrd=(0x%08lx:0x%08lx) normal_mem=(0x%08lx:0x%08lx)\n"
+			       "initrd=(0x%08lx:0x%08lx) normal_mem=(%p:%p)\n"
 			       "disabling initrd\n",
 			       initrd_start, initrd_start + initrd_size,
-			       memory_start, memory_end);
+			       (void *)memory_start, (void *)memory_end);
 			initrd_start = 0;
 		}
 	}
