@@ -29,11 +29,8 @@
 
 #ifndef __ASSEMBLY__
 
-typedef unsigned long mm_segment_t;
-
-#define MAKE_MM_SEG(s)  ((mm_segment_t) (s))
-#define USER_DS         MAKE_MM_SEG(__USER_DS)
-#define KERNEL_DS       MAKE_MM_SEG(__KERNEL_DS)
+#define USER_DS         __USER_DS
+#define KERNEL_DS       __KERNEL_DS
 
 /*
  * Get/set the SFC/DFC registers for MOVES instructions
