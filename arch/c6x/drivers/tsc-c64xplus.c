@@ -47,7 +47,7 @@ int __init c6x_arch_init_clocksource(void)
 	cs->mult = (u32) temp;
 
 	/* write anything into TSCL to enable counting */
-	TSCL = 0;
+	set_creg(TSCL, 0);
 
 	clocksource_register(cs);
 

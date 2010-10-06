@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -15,6 +15,9 @@
 
 #include <linux/linkage.h>
 #include <asm/segment.h>
+
+/* Enable/disable interrupts */
+extern unsigned int irq_IER;
 
 /*
  * switch_to() saves the extra registers, that are not saved
@@ -38,6 +41,8 @@ asmlinkage void * resume(void *prev, void *next, int thread, char shared);
 /* Reset the board */
 #define HARD_RESET_NOW()
 
+#ifdef CONFIG_TI_C6X_COMPILER
+
 extern cregister volatile unsigned int IRP;     /* Interrupt Return Pointer */
 extern cregister volatile unsigned int NRP;     /* NMI Return Pointer */
 extern cregister volatile unsigned int CSR;     /* Control Status Register */
@@ -57,11 +62,17 @@ extern cregister volatile unsigned int TSCL;    /* Time Stamp Counter Register -
 extern cregister volatile unsigned int TSCH;    /* Time Stamp Counter Register - High Half */
 extern cregister volatile unsigned int DNUM;    /* Core number */
 
+
+#define get_creg(reg)    reg
+#define set_creg(reg, v) reg = (v)
+#define or_creg(reg, n)  reg |= (n)
+#define and_creg(reg, n) reg &= (n)
+
 #define get_coreid()             (DNUM & 0xff)
 
 #endif
 
-/* 
+/*
  * Interrupt management
  */
 
@@ -73,17 +84,13 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #define set_IST(x)               ISTP = x
 #define get_IST()                ISTP
 
-/* Enable/disable interrupts */
-extern unsigned int irq_IER;
-
 #ifdef __TMS320C6XPLUS__
 #define __dint()                 asm(" DINT")
 #define __rint()                 asm(" RINT")
 #endif
+
 #define global_sti()             CSR |= 1
 #define global_cli()             CSR &= -2
-#define partial_sti()            do { CSR &= -2; IER |= irq_IER; CSR |= 1; } while(0)
-#define partial_cli()            do { CSR &= -2; IER &= ~(irq_IER); CSR |= 1; } while(0)
 
 #define enable_irq_mask(mask)    IER |= mask
 #define disable_irq_mask(mask)   IER &= ~(mask)
@@ -96,6 +103,108 @@ extern unsigned int irq_IER;
 #define restore_global_flags(x)  CSR = x
 #define save_partial_flags(x)    x = IER
 #define restore_partial_flags(x) IER = x
+
+#else /* CONFIG_TI_C6X_COMPILER */
+
+#if 0
+extern cregister volatile unsigned int IRP;     /* Interrupt Return Pointer */
+extern cregister volatile unsigned int NRP;     /* NMI Return Pointer */
+extern cregister volatile unsigned int CSR;     /* Control Status Register */
+extern cregister volatile unsigned int IER;     /* Interrupt Enable Register */
+extern cregister volatile unsigned int IFR;     /* Interrupt Flag Register */
+extern cregister volatile unsigned int ISR;     /* Interrupt Set Register */
+extern cregister volatile unsigned int ICR;     /* Interrupt Clear Register */
+extern cregister volatile unsigned int ISTP;    /* Interrupt Service Table Pointer */
+#ifdef __TMS320C6XPLUS__
+extern cregister volatile unsigned int IERR;    /* Internal Exception Report Register */
+extern cregister volatile unsigned int ECR;     /* Exception Clear Register */
+extern cregister volatile unsigned int EFR;     /* Exception Flag Register */
+extern cregister volatile unsigned int TSR;     /* Task State Register */
+extern cregister volatile unsigned int ITSR;    /* Interrupt Task State Register */
+extern cregister volatile unsigned int NTSR;    /* NMI/exception Task State Register */
+extern cregister volatile unsigned int TSCL;    /* Time Stamp Counter Register - Low Half  */
+extern cregister volatile unsigned int TSCH;    /* Time Stamp Counter Register - High Half */
+extern cregister volatile unsigned int DNUM;    /* Core number */
+#endif
+#endif
+
+#define get_creg(reg) \
+	({ unsigned int __x; asm volatile (" mvc .s2 " #reg ",%0\n" : "=b"(__x)); __x; })
+
+#define set_creg(reg, v) \
+	do { unsigned int __x = (unsigned int)(v); \
+		asm volatile (" mvc .s2 %0," #reg "\n" : : "b"(__x)); \
+	} while(0)
+
+#define or_creg(reg, n) \
+	do { unsigned __x, __n = (unsigned)(n);		  \
+		asm volatile (" mvc .s2 " #reg ",%0\n"	  \
+			      " or  .l2 %1,%0,%0   \n"    \
+			      " mvc .s2 %0," #reg "\n"    \
+			      : "=&b"(__x) : "b"(__n));	  \
+	} while(0)
+
+#define and_creg(reg, n) \
+	do { unsigned __x, __n = (unsigned)(n);		  \
+		asm volatile (" mvc .s2 " #reg ",%0\n"	  \
+			      " and .l2 %1,%0,%0   \n"    \
+			      " mvc .s2 %0," #reg "\n"    \
+			      : "=&b"(__x) : "b"(__n));	  \
+	} while(0)
+
+#define get_coreid() get_creg(DNUM)
+
+/*
+ * Interrupt management
+ */
+
+/* Return from interrupt function */
+#define iret()	  asm volatile(" B   .S2 IRP  \n" \
+			       " NOP 5	      \n")
+
+/* Set/get IST */
+#define set_IST(x)               set_creg(ISTP,x)
+#define get_IST()                get_creg(ISTP)
+
+#ifdef __TMS320C6XPLUS__
+#define __dint()                 asm(" DINT\n")
+#define __rint()                 asm(" RINT\n")
+#endif
+
+#define global_sti()             or_creg(CSR, 1)
+#define global_cli()             and_creg(CSR, -2)
+
+#define enable_irq_mask(x)	 or_creg(IER, (x))
+#define disable_irq_mask(x)      and_creg(IER, ~(x))
+
+#define set_irq_mask(mask)				  \
+	do { unsigned __x, __n = (unsigned)(mask);	  \
+		asm volatile (" mvc .s2 IFR,%0\n"	  \
+			      " or  .l2 %1,%0,%0   \n"    \
+			      " mvc .s2 %0,ISR\n"	  \
+			      : "=&b"(__x) : "b"(__n));	  \
+	} while(0)
+
+#define clear_irq_mask(mask)				  \
+	do { unsigned __x, __n = (unsigned)~(mask);	  \
+		asm volatile (" mvc .s2 IFR,%0\n"	  \
+			      " and .l2 %1,%0,%0   \n"    \
+			      " mvc .s2 %0,ICR\n"	  \
+			      : "=&b"(__x) : "b"(__n));	  \
+	} while(0)
+
+#define init_irq_mask()          set_creg(IER, 2)
+#define clear_all_irq()          set_creg(ICR, -1)
+
+#define save_global_flags(x)     (x) = get_creg(CSR)
+#define restore_global_flags(x)  set_creg(CSR, (x))
+#define save_partial_flags(x)    (x) = get_creg(IER)
+#define restore_partial_flags(x) set_creg(IER, x)
+
+#endif  /* CONFIG_TI_C6X_COMPILER */
+
+#define partial_sti()            do { global_cli(); enable_irq_mask(irq_IER); global_sti(); } while(0)
+#define partial_cli()            do { global_cli(); disable_irq_mask(irq_IER); global_sti(); } while(0)
 
 #ifdef CONFIG_NK
 #define __cli()                  partial_cli()
@@ -139,18 +248,18 @@ extern unsigned int irq_IER;
 
 #ifdef __TMS320C6XPLUS__
 asmlinkage void enable_exception(void);
-#define disable_exception()	 
-#define get_except_type()        EFR
-#define ack_exception(type)      (ECR = 1 << (type))
-#define get_iexcept()            IERR
-#define set_iexcept(mask)        (IERR = mask)
+#define disable_exception()
+#define get_except_type()        get_creg(EFR)
+#define ack_exception(type)      set_creg(ECR, 1 << (type))
+#define get_iexcept()            get_creg(IERR)
+#define set_iexcept(mask)        set_creg(IERR, (mask))
 #else
 #define enable_exception()
 #define disable_exception()
-#define get_except_type()	 
+#define get_except_type()
 #define ack_exception(type)
 #define get_iexcept()
-#define set_iexcept(mask) 
+#define set_iexcept(mask)
 #endif
 
 /*
@@ -158,10 +267,10 @@ asmlinkage void enable_exception(void);
  */
 
 /* Return from exception function */
-#define eret()                   { asm("	B.S2	NRP"); \
- 		                   asm("	NOP	5"); }
+#define eret()			 { asm("	B .S2	NRP\n"); \
+				   asm("	NOP	5\n"); }
 
-#define nop()                    asm("	NOP");
+#define nop()                    asm("	NOP\n");
 #define mb()                     barrier()
 #define rmb()                    barrier()
 #define wmb()                    barrier()
@@ -173,7 +282,7 @@ asmlinkage void enable_exception(void);
 #define smp_wmb()	         barrier()
 #define smp_read_barrier_depends()	do { } while(0)
 
-#define xchg(ptr,x) (__xchg((unsigned int)(x),(void *) (ptr),sizeof(*(ptr))))
+#define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned int)(x),(void *) (ptr),sizeof(*(ptr))))
 #define tas(ptr)    (xchg((ptr),1))
 
 unsigned int _lmbd(unsigned int, unsigned int);

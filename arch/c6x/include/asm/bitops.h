@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -105,6 +105,9 @@ static __inline__ int test_and_change_bit(int nr, volatile void *addr)
 }
 
 #if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)
+unsigned int _lmbd(unsigned int, unsigned int);
+unsigned int _bitr(unsigned int);
+
 /*
  * We are lucky, DSP is perfect for bitops: do it in 3 cycles
  */
