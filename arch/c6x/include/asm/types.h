@@ -14,6 +14,8 @@
 #define __ASM_C6X_TYPES_H
 #include <asm-generic/types.h>
 
+#ifdef CONFIG_TI_C6X_COMPILER
 #define _Bool  unsigned int
+#endif
 
 #endif /* __ASM_C6X_TYPES_H */
