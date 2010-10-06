@@ -2,8 +2,6 @@
 # Makefile for arch/c6x/kernel/
 #
 
-include $(srctree)/arch/c6x/Makefile.lib
-
 extra-y	 := head.o vmlinux.lds
 
 obj-y 	 := process.o traps.o irq.o signal.o ptrace.o \
@@ -12,6 +10,10 @@ obj-y 	 := process.o traps.o irq.o signal.o ptrace.o \
 
 obj-$(CONFIG_MODULES)          += module.o
 obj-$(CONFIG_COMMON_CLKDEV)    += clkdev.o
+
+ifdef CONFIG_TI_C6X_COMPILER
+
+include $(srctree)/arch/c6x/Makefile.lib
 
 $(obj)/unaligned.o: $(src)/unaligned.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
 $(obj)/entry.o:    $(src)/entry.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
@@ -39,4 +41,5 @@ $(obj)/c6x_config.inc: include/generated/autoconf.h
 	@echo $(config-c64plus-$(CONFIG_TMS320C64XPLUS)) >> $(obj)/c6x_config.inc
 	@echo $(config-mtduclinux-$(CONFIG_MTD_UCLINUX)) >> $(obj)/c6x_config.inc
 
+endif
 
