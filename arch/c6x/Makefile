@@ -10,30 +10,46 @@ PROCESSOR	 = c6x
 ABI		:= elf
 
 DEFINES	        := -D__linux__ -DNO_MM -D__TMS320C6X__
-
-# FIXME. Need to differentiate gcc from TI compiler.
-DEFINES		+= -D__TI_C6X_COMPILER__
-
-CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
-AFLAGS_MODULE   += -mlarge-memory-model=3
-
-ifeq ($(CONFIG_TI_C6X_LINKER),y)
-LINKFLAGS_ABI  := -Wl,--unused_section_elimination=off
-endif
-
-JIFFIES64      := jiffies_64
-
-ifeq ($(CONFIG_TMS320C64XPLUS),y)
+ifdef CONFIG_TMS320C64XPLUS
 DEFINES         += -D__TMS320C6XPLUS__
 endif
 
-LINKFLAGS	:= $(LINKFLAGS_ABI)
-GZFLAGS		:= -9
-KBUILD_AFLAGS   := -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
+LDSCRIPT = $(obj)/arch/c6x/kernel/vmlinux.lds
+
+ifdef CONFIG_TI_C6X_COMPILER
+include $(srctree)/arch/c6x/Makefile.lib
+
+CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
+AFLAGS_MODULE   += -mlarge-memory-model=3
+KBUILD_AFLAGS   = -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
+DEFINES		+= -D__TI_C6X_COMPILER__
+
+AS		 = $(CROSS_COMPILE)gcc -c
+
+HOSTCFLAGS_kallsyms.o += -DTI_ASM
+export HOSTCFLAGS_kallsyms.o
+endif
+
+ifdef CONFIG_TI_C6X_LINKER
+LINKFLAGS	= -Wl,--unused_section_elimination=off
+
+MODULESCRIPT := $(srctree)/arch/c6x/modules.cmd
+export MODULESCRIPT
+LDFLAGS_MODULE = $(MODULESCRIPT)
+
+# Flags used for the final link
+LDFLAGS_vmlinux	:= --final-script=arch/c6x/vmlinux.cmd \
+		   -Wl,-m,arch/c6x/vmlinux.map -Wl,--reread_libs
+
+# FIXME. Why isn't the elf linker getting this from --final-script ?
+LDFLAGS_vmlinux	+= -Wl,arch/c6x/vmlinux.cmd
+
+LD		= $(CROSS_COMPILE)gcc -nostdlib $(LINKFLAGS)
+endif
 
 KBUILD_CPPFLAGS += -I$(srctree)/arch/c6x/platforms/include -I$(obj)/arch/c6x/kernel
 
-ifeq ($(CONFIG_DEBUG_INFO),y)
+ifdef CONFIG_DEBUG_INFO
 # KBUILD_CFLAGS	:= $(CPPFLAGS) $(DEFINES) -g
 KBUILD_CFLAGS   += $(DEFINES) -g
 KBUILD_AFLAGS   += -g
@@ -42,12 +58,7 @@ else
 KBUILD_CFLAGS   += $(DEFINES) -O2
 endif
 
-ifeq ($(CONFIG_TI_C6X_LINKER),y)
-LD		 = $(CROSS_COMPILE)gcc -nostdlib $(LINKFLAGS_ABI)
-endif
-AS		 = $(CROSS_COMPILE)gcc -c
-
-ifneq ($(CONFIG_NO_FRAME_POINTER),y)
+ifdef CONFIG_NO_FRAME_POINTER
 KBUILD_CFLAGS	:= $(KBUILD_CFLAGS:-fomit-frame-pointer=)
 endif
 
@@ -61,47 +72,33 @@ nk-flags-y                := 1
 be-flags-                 := 0
 be-flags-y                := 1
 
-ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ifdef CONFIG_CPU_BIG_ENDIAN
 KBUILD_CFLAGS   += -mbig-endian
 KBUILD_AFLAGS	+= -mbig-endian
 LINKFLAGS	+= -mbig-endian
 KBUILD_LDFLAGS	+= -mbig-endian
-JIFFIES        = $(JIFFIES64) + 4
-else
-JIFFIES        = $(JIFFIES64)
 endif
 
 KBUILD_CFLAGS	+= $(arch-y)
 KBUILD_AFLAGS	+= $(arch-y) -Wa,-d__NK__=$(nk-flags-$(CONFIG_NK)) \
                    -Wa,-d__BIG_ENDIAN__=$(be-flags-$(CONFIG_CPU_BIG_ENDIAN))
 
-ifeq ($(CONFIG_TI_C6X_LINKER),y)
-MODULESCRIPT := $(srctree)/arch/c6x/modules.cmd
-export MODULESCRIPT
-LDFLAGS_MODULE = $(MODULESCRIPT)
-
-# Flags used for the final link
-LDFLAGS_vmlinux	:= --final-script=arch/c6x/vmlinux.cmd \
-		   -Wl,-m,arch/c6x/vmlinux.map -Wl,--reread_libs
-
-# FIXME. Why isn't the elf linker getting this from --final-script ?
-LDFLAGS_vmlinux	+= -Wl,arch/c6x/vmlinux.cmd
-endif
-
 head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/
 libs-y		+= arch/c6x/lib/
 
-ifeq ($(CONFIG_NK),y)
+ifdef CONFIG_NK
 core-y         	+= arch/c6x/nkernel/
 endif
 
-LIBGCC = $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)
+ifdef CONFIG_TI_C6X_COMPILER
+LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)
+else
+LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
+endif
 libs-y		+= $(LIBGCC)
 
-LDSCRIPT = $(obj)/arch/c6x/kernel/vmlinux.lds
-
-ifeq ($(CONFIG_TI_C6X_LINKER),y)
+ifdef CONFIG_TI_C6X_LINKER
 TI_LDSCRIPT := $(obj)/arch/c6x/vmlinux.cmd
 BUILTINSCRIPT := $(srctree)/arch/c6x/builtin.cmd
 export BUILTINSCRIPT
@@ -123,14 +120,9 @@ cmd_vmlinux-modpost = $(LD) $(LDFLAGS) $(BUILTINSCRIPT) -r -o $@         \
 	 $(filter-out $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
 endif
 
-include $(srctree)/arch/c6x/Makefile.lib
-
-HOSTCFLAGS_kallsyms.o += -DTI_ASM
-export HOSTCFLAGS_kallsyms.o
-
 #CLEAN_FILES =
 MRPROPER_FILES = arch/c6x/kernel/c6x_config.inc arch/c6x/kernel/c6x_defs.inc
-ifeq ($(CONFIG_TI_C6X_LINKER),y)
+ifdef CONFIG_TI_C6X_LINKER
 MRPROPER_FILES += arch/c6x/vmlinux.cmd arch/c6x/vmlinux.map
 endif
 #archclean:

@@ -96,8 +96,15 @@ config CMDLINE
 config RAM_ATTACHED_ROMFS
 	bool "m68knommu-style attached romfs in RAM support"
 
+config TI_C6X_COMPILER
+       bool "Build using Texas Instruments compiler"
+       help
+	  Say Y if you are using the Texas Instruments compiler rather
+	  than GCC.
+
 config TI_C6X_LINKER
        bool "Build using Texas Instruments linker"
+       depends on TI_C6X_COMPILER
        help
 	  Say Y if you are using the Texas Instruments linker rather than GCC.
 
