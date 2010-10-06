@@ -288,7 +288,7 @@ void zlib_tr_stored_type_only (deflate_state *);
  * method would use a table)
  * IN assertion: 1 <= len <= 15
  */
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 static inline unsigned bi_reverse(unsigned code, /* the value to invert */
 				  int len)       /* its bit length */
 {

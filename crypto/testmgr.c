@@ -1428,7 +1428,7 @@ static int alg_test_crc32c(const struct alg_test_desc *desc,
 	}
 
 	do {
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 		struct {
 			struct shash_desc shash;
 			char ctx[crypto_shash_descsize(tfm)];

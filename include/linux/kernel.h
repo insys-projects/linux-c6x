@@ -294,7 +294,7 @@ static inline void log_buf_kexec_setup(void)
 extern int printk_needs_cpu(int cpu);
 extern void printk_tick(void);
 
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 extern void asmlinkage __attribute__((format(printf, 1, 2)))
 #else
 extern void asmlinkage

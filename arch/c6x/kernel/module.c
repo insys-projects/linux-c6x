@@ -51,7 +51,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	kfree(me->arch.sh_addr);
 	me->arch.sh_addr = NULL;
 #endif
@@ -73,7 +73,7 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      char *secstrings,
 			      struct module *mod)
 {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	int i, max_alloc = 0;
 	Elf_Shdr shdr, *shdrs = (void *)hdr + hdr->e_shoff;
 
@@ -117,7 +117,7 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 	unsigned int i;
 	Elf32_Addr v;
 	int res;
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
 	Elf_Addr offset = 0;
@@ -140,7 +140,11 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 			+ ELF32_R_SYM(rel[i].r_info);
 
 		/* this is the adjustment to be made */
+#ifdef CONFIG_TI_C6X_COMPILER
 		v = sym->st_value - me->arch.sh_addr[sym->st_shndx];
+#else
+		v = sym->st_value;
+#endif
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_C6000_ABS32:
@@ -201,7 +205,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	unsigned int i;
 	Elf32_Addr v;
 	int res;
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
 	Elf_Addr offset = 0;
@@ -220,7 +224,11 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			+ ELF32_R_SYM(rel[i].r_info);
 
 		/* this is the adjustment to be made */
+#ifdef CONFIG_TI_C6X_COMPILER
 		v = sym->st_value + rel[i].r_addend - me->arch.sh_addr[sym->st_shndx];
+#else
+		v = sym->st_value + rel[i].r_addend;
+#endif
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_C6000_ABS_L16:

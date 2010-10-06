@@ -100,7 +100,7 @@ MODULE_PARM_DESC(write_timeout, "Time (in ms) to try writes (default 25)");
 
 #define AT24_BITMASK(x) (BIT(x) - 1)
 
-#ifdef __TI_C6X_COMPILER__
+#ifdef CONFIG_TI_C6X_COMPILER
 /* create non-zero magic value for given eeprom parameters */
 #define AT24_DEVICE_MAGIC(_len, _flags) 		\
 	((1 << AT24_SIZE_FLAGS | (_flags)) 		\

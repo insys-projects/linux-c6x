@@ -79,7 +79,7 @@ extern unsigned int __invalid_size_argument_for_IOC;
 #define _IOC_TYPECHECK(t) (sizeof(t))
 #endif
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 /* TI compiler has trouble with this */
 #undef _IOC_TYPECHECK
 #define _IOC_TYPECHECK(t) (sizeof(t))

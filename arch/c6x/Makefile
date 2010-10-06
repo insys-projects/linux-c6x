@@ -22,12 +22,14 @@ include $(srctree)/arch/c6x/Makefile.lib
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
 KBUILD_AFLAGS   = -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
-DEFINES		+= -D__TI_C6X_COMPILER__
 
 AS		 = $(CROSS_COMPILE)gcc -c
 
 HOSTCFLAGS_kallsyms.o += -DTI_ASM
 export HOSTCFLAGS_kallsyms.o
+
+# native works well enough but cross toolchain should have one
+NM		= /usr/bin/nm
 endif
 
 ifdef CONFIG_TI_C6X_LINKER

@@ -39,7 +39,7 @@ void __weak __clk_put(struct clk *clk)
 {
 }
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 asm(" .weak __clk_put\n"
     " .weak __clk_get\n");
 #endif

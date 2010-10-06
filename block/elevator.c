@@ -150,7 +150,7 @@ static struct elevator_type *elevator_get(const char *name)
 
 	e = elevator_find(name);
 	if (!e) {
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 		char elv[ELV_NAME_MAX + strlen("-iosched")];
 #else
 		/* TI compiler can't do variable sized automatic arrays */

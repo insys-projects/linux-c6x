@@ -25,7 +25,7 @@ struct svc_rqst;
 #define NLM_MAXCOOKIELEN    	32
 #define NLM_MAXSTRLEN		1024
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 #define	nlm_granted		__constant_cpu_to_be32(NLM_LCK_GRANTED)
 #define	nlm_lck_denied		__constant_cpu_to_be32(NLM_LCK_DENIED)
 #define	nlm_lck_denied_nolocks	__constant_cpu_to_be32(NLM_LCK_DENIED_NOLOCKS)
