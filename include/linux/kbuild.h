@@ -11,17 +11,21 @@
 		static int __CONCAT1(sym,__xx__) = val;	\
 		bar(&__CONCAT1(sym,__xx__));		\
 	})
+#define BLANK() asm ("\n->" : : )
+
+#define COMMENT(x) \
+	asm ("\n->#" x)
 #else
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
-#endif
 
 #define BLANK() asm volatile("\n->" : : )
 
-#define OFFSET(sym, str, mem) \
-	DEFINE(sym, offsetof(struct str, mem))
-
 #define COMMENT(x) \
 	asm volatile("\n->#" x)
+#endif
+
+#define OFFSET(sym, str, mem) \
+	DEFINE(sym, offsetof(struct str, mem))
 
 #endif
