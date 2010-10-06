@@ -36,11 +36,18 @@ static inline cycles_t get_cycles (void)
 #ifdef CONFIG_TMS320C64XPLUS
 	unsigned l, h;
 
+#ifdef CONFIG_TI_C6X_COMPILER
 	__dint();
 	l = TSCL;
 	h = TSCH;
 	__rint();
-
+#else
+	asm volatile (" dint\n"
+		      " mvc .s2 TSCL,%0\n"
+		      " mvc .s2 TSCH,%1\n"
+		      " rint\n"
+		      : "=b"(l), "=b"(h));
+#endif
 	return ((cycles_t)h << 32) | l;
 #else
 	/* FIXME */
