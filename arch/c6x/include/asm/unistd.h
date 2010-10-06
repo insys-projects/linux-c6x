@@ -506,12 +506,25 @@ static inline pid_t wait(int * wait_stat)
 
 #endif /* __KERNEL_SYSCALLS__ */
 
+#ifdef CONFIG_TI_C6X_COMPILER
 #define cond_syscall(name) \
 	asm(" .text\n" \
 	    " .global "#name "\n" \
 	    " .weak "#name "\n" \
 	    #name " .set sys_ni_syscall\n")
+#else
+/*
+ * "Conditional" syscalls
+ *
+ * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
+ * but it doesn't work on all toolchains, so we just do it by hand
+ */
+#ifndef cond_syscall
+#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#endif
+#endif
+
+#endif /* __KERNEL__ */
 
 #endif /* __ASM_C6x_UNISTD_H_ */
 
-#endif /* __KERNEL__ */
