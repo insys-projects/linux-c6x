@@ -48,7 +48,7 @@
 /*
  * Architectures can override it:
  */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 void asmlinkage early_printk(const char *fmt, ...)
 {
 }

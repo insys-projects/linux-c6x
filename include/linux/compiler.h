@@ -51,7 +51,7 @@ extern void __chk_io_ptr(const volatile void __iomem *);
 # include <linux/compiler-intel.h>
 #endif
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 # include <linux/compiler-ti.h>
 #endif
 

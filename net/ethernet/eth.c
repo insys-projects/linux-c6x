@@ -130,7 +130,7 @@ int eth_rebuild_header(struct sk_buff *skb)
 
 	switch (eth->h_proto) {
 #ifdef CONFIG_INET
-#ifdef __TI_C6X_COMPILER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	case htons_const(ETH_P_IP):
 #else
 	case htons(ETH_P_IP):

@@ -924,7 +924,7 @@ struct net_device {
 	       NETREG_UNREGISTERED,	/* completed unregister todo */
 	       NETREG_RELEASED,		/* called free_netdev */
 	       NETREG_DUMMY,		/* dummy device for NAPI poll */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 		/* force enum to be 16 bits */
 	       NETREG_TI_TOOL_DUMMY = 0x7fff,
 #endif
@@ -933,7 +933,7 @@ struct net_device {
 	enum {
 		RTNL_LINK_INITIALIZED,
 		RTNL_LINK_INITIALIZING,
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 		/* force enum to be 16 bits */
 		RTNL_LINK_TI_TOOL_DUMMY = 0x7fff,
 #endif

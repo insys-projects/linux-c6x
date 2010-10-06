@@ -315,12 +315,7 @@ LD		= $(CROSS_COMPILE)ld
 CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
-ifneq ($(SRCARCH),c6x)
 NM		= $(CROSS_COMPILE)nm
-else
-# native works well enough and proprietary TI toolchain doesn't have nm
-NM		= /usr/bin/nm
-endif
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
@@ -806,7 +801,7 @@ quiet_cmd_kallsyms = KSYM    $@
       cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) \
                      $(if $(CONFIG_KALLSYMS_ALL),--all-symbols) > $@
 
-ifeq ($(SRCARCH),c6x)
+ifdef CONFIG_TI_C6X_COMPILER
 .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S64 scripts FORCE
 	$(call if_changed_dep,as_o_S64)
 

@@ -540,7 +540,7 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 
 	return cfi_intelext_setup(mtd);
 }
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 struct mtd_info *cfi_cmdset_0003(struct map_info *map, int primary);
 asm("cfi_cmdset_0003 .set cfi_cmdset_0001\n");
 struct mtd_info *cfi_cmdset_0200(struct map_info *map, int primary);

@@ -185,7 +185,7 @@ void *__symbol_get_gpl(const char *symbol);
 #ifdef CONFIG_MODVERSIONS
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 /* TI compiler doesn't have "used" attribute and will throw out
    static data unless it is referenced. */
 #define __CRC_SYMBOL(sym, sec)					\
@@ -207,7 +207,7 @@ void *__symbol_get_gpl(const char *symbol);
 #endif
 
 /* For every exported symbol, place a struct in the __ksymtab section */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 /* TI compiler doesn't have "used" attribute and will throw out
    static data unless it is referenced. */
 #define __EXPORT_SYMBOL(sym, sec)				\

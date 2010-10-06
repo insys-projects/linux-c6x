@@ -107,7 +107,7 @@ struct pppoe_tag {
 #define PTT_GEN_ERR  	__cpu_to_be16(0x0203)
 
 struct pppoe_hdr {
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__LITTLE_ENDIAN_BITFIELD)
 	__u8 ver : 4;
 	__u8 type : 4;

@@ -618,7 +618,7 @@ static inline int mtd_proc_info (char *buf, int i)
 	if (!this)
 		return 0;
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	return sprintf(buf, "mtd%d: %8.8lx %8.8x \"%s\"\n", i,
 		       (unsigned long)this->size,
 #else

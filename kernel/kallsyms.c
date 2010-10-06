@@ -43,7 +43,7 @@ const u8 kallsyms_names[] __weak;
  * has one (eg: FRV).
  */
 const unsigned long kallsyms_num_syms
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 __attribute__((section(".rodata")));
 #else
 __attribute__((weak, section(".rodata")));
@@ -54,7 +54,7 @@ const u16 kallsyms_token_index[] __weak;
 
 const unsigned long kallsyms_markers[] __weak;
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 asm("\t.weak kallsyms_addresses");
 asm("\t.weak kallsyms_names");
 asm("\t.weak kallsyms_num_syms");

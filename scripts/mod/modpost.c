@@ -282,7 +282,7 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 		s = new_symbol(name, mod, export);
 	} else {
 		if (!s->preloaded) {
-#ifdef CONFIG_TMS320C6X
+#ifdef CONFIG_TI_C6X_COMPILER
 			/* The TI compiler will create symbols for section names.
 			   Ignore those. */
 			if (strcmp(name,"gpl") && strcmp(name,"strings"))

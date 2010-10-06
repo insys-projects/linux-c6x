@@ -1067,7 +1067,7 @@ typedef enum {
 } mechtype_t;
 
 typedef struct {
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 ps			: 1;
 	__u8 reserved1		: 1;
@@ -1110,7 +1110,7 @@ typedef struct {
 #endif
 	__u8 link_size;
 	__u8 reserved4;
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved5		: 2;
 	__u8 app_code		: 6;
@@ -1153,7 +1153,7 @@ typedef struct {
 	__u16 report_key_length;
 	__u8 reserved1;
 	__u8 reserved2;
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 type_code			: 2;
 	__u8 vra			: 3;
@@ -1173,7 +1173,7 @@ typedef struct {
 
 struct event_header {
 	__be16 data_len;
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 nea		: 1;
 	__u8 reserved1		: 4;
@@ -1190,7 +1190,7 @@ struct event_header {
 };
 
 struct media_event_desc {
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved1		: 4;
 	__u8 media_event_code	: 4;

@@ -52,7 +52,7 @@ static int hmac_setkey(struct crypto_shash *parent,
 	struct hmac_ctx *ctx = align_ptr(opad + ss,
 					 crypto_tfm_ctx_alignment());
 	struct crypto_shash *hash = ctx->hash;
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 	struct {
 		struct shash_desc shash;
 		char ctx[crypto_shash_descsize(hash)];

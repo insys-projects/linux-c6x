@@ -1256,7 +1256,7 @@ replay:
 	}
 
 	if (1) {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 		struct nlattr *attr[32], **data = NULL;
 #else
 		struct nlattr *attr[ops ? ops->maxtype + 1 : 0], **data = NULL;

@@ -65,7 +65,7 @@ static inline struct request *__elv_next_request(struct request_queue *q)
 		if (!q->elevator->ops->elevator_dispatch_fn(q, 0))
 			return NULL;
 	}
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	/* never reached, but quiet build warning. */
 	return NULL;
 #endif
