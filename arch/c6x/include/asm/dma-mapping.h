@@ -20,8 +20,8 @@
 #include <asm/scatterlist.h>
 
 /* arch/c6x/mm/consistent.c */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
+
+#define dma_supported(d, m)         (1)
 
 static inline int dma_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
         enum dma_data_direction direction)
@@ -75,5 +75,44 @@ static inline void dma_free_coherent(struct device *dev, size_t size,
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent((d), (s), (h), (f))
 #define dma_free_noncoherent(d, s, v, h)  dma_free_coherent((d), (s), (v), (h))
+
+static inline void
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t handle,
+			      unsigned long offset, size_t size,
+			      enum dma_data_direction dir)
+{
+	BUG_ON(!valid_dma_direction(dir));
+}
+
+static inline void
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t handle,
+				 unsigned long offset, size_t size,
+				 enum dma_data_direction dir)
+{
+	/* _dma_sync(handle + offset, size, dir); */
+}
+
+static inline void
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t handle, size_t size,
+			enum dma_data_direction dir)
+{
+	dma_sync_single_range_for_cpu(dev, handle, 0, size, dir);
+}
+
+static inline void
+dma_sync_single_for_device(struct device *dev, dma_addr_t handle, size_t size,
+			   enum dma_data_direction dir)
+{
+	dma_sync_single_range_for_device(dev, handle, 0, size, dir);
+}
+
+static inline void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nents,
+		    enum dma_data_direction dir)
+{
+	BUG_ON(!valid_dma_direction(dir));
+}
+
+
 
 #endif  /* _C6X_DMA_MAPPING_H */

@@ -300,7 +300,7 @@ asmlinkage int c6x_clone(struct pt_regs *regs)
 	else
 		newsp = regs->sp;
 
-	return do_fork(clone_flags, newsp, regs, 0, regs->a6, regs->b6);
+	return do_fork(clone_flags, newsp, regs, 0, (int __user *)regs->a6, (int __user *)regs->b6);
 }
 
 /*
@@ -391,6 +391,7 @@ asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char 
 	return (do_exec_memobj(exe, argv, envp, regs));
 }
 #else
+struct memobj_frm_struct;
 asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char **envp, struct pt_regs *regs)
 {
 	return -ENOSYS;
@@ -411,6 +412,7 @@ unsigned long __kstk_eip(struct task_struct *p)
 
 unsigned long get_wchan(struct task_struct *p)
 {
+#if 0
 	unsigned long fp, pc;
 	unsigned long stack_page;
 	int count = 0;
@@ -419,6 +421,6 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
  
 	/* TO BE DONE */
-
+#endif
 	return 0;
 }

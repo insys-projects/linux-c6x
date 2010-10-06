@@ -47,4 +47,6 @@
 #define INT14		    14   /* level 14 interrupt */
 #define INT15		    15   /* level 15 interrupt */
 
+extern void irq_map(unsigned int irq_src, unsigned int cpu_irq);
+
 #endif /* __ASM_C6X_IRQ_H_ */
