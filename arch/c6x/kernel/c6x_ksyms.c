@@ -33,10 +33,6 @@ extern void consistent_sync(void *vaddr, size_t size, int direction);
 
 /******************************************************************************/
 
-/* address translation */
-EXPORT_SYMBOL(mm_ptov);
-EXPORT_SYMBOL(mm_vtop);
-
 /*
  * libcl6x/libgcc functions - used internally by the compiler...
  */
