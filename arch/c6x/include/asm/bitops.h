@@ -104,16 +104,17 @@ static __inline__ int test_and_change_bit(int nr, volatile void *addr)
 	return retval;
 }
 
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)
-unsigned int _lmbd(unsigned int, unsigned int);
-unsigned int _bitr(unsigned int);
-
 /*
  * We are lucky, DSP is perfect for bitops: do it in 3 cycles
  */
+#ifdef CONFIG_TI_C6X_COMPILER
+unsigned int _lmbd(unsigned int, unsigned int);
+unsigned int _bitr(unsigned int);
+
 #define ffz(a)     (_lmbd(0, _bitr(a)))
 #define __ffs(a)   (_lmbd(1, _bitr(a)))
-#define fls(a)     (32 - _lmbd(1, (a)))
+#define fls(a)     (!(a)?0:(32 - _lmbd(1, (a))))
+
 /*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
@@ -121,12 +122,73 @@ unsigned int _bitr(unsigned int);
  */
 #define ffs(x) ((__ffs(x) + 1) % 33)
 
-#else /* CONFIG_TMS320C64X || CONFIG_TMS320C64XPLUS */
-#include <asm-generic/bitops/ffz.h>
-#include <asm-generic/bitops/__ffs.h>
-#include <asm-generic/bitops/fls.h>
-#include <asm-generic/bitops/ffs.h>
-#endif /* CONFIG_TMS320C64X || CONFIG_TMS320C64XPLUS */
+#else /* CONFIG_TI_C6X_COMPILER */
+
+/**
+ * __ffs - find first bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ * Note __ffs(0) = undef, __ffs(1) = 0, __ffs(0x80000000) = 31.
+ *
+ */
+static inline unsigned long __ffs(unsigned long x)
+{
+	asm (" bitr  .M1  %0,%0\n"
+	     " nop\n"
+	     " lmbd  .L1  1,%0,%0\n"
+	     : "+a"(x));
+
+	return x;
+}
+
+/*
+ * ffz - find first zero in word.
+ * @word: The word to search
+ *
+ * Undefined if no zero exists, so code should check against ~0UL first.
+ */
+#define ffz(x) __ffs(~(x))
+
+/**
+ * fls - find last (most-significant) bit set
+ * @x: the word to search
+ *
+ * This is defined the same way as ffs.
+ * Note fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
+ */
+static inline unsigned long fls(unsigned long x)
+{
+	if (!x)
+		return 0;
+
+	asm (" lmbd  .L1  1,%0,%0\n" : "+a"(x));
+
+	return 32 - x;
+}
+
+/**
+ * ffs - find first bit set
+ * @x: the word to search
+ *
+ * This is defined the same way as
+ * the libc and compiler builtin ffs routines, therefore
+ * differs in spirit from the above ffz (man ffs).
+ * Note ffs(0) = 0, ffs(1) = 1, ffs(0x80000000) = 32.
+ */
+static inline int ffs(int x)
+{
+	if (!x)
+		return 0;
+
+	asm (" bitr  .M1  %0,%0\n"
+	     " nop\n"
+	     " lmbd  .L1  1,%0,%0\n"
+	     : "+a"(x));
+
+	return 32 - x;
+}
+#endif /* CONFIG_TI_C6X_COMPILER */
 
 #include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/fls64.h>
