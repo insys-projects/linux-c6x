@@ -2,7 +2,9 @@
 # Makefile for arch/c6x/lib/
 #
 
+ifdef CONFIG_TI_C6X_COMPILER
 include $(srctree)/arch/c6x/Makefile.lib
+endif
 
 lib-y	 := memcmp.o memmove.o memset.o misc.o delay.o io-readwrite.o
 
