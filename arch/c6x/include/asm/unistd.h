@@ -300,7 +300,7 @@
 #define __NR_keyctl		281
 
 /* C6x special syscalls */		
-#define __NR_exec_memobj	282
+/* #define __NR_exec_memobj	282 */
 #define __NR_dp_alloc		283
 
 #define __NR_sched_setaffinity	284
@@ -416,7 +416,6 @@
 
 extern int clone(unsigned int flags, char * usp);
 extern int execve(char * file, char ** argvp, char ** envp);
-extern int exec_memobj(struct binfmt_memobj * exe, char ** argvp, char ** envp);
 
 extern void sys_idle(void);
 static inline void idle(void) 

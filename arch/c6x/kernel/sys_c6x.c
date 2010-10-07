@@ -220,9 +220,3 @@ int kernel_execve(char * file, char ** argvp, char ** envp)
         KERNEL_SYSCALL_GENERATE(11);   /* __NR_execve */
 }
 
-int exec_memobj(struct binfmt_memobj * exe,
-			      char ** argvp,
-			      char ** envp)
-{
-	KERNEL_SYSCALL_GENERATE(235);  /* __NR_exec_memobj */
-}

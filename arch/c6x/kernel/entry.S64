@@ -59,7 +59,6 @@ HAVE_32_REGS .set 0
 		.def 	sys_fork
 		.def	sys_clone
 		.def 	sys_execve
-		.def	sys_exec_memobj
 
 	;; External functions
 		.ref	schedule
@@ -73,7 +72,6 @@ HAVE_32_REGS .set 0
 		.ref	c6x_clone
 		.ref	c6x_vfork
 		.ref	c6x_execve
-		.ref	c6x_exec_memobj
 		.ref 	do_sigsuspend
 		.ref	do_sigreturn
 		.ref	do_rt_sigreturn
@@ -965,25 +963,6 @@ sys_fallocate_c6x:
 	MV	A8,B7
 	MV	B8,B6
 
-sys_exec_memobj:
-	ADDAW	SP,1,B6			; put regs addr in 4th parameter
-					; & adjust regs stack addr
-
-	;; c6x_exec_memobj(struct memobj_frm_struct *memobj_frm, char **argv,
-	;;                 char **envp, struct pt_regs *regs) 
-
-	MVKL	c6x_exec_memobj,A0
-	MVKH	c6x_exec_memobj,A0
-	B	A0
-	STW	B3,*SP--[2]
-	ADDKPC	ret_from_c6x_exec_memobj,B3,3
-
-ret_from_c6x_exec_memobj:
-	LDW	*++SP[2],B3
-	NOP	4
-	BNOP	B3,5
-	MV	A4,SP
-
 	;;
 	;; resume() switchs to a new task
 	;; A4 = prev task
@@ -1364,7 +1343,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_keyctl
 
 	; C6x special syscalls
-	SYSCALL_LOCAL   sys_exec_memobj
+	SYSCALL_NI
 	SYSCALL_ENTRY	sys_dp_alloc
 
 	SYSCALL_ENTRY	sys_sched_setaffinity
