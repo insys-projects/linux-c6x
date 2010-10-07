@@ -414,9 +414,6 @@
 
 #define __NR__exit __NR_exit
 
-extern int clone(unsigned int flags, char * usp);
-extern int execve(char * file, char ** argvp, char ** envp);
-
 extern void sys_idle(void);
 static inline void idle(void) 
 { 
