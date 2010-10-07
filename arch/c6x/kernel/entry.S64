@@ -1019,24 +1019,6 @@ __current_thread_info:
 	MV	.D1X	B4,A4
 
 	;;
-	;; unsigned int get_sp(void):
-	;; Return current SP
-	;;
-	.global	get_sp
-get_sp:
-	BNOP	.S2	B3,4
-	MV	.D1X	SP,A4
-
-	;;
-	;; void set_sp(unsigned int sp):
-	;; Set current SP
-	;;
-	.global	set_sp
-set_sp:
-	BNOP	.S2	B3,4
-	MV	.D2X	A4,SP
-
-	;;
 	;; System calls table
 	;;
 SYSCALL_ENTRY .macro handler

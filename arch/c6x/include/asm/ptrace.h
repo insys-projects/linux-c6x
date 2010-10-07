@@ -289,7 +289,8 @@ struct switch_stack {
                                                 /* used in /include/asm/processor.h*/
 
 #ifndef CONFIG_TMS320C64XPLUS
-#define user_mode(regs)           (((((regs)->sp) ^ (get_sp())) >> PAGE_SHIFT) != 0)
+extern unsigned long current_ksp;
+#define user_mode(regs)           (((((regs)->sp) ^ current_ksp) >> PAGE_SHIFT) != 0)
 #else
 #define user_mode(regs)           ((((regs)->tsr) & 0x40) != 0)
 #endif
