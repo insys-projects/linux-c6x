@@ -99,62 +99,6 @@ asmlinkage int sys_getpagesize(void)
 	return PAGE_SIZE;
 }
 
-/*
- * dp allocator
- */
-#define DP_ALIGN 32
-struct dp_segment {
-	struct list_head list;
-
-	char name[24];
-	unsigned long addr;
-};
-static struct dp_segment dp_segment_list[16];
-static int dp_segment_initialiased[16];
-static int dp_segment_last_allocated[16];
-
-asmlinkage unsigned long sys_dp_alloc(const char *name,
-				      int area,
-				      unsigned long len)
-{
-	struct list_head *pos;
-	struct dp_segment *tmp;
-
-	/* List initialisation if needed */
-	if(dp_segment_initialiased[area] == 0) {
-		INIT_LIST_HEAD(&dp_segment_list[area].list);
-		dp_segment_initialiased[area] = 1;
-	}
-
-	/* Find an already allocated library */
-	list_for_each(pos, &dp_segment_list[area].list) {
-		tmp = list_entry(pos, struct dp_segment, list);
-		if(strncmp(name, tmp->name, 23) == 0)
-			goto out;
-	}
-
-	/* If no library is found, allocate a new segment */
-	tmp = kmalloc(sizeof(struct dp_segment), GFP_KERNEL);
-	if(tmp == NULL) {
-		printk(KERN_ALERT "Cannot allocate memory for dp_alloc\n");
-		return -1;
-	}
-	strncpy(tmp->name, name, 23);
-	tmp->name[23] = 0;
-	tmp->addr = dp_segment_last_allocated[area];
-
-	list_add(&(tmp->list), &(dp_segment_list[area].list));
-
-	dp_segment_last_allocated[area] += len;
-	dp_segment_last_allocated[area] =
-		(dp_segment_last_allocated[area] + DP_ALIGN - 1)
-		& ~(DP_ALIGN - 1);
-
-out:
-	return tmp->addr;
-}
-
-
 asmlinkage long old_mmap(unsigned long addr, unsigned long len,
 			 unsigned long prot, unsigned long flags,
 			 unsigned long fd, unsigned long offset)

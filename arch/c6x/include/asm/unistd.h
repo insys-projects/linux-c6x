@@ -301,7 +301,7 @@
 
 /* C6x special syscalls */		
 /* #define __NR_exec_memobj	282 */
-#define __NR_dp_alloc		283
+/* #define __NR_dp_alloc	283 */
 
 #define __NR_sched_setaffinity	284
 #define __NR_sched_getaffinity	285
