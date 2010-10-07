@@ -381,23 +381,6 @@ out:
 }
 
 /*
- * c6x_exec_memobj() executes a new program already store in a memory space (special feature).
- */
-#ifdef CONFIG_BINFMT_MEM
-#include <asm/binfmt_mem.h>
-extern int do_exec_memobj(struct memobj_frm_struct *, char **, char **, struct pt_regs *);
-asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char **envp, struct pt_regs *regs)
-{
-	return (do_exec_memobj(exe, argv, envp, regs));
-}
-#else
-struct memobj_frm_struct;
-asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char **envp, struct pt_regs *regs)
-{
-	return -ENOSYS;
-}
-#endif
-/*
  * These bracket the sleeping functions..
  */
 extern void scheduling_functions_start_here(void);
