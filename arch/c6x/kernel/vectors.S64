@@ -20,11 +20,11 @@
 IRQVEC	   .macro __name,__handler
 	   .align 32
 	   .ref __handler
-__name:    STW	.D2     A0,*B15--[2]
+__name:    STW	.D2T1     A0,*B15--[2]
        ||  MVKL	.S1     __handler,A0
            MVKH	.S1     __handler,A0
-           B	.S2	A0
-           LDW	.D2	*++B15[2],A0
+           B	.S2X	A0
+           LDW	.D2T1	*++B15[2],A0
            NOP         	4
            NOP
            NOP
@@ -36,7 +36,7 @@ __name:    STW	.D2     A0,*B15--[2]
 	   .align 32
 RESET:     MVKL	.S1	_c_int00,A0		; branch to _c_int00
            MVKH	.S1	_c_int00,A0
-           B	.S2	A0
+           B	.S2X	A0
            NOP
            NOP
            NOP
