@@ -1341,11 +1341,8 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_add_key
 	SYSCALL_ENTRY	sys_request_key		; 280
 	SYSCALL_ENTRY	sys_keyctl
-
-	; C6x special syscalls
 	SYSCALL_NI
-	SYSCALL_ENTRY	sys_dp_alloc
-
+	SYSCALL_NI
 	SYSCALL_ENTRY	sys_sched_setaffinity
 	SYSCALL_ENTRY	sys_sched_getaffinity
 	SYSCALL_NI
