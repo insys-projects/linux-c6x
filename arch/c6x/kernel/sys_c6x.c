@@ -29,12 +29,14 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/mtd/map.h>
+#include <linux/stringify.h>
 
 #include <asm/setup.h>
 #include <asm/segment.h>
 #include <asm/traps.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #ifdef CONFIG_ACCESS_CHECK
 int _access_ok(unsigned long addr, unsigned long size)
@@ -127,40 +129,32 @@ asmlinkage int old_select(struct sel_arg_struct __user *arg)
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
 }
 
-/*
- * System calls used by the kernel.
- */
-#include <linux/unistd.h>
-
-#ifdef _TMS320C64_PLUS
-#define KERNEL_SYSCALL_GENERATE(syscall_num) \
-        asm(" MVK " #syscall_num ",B0\n" \
-            " SWE")
-#else /* _TMS320C64_PLUS */
-#define KERNEL_SYSCALL_GENERATE(syscall_num) \
-        asm(" .ref _system_call\n" \
-            " MVK " #syscall_num ",B0\n" \
-            " MVC CSR,B2\n" \
-	    " MV B2,B1\n" \
-	    " SHL B1,1,B1\n" \
-	    " AND -2,B2,B2\n" \
-	    " AND 2,B1,B1\n" \
-	    " OR  B2,B1,B1\n" \
-	    " MVC B1,CSR\n" \
-	    " MVKL _system_call,A0\n" \
-	    " MVKH _system_call,A0\n" \
-	    " B	A0\n" \
-	    " MVC B3,IRP\n" \
-	    " NOP 4")
-#endif /* _TMS320C64_PLUS */
-
 int clone(unsigned int flags, char * usp)
 {
         KERNEL_SYSCALL_GENERATE(120);  /* __NR_clone */
 }
 
-int kernel_execve(char * file, char ** argvp, char ** envp)
-{
-        KERNEL_SYSCALL_GENERATE(11);   /* __NR_execve */
-}
-
+/*
+ * This is inlined from a C file to avoid incompatibilities between
+ * the GNU and TI assembler syntax.
+ */
+   asm ("	.global kernel_execve\n"
+	"kernel_execve:\n"
+	" 	MVK	.S2	" __stringify(__NR_execve) ",B0\n"
+#ifdef CONFIG_TMS320C64XPLUS
+	"	SWE\n"
+	"	BNOP	.S2	B3,5\n"
+#else
+        " 	MVC	.S2	CSR,B2\n"
+	"	SHL	.S2	B2,1,B1\n"
+	" ||	AND	.D2	-2,B2,B2\n"
+	"	AND	.D2	2,B1,B1\n"
+	" ||	MVKL	.S1	_system_call,A0\n"
+	"	OR	.D2	B2,B1,B1\n"
+	" ||	MVKH	.S1	_system_call,A0\n"
+	"	MVC	.S2	B1,CSR\n"
+	"	B	.S2X	A0\n"
+	"	MVC	.S2	B3,IRP\n"
+	"	NOP	4"
+#endif
+	   );
