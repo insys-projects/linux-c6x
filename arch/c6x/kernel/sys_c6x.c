@@ -129,11 +129,6 @@ asmlinkage int old_select(struct sel_arg_struct __user *arg)
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
 }
 
-int clone(unsigned int flags, char * usp)
-{
-        KERNEL_SYSCALL_GENERATE(120);  /* __NR_clone */
-}
-
 /*
  * This is inlined from a C file to avoid incompatibilities between
  * the GNU and TI assembler syntax.
