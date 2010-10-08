@@ -801,19 +801,11 @@ quiet_cmd_kallsyms = KSYM    $@
       cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) \
                      $(if $(CONFIG_KALLSYMS_ALL),--all-symbols) > $@
 
-ifdef CONFIG_TI_C6X_COMPILER
-.tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S64 scripts FORCE
-	$(call if_changed_dep,as_o_S64)
-
-.tmp_kallsyms%.S64: .tmp_vmlinux% $(KALLSYMS)
-	$(call cmd,kallsyms)
-else
 .tmp_kallsyms1.o .tmp_kallsyms2.o .tmp_kallsyms3.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)
 
 .tmp_kallsyms%.S: .tmp_vmlinux% $(KALLSYMS)
 	$(call cmd,kallsyms)
-endif
 
 # .tmp_vmlinux1 must be complete except kallsyms, so update vmlinux version
 .tmp_vmlinux1: $(vmlinux-lds) $(vmlinux-all) FORCE

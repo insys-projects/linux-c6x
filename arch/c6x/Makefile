@@ -21,7 +21,7 @@ include $(srctree)/arch/c6x/Makefile.lib
 
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
-KBUILD_AFLAGS   = -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
+KBUILD_AFLAGS   = -P -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
 
 AS		 = $(CROSS_COMPILE)gcc -c
 

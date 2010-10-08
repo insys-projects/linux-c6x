@@ -6,35 +6,49 @@
 ;  Copyright (C) 2004, 2005, 2006, 2009, 2010 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
 ;  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
-;  
+;
 ;  This program is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License version 2 as
 ;  published by the Free Software Foundation.
 ;
 
+#ifdef CONFIG_TI_C6X_COMPILER
+#define _DEFINE_MACRO(name,args...) name .macro args
+#define _ARG(x) x
+
+#define THREAD_SHIFT	  KTHREAD_SHIFT
+#define THREAD_START_SP	  KTHREAD_START_SP
+#define TIF_SYSCALL_TRACE _TIF_SYSCALL_TRACE
+#define TIF_NEED_RESCHED  _TIF_NEED_RESCHED
+#define TIF_WORK_MASK     _TIF_WORK_MASK
+#define TIF_ALLWORK_MASK  _TIF_ALLWORK_MASK
+
 		.include	"c6x_defs.inc"
 		.include	"c6x_config.inc"
+#else
+#define _DEFINE_MACRO(name,args...) .macro name args
+#define _ARG(x) \x
 
-	;; Registers naming
-DP			.set	B14
-FP			.set	A15
-SP			.set	B15
-	
-	;; Constants
-INT_SYSCALL		.set	6	; interrupt used for system call
+#include <linux/sys.h>
+#include <linux/linkage.h>
+#include <asm/thread_info.h>
+#include <asm/asm-offsets.h>
+#endif
 
-	.if (CONFIG_TMS320C64X == 1)
-HAVE_32_REGS .set 1
-	.elseif (CONFIG_TMS320C64XPLUS == 1)
-HAVE_32_REGS .set 1
-	.else
-HAVE_32_REGS .set 0
-	.endif
+; Registers naming
+#define DP	B14
+#define FP	A15
+#define SP	B15
 
-	.if (CONFIG_PREEMPT == 0)
-	.asg restore_all,resume_kernel
-	.endif
+#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)
+#define HAVE_32_REGS 1
+#endif
 
+#ifndef CONFIG_PREEMPT
+#define resume_kernel restore_all
+#endif
+
+#ifdef CONFIG_TI_C6X_COMPILER
 	;; Entry management functions
 		.def 	resume
 		.def 	ret_from_exception
@@ -84,21 +98,26 @@ HAVE_32_REGS .set 0
 		.ref	sys_truncate64
 		.ref	sys_ftruncate64
 		.ref	sys_fallocate
-		.if (CONFIG_PREEMPT == 1)
+		.ref	process_exception
+		.ref   sys_ni_syscall
+#ifdef CONFIG_PREEMPT
 		.ref	preempt_schedule_irq
-		.endif
+#endif
 
 	;; External variables
 		.ref	irq_stat
 		.ref	_edata
+		.ref    irq_IER
 
 	;; Internal variables
 		.def	_sys_call_table
 
+#endif  /* CONFIG_TI_C6X_COMPILER */
+
 	;;
 	;;  This defines the normal kernel pt_regs layout.
 	;;
-SAVE_ALL	.macro	__rp,__tsr
+_DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 	STW	.D2T2	B0,*SP--[2]		; save original B0
 	MVKL	.S2	current_ksp,B0
 	MVKH	.S2	current_ksp,B0
@@ -109,7 +128,7 @@ SAVE_ALL	.macro	__rp,__tsr
 	XOR	.D2	SP,B1,B0		; (SP ^ KSP)
 	LDW	.D2T2	*+SP[1],B1		; restore B0/B1
 	LDW	.D2T2	*++SP[2],B0
-	SHR	.S2	B0,KTHREAD_SHIFT,B0	; 0 if already using kernel stack
+	SHR	.S2	B0,THREAD_SHIFT,B0	; 0 if already using kernel stack
 
   [B0]	STDW	.D2T2	SP:DP,*--B1[1]		; user: save user sp/dp on kernel stack
   [B0]	MV	.S2	B1,SP			;    and switch to kernel stack
@@ -117,48 +136,48 @@ SAVE_ALL	.macro	__rp,__tsr
 
 	SUBAW	.D2	SP,2,SP
 
-	.if	(HAVE_32_REGS == 1)
+#ifdef HAVE_32_REGS
 	ADD	.D1X	SP,-8,A15
  ||	STDW	.D2T1	A15:A14,*SP--[16]	; save A15:A14
- 	.else
+#else
 	ADD	.D1X	SP,-8,A15
  ||	STDW	.D2T1	A15:A14,*SP--[8]	; save A15:A14
-	.endif
+#endif
 
 	STDW	.D2T2	B13:B12,*SP--[1]
  ||	STDW	.D1T1	A13:A12,*A15--[1]
- ||	MVC	.S2	__rp,B13
+ ||	MVC	.S2	_ARG(__rp),B13
 
 	STDW	.D2T2	B11:B10,*SP--[1]
  ||	STDW	.D1T1	A11:A10,*A15--[1]
  ||	MVC	.S2	CSR,B12
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
+#ifdef CONFIG_TMS320C64XPLUS
 	STDW	.D2T2	B9:B8,*SP--[1]
  ||	STDW	.D1T1	A9:A8,*A15--[1]
  ||	MVC	.S2	RILC,B11
 	STDW	.D2T2	B7:B6,*SP--[1]
  ||	STDW	.D1T1	A7:A6,*A15--[1]
  ||	MVC	.S2	ILC,B10
-	.else
+#else
 	STDW	.D2T2	B9:B8,*SP--[1]
  ||	STDW	.D1T1	A9:A8,*A15--[1]
 	STDW	.D2T2	B7:B6,*SP--[1]
  ||	STDW	.D1T1	A7:A6,*A15--[1]
-	.endif
+#endif
 
 	STDW	.D2T2	B5:B4,*SP--[1]
  ||	STDW	.D1T1	A5:A4,*A15--[1]
 
 	STDW	.D2T2	B3:B2,*SP--[1]
  ||	STDW	.D1T1	A3:A2,*A15--[1]
- ||	MVC	.S2	__tsr,B5
+ ||	MVC	.S2	_ARG(__tsr),B5
 
 	STDW	.D2T2	B1:B0,*SP--[1]
  ||	STDW	.D1T1	A1:A0,*A15--[1]
  ||	MV	.S1X	B5,A5
 
-	.if	(HAVE_32_REGS == 1)
+#ifdef HAVE_32_REGS
 	STDW	.D2T2	B31:B30,*SP--[1]
  ||	STDW	.D1T1	A31:A30,*A15--[1]
 	STDW	.D2T2	B29:B28,*SP--[1]
@@ -175,16 +194,16 @@ SAVE_ALL	.macro	__rp,__tsr
  ||	STDW	.D1T1	A19:A18,*A15--[1]
 	STDW	.D2T2	B17:B16,*SP--[1]
  ||	STDW	.D1T1	A17:A16,*A15--[1]
-	.endif
+#endif
 
 	STDW	.D2T2	B13:B12,*SP--[1]	; save PC and CSR
 
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+#ifndef CONFIG_TMS320C64XPLUS
 	STW	.D2T2	A4,*SP--[2]		; orig A4
-	.else
+#else
 	STDW	.D2T2	B11:B10,*SP--[1]	; save RILC and ILC
 	STDW	.D2T1	A5:A4,*SP--[1]		; save TSR and orig A4
-	.endif
+#endif
 
 	;; We left an unused word on the stack just above pt_regs.
 	;; It is used to save whether or not this frame is due to
@@ -194,39 +213,39 @@ SAVE_ALL	.macro	__rp,__tsr
 	STW	.D2T2	B1,*+SP(REGS__END+8)	; clear syscall flag
 	.endm
 
-SAVE_ALL_EXCEPT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(SAVE_ALL_EXCEPT)
+#ifndef CONFIG_TMS320C64XPLUS
 	SAVE_ALL IRP
-	.else
+#else
 	SAVE_ALL NRP,NTSR
-	.endif
+#endif
 	.endm
 
-SAVE_ALL_INT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(SAVE_ALL_INT)
+#ifndef CONFIG_TMS320C64XPLUS
 	SAVE_ALL IRP
-	.else
+#else
 	SAVE_ALL IRP,ITSR
-	.endif
+#endif
 	.endm
 
-RESTORE_ALL	.macro	__rp,__tsr
+_DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
+#ifdef CONFIG_TMS320C64XPLUS
 	LDDW	.D2T2	*++SP[1],B9:B8		; get TSR (B9)
 	LDDW	.D2T2	*++SP[1],B11:B10	; get RILC (B11) and ILC (B10)
 	LDDW	.D2T2	*++SP[1],B13:B12	; get PC (B13) and CSR (B12)
-	.else
+#else
 	LDDW	.D2T2	*++SP[2],B13:B12	; get PC (B13) and CSR (B12)
-	.endif
+#endif
 
-	.if	(HAVE_32_REGS == 1)
+#ifdef HAVE_32_REGS
 	ADDAW	.D1X	SP,30,A15
-	.else
+#else
 	ADDAW	.D1X	SP,14,A15
-	.endif
+#endif
 
-	.if	(HAVE_32_REGS == 1)
+#ifdef HAVE_32_REGS
 	LDDW	.D1T1	*++A15[1],A17:A16
  ||	LDDW	.D2T2	*++SP[1],B17:B16
 	LDDW	.D1T1	*++A15[1],A19:A18
@@ -243,33 +262,33 @@ RESTORE_ALL	.macro	__rp,__tsr
  ||	LDDW	.D2T2	*++SP[1],B29:B28
 	LDDW	.D1T1	*++A15[1],A31:A30
  ||	LDDW	.D2T2	*++SP[1],B31:B30
-	.endif
+#endif
 
 	LDDW	.D1T1	*++A15[1],A1:A0
  ||	LDDW	.D2T2	*++SP[1],B1:B0
 
-	.if	(HAVE_32_REGS == 1)
+#ifdef HAVE_32_REGS
 	LDDW	.D1T1	*++A15[1],A3:A2
  ||	LDDW	.D2T2	*++SP[1],B3:B2
- ||	MVC	.S2	B9,__tsr
+ ||	MVC	.S2	B9,_ARG(__tsr)
 	LDDW	.D1T1	*++A15[1],A5:A4
  ||	LDDW	.D2T2	*++SP[1],B5:B4
  ||	MVC	.S2	B11,RILC
 	LDDW	.D1T1	*++A15[1],A7:A6
  ||	LDDW	.D2T2	*++SP[1],B7:B6
  ||	MVC	.S2	B10,ILC
-	.else
+#else
 	LDDW	.D1T1	*++A15[1],A3:A2
  ||	LDDW	.D2T2	*++SP[1],B3:B2
 	LDDW	.D1T1	*++A15[1],A5:A4
  ||	LDDW	.D2T2	*++SP[1],B5:B4
 	LDDW	.D1T1	*++A15[1],A7:A6
  ||	LDDW	.D2T2	*++SP[1],B7:B6
-	.endif
+#endif
 
 	LDDW	.D1T1	*++A15[1],A9:A8
  ||	LDDW	.D2T2	*++SP[1],B9:B8
- ||	MVC	.S2	B13,__rp
+ ||	MVC	.S2	B13,_ARG(__rp)
 
 	LDDW	.D1T1	*++A15[1],A11:A10
  ||	LDDW	.D2T2	*++SP[1],B11:B10
@@ -286,65 +305,64 @@ RESTORE_ALL	.macro	__rp,__tsr
 
 	LDDW	.D2T1	*++SP[1],A15:A14
 
-	B	.S2	__rp		; return from interruption
+	B	.S2	_ARG(__rp)		; return from interruption
 	LDDW	.D2T2	*+SP[1],SP:DP
 	NOP	4
 	.endm
 
-RESTORE_ALL_EXCEPT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(RESTORE_ALL_EXCEPT)
+#ifndef CONFIG_TMS320C64XPLUS
 	RESTORE_ALL IRP
-	.else
+#else
 	RESTORE_ALL NRP,NTSR
-	.endif
+#endif
 	.endm
 
-RESTORE_ALL_INT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(RESTORE_ALL_INT)
+#ifndef CONFIG_TMS320C64XPLUS
 	RESTORE_ALL IRP
-	.else
+#else
 	RESTORE_ALL IRP,ITSR
-	.endif
-	.endm	
+#endif
+	.endm
 
-MASK_SYSCALL  .macro tmp
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(MASK_SYSCALL,tmp)
+#ifndef CONFIG_TMS320C64XPLUS
 	MVC	.S2	IER,B1
 	CLR	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
 	MVC	.S2	B1,IER
-	.endif
+#endif
 	.endm
 
-UNMASK_SYSCALL  .macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(UNMASK_SYSCALL)
+#ifndef CONFIG_TMS320C64XPLUS
 	MVC	.S2	IER,B1
 	SET	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
 	MVC	.S2	B1,IER
-	.endif
+#endif
 	.endm
 
-MASK_INT  .macro reg
+_DEFINE_MACRO(MASK_INT,reg)
 	MVC	.S2	CSR,reg
 	CLR	.S2	reg,0,0,reg
 	MVC	.S2	reg,CSR
 	.endm
 
 	;; Enable interrupts
-UNMASK_INT	.macro	reg
+_DEFINE_MACRO(UNMASK_INT,reg)
 	MVC	.S2	CSR,reg
 	SET	.S2	reg,0,0,reg
 	MVC	.S2	reg,CSR
 	.endm
 
 
-RESTORE_NK_INT	.macro
+_DEFINE_MACRO(RESTORE_NK_INT)
 
 	MVC	.S2	CSR,B2
 	CLR	.S2	B2,0,0,B2
 	MVC	.S2	B2,CSR		; cut global IRQ
 
-	.if	(CONFIG_NK == 1)
-	.ref    irq_IER
+#ifdef CONFIG_NK
 	MVC	.S2	IER,B4
 	MVKL	.S2	irq_IER,B2
 	MVKH	.S2	irq_IER,B2
@@ -352,28 +370,28 @@ RESTORE_NK_INT	.macro
 	NOP	4
 	OR	.L2	B2,B4,B4	; enable IT set in irq_IER
 	MVC	.S2	B4,IER
-	.endif
+#endif
 	.endm
 
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-SWITCH_STACK_SIZE 	.set	(12*4+8)
-	.else
-SWITCH_STACK_SIZE 	.set	(14*4+8)
-	.endif
+#ifndef CONFIG_TMS320C64XPLUS
+#define SWITCH_STACK_SIZE (12*4+8)
+#else
+#define SWITCH_STACK_SIZE (14*4+8)
+#endif
 
 	;;
 	;; Save remaining registers preserved by C
 	;; B3 must contain the return addresse
 	;;
-SAVE_SWITCH_STACK	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(SAVE_SWITCH_STACK)
+#ifndef CONFIG_TMS320C64XPLUS
 	STW	.D2T2	B3,*SP--[12]		; push return address
 	STDW	.D2T2	B13:B12,*+SP[5]
 	STDW	.D2T2	B11:B10,*+SP[4]
 	STDW	.D2T1	A15:A14,*+SP[3]
 	STDW	.D2T1	A13:A12,*+SP[2]
 	STDW	.D2T1	A11:A10,*+SP[1]
-	.else
+#else
 	STW	.D2T2	B3,*SP--[14]		; push return address
 	STDW	.D2T2	B13:B12,*+SP[6]
 	STDW	.D2T2	B11:B10,*+SP[5]
@@ -383,18 +401,18 @@ SAVE_SWITCH_STACK	.macro
 	STDW	.D2T1	A11:A10,*+SP[2]
  ||	MVC	.S2	ILC,B10
 	STDW	.D2T2	B11:B10,*+SP[1]
-	.endif
+#endif
 	.endm
 
-RESTORE_SWITCH_STACK	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(RESTORE_SWITCH_STACK)
+#ifndef CONFIG_TMS320C64XPLUS
 	LDDW	.D2T1	*+SP[1],A11:A10
 	LDDW	.D2T1	*+SP[2],A13:A12
 	LDDW	.D2T1	*+SP[3],A15:A14
 	LDDW	.D2T2	*+SP[4],B11:B10
 	LDDW	.D2T2	*+SP[5],B13:B12
 	LDW	.D2T2	*++SP[12],B3		; pop return address
-	.else
+#else
 	LDDW	.D2T2	*+SP[1],B11:B10		; load B11 (RILC ) and B10 (ILC)
 
 	LDDW	.D2T1	*+SP[2],A11:A10
@@ -407,15 +425,15 @@ RESTORE_SWITCH_STACK	.macro
 
 	LDW	.D2T2	*++SP[14],B3		; pop return address
  ||	MVC	.S2	B11,RILC
-	.endif
-	NOP		4
+#endif
+	NOP	4
 	.endm
 
 	;;
 	;; Call c6x_do_IRQ with the corresponding int number and regs
 	;;
-CALL_INT	.macro int
-	MVK	.S1	int,A4
+_DEFINE_MACRO(CALL_INT,int)
+	MVK	.S1	_ARG(int),A4
  ||	ADDAW	.D2	SP,2,B4
 	MVKL	.S1	c6x_do_IRQ,A0
 	MVKH	.S1	c6x_do_IRQ,A0
@@ -424,16 +442,16 @@ CALL_INT	.macro int
 	MVKH	.S2	ret_from_interrupt,B3
 	.endm
 
-GET_THREAD_INFO	.macro reg
-	SHR	.S1X	SP,KTHREAD_SHIFT,reg
-	SHL	.S1	reg,KTHREAD_SHIFT,reg
+_DEFINE_MACRO(GET_THREAD_INFO,reg)
+	SHR	.S1X	SP,THREAD_SHIFT,_ARG(reg)
+	SHL	.S1	_ARG(reg),THREAD_SHIFT,_ARG(reg)
 	.endm
 
 	.sect 	".data"
 
 	.global	current_ksp
 current_ksp:
-	.word	init_thread_union + KTHREAD_START_SP
+	.word	init_thread_union + THREAD_START_SP
 
 	.sect 	".text"
 
@@ -488,7 +506,7 @@ ret_from_syscall_trace:
  ||	LDW	.D2T1	*+SP(REGS_ORIG_A4+8),A4
 
 syscall_exit_work:
-	AND	.D1	_TIF_SYSCALL_TRACE,A2,A0
+	AND	.D1	TIF_SYSCALL_TRACE,A2,A0
  [!A0]	BNOP	.S1	work_pending,5
  [A0]	B	.S2	syscall_trace_exit
 	ADDKPC	.S2	resume_userspace,B3,1
@@ -497,7 +515,7 @@ syscall_exit_work:
 	MVC	.S2	B1,CSR		; enable ints
 
 work_pending:
-	AND	.D1	_TIF_NEED_RESCHED,A2,A0
+	AND	.D1	TIF_NEED_RESCHED,A2,A0
  [!A0]	BNOP	.S1	work_notifysig,5
 
 work_resched:
@@ -511,8 +529,8 @@ work_rescheduled:
 	MASK_INT B2
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	.S1	_TIF_WORK_MASK,A1
-	MVK	.S1	_TIF_NEED_RESCHED,A3
+	MVK	.S1	TIF_WORK_MASK,A1
+	MVK	.S1	TIF_NEED_RESCHED,A3
 	NOP	2
 	AND	.D1	A1,A2,A0
  ||	AND	.S1	A3,A2,A1
@@ -527,16 +545,15 @@ work_notifysig:
 	MV	.D2X	A2,B4		; thread_info flags is second arg
 
 ret_from_exception:
-	.if (CONFIG_PREEMPT == 1)
+#ifdef CONFIG_PREEMPT
 	MASK_INT B2
-	.endif
+#endif
 	;;
 	;; On C64x+, the return way from exception and interrupt
 	;; is a little bit different
 	;;
 ret_from_interrupt:
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-
+#ifndef CONFIG_TMS320C64XPLUS
 	;;
 	;; Check if we are comming from user mode.
 	;; C6x doesn't have a user/supervisor mode
@@ -548,9 +565,9 @@ ret_from_interrupt:
 	MVKH	.S1	resume_kernel,A0
 	NOP	2
 	XOR	.D2	B0,SP,B0
-	SHR	.S2	B0,KTHREAD_SHIFT,B0	; (SP ^ KSP) >> THREAD_SHIFT => User or Sup
+	SHR	.S2	B0,THREAD_SHIFT,B0	; (SP ^ KSP) >> THREAD_SHIFT => User or Sup
 
-	.else
+#else
 
 	;;
 	;; Check if we are comming from user mode.
@@ -562,7 +579,7 @@ ret_from_interrupt:
 	NOP	1
 	AND	.D2	B0,B1,B0
 
-	.endif
+#endif
 
  [!B0]	BNOP	.S2X	A0,5
 
@@ -572,8 +589,8 @@ resume_userspace:
 	MASK_INT B2
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	.S1	_TIF_WORK_MASK,A1
-	MVK	.S1	_TIF_NEED_RESCHED,A3
+	MVK	.S1	TIF_WORK_MASK,A1
+	MVK	.S1	TIF_NEED_RESCHED,A3
 	NOP	2
 	AND	.D1	A1,A2,A0
  [A0]	BNOP	.S1	work_pending,5
@@ -584,20 +601,20 @@ resume_userspace:
 	;; B0 = syscall number (in _sys_call_table)
 	;; A4,B4,A6,B6,A8,B8 = arguments of the syscall function
 	;; A4 is the return value register
-	;; 
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	.def 	_system_call
+	;;
+#ifndef CONFIG_TMS320C64XPLUS
+	.global _system_call
 _system_call:
 	SAVE_ALL_EXCEPT			; save A0-A9/B0-B9 registers in stack
 	MASK_SYSCALL
-	.endif
+#endif
 
 system_call_saved:
 	MVK	.L2	1,B2
 	STW	.D2T2	B2,*+SP(REGS__END+8)	; set syscall flag
-	.if	(CONFIG_TMS320C64XPLUS == 1)
+#ifdef CONFIG_TMS320C64XPLUS
 	MVC	.S2	B2,ECR			; acknowledge the software exception
-	.endif
+#endif
 
 	UNMASK_INT B2			; re-enable global IT
 
@@ -611,7 +628,7 @@ system_call_saved_noack:
  [!B1]	B	.S2X	A0
  [!B1]	ADDKPC	.S2	ret_from_syscall_function,B3,4
 
-	;; Get syscall handler addr from _sys_call_table:	
+	;; Get syscall handler addr from _sys_call_table:
 	MVKL	.S2	_sys_call_table,B1
 	MVKH	.S2	_sys_call_table,B1
 	LDW	.D2T2	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
@@ -620,7 +637,7 @@ system_call_saved_noack:
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	NOP	4
-	AND	.D1	_TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
+	AND	.D1	TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
  [A2]	BNOP	.S1	tracesys_on,5		 ; call syscall_trace_entry before syscall function
 
 	;; Branch to the corresponding syscall
@@ -636,9 +653,7 @@ syscall_exit:
 	MASK_INT B2
 
 	;; Disable IT
-	.if	(CONFIG_NK == 1)
-	.ref    irq_IER
-
+#ifdef CONFIG_NK
 	MVC	.S2	IER,B4
 	MVKL	.S2	irq_IER,B2
 	MVKH	.S2	irq_IER,B2
@@ -648,12 +663,12 @@ syscall_exit:
 	MVC	.S2	B4,IER			; change IER
 
 	UNMASK_INT B2
-	.endif
+#endif
 
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	MVKL	.S1	syscall_exit_work,A0
 	MVKH	.S1	syscall_exit_work,A0
-	MVK	.S1	_TIF_ALLWORK_MASK,A1
+	MVK	.S1	TIF_ALLWORK_MASK,A1
 	NOP
 	AND	.D1	A1,A2,A2 ; check for work to do
  [A2]	BNOP	.S1	syscall_exit_work,5
@@ -665,7 +680,7 @@ restore_all:
 	;; After a fork we jump here directly from resume,
 	;; so that A4 contains the previous task structure.
 	;;
-	.def 	ret_from_fork
+	.global	ret_from_fork
 ret_from_fork:
 	MVKL	.S1	schedule_tail,A0
 	MVKH	.S1	schedule_tail,A0
@@ -693,13 +708,13 @@ _int5_handler:
 	MASK_SYSCALL
 	CALL_INT 5
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	.def	_int6_handler 
+#ifdef CONFIG_TMS320C64XPLUS
+	.global	_int6_handler
 _int6_handler:
 	SAVE_ALL_INT
 	MASK_SYSCALL
 	CALL_INT 6
-	.endif
+#endif
 
 _int7_handler:
 	SAVE_ALL_INT
@@ -746,17 +761,18 @@ _int15_handler:
 	MASK_SYSCALL
 	CALL_INT 15
 
-	.if	(CONFIG_NK == 1)
-	.def 	_xirq_handler
+#ifdef CONFIG_NK
+	.global	_xirq_handler
 _xirq_handler:
 	SAVE_ALL_INT
 	MASK_SYSCALL
 	CALL_INT 5
-	.endif
+#endif
 
 	;;
 	;; Handler for uninitialized and spurious interrupts
 	;;
+	.global _bad_interrupt
 _bad_interrupt:
 	B	.S2	IRP
 	NOP	5
@@ -764,15 +780,17 @@ _bad_interrupt:
 	;;
 	;; Handler for NMI (C6x) and exceptions (C64x+)
 	;;
+	.global _nmi_handler
 _nmi_handler:
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+#ifndef CONFIG_TMS320C64XPLUS
 
 	B	.S2	NRP
 	NOP	5
 
-	.else
+#else
 
-	.ref	process_exception
+#ifdef CONFIG_TI_C6X_COMPILER
+#endif
 
 	SAVE_ALL_EXCEPT
 
@@ -810,11 +828,12 @@ ret_from_trap:
  ||	B	.S2	B3
 	LDW	.D2T2	*+SP(REGS_B8+8),B8
 	NOP	4
-	.endif
+#endif
 
 	;;
 	;; Jump to schedule() then return to ret_from_isr
 	;;
+#ifdef	CONFIG_PREEMPT
 irq_reschedule:
 	MVKL	.S1	schedule,A0
 	MVKH	.S1	schedule,A0
@@ -823,7 +842,6 @@ irq_reschedule:
 	MVKH	.S2	ret_from_interrupt,B3
 	NOP	3
 
-	.if (CONFIG_PREEMPT == 1)
 resume_kernel:
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_PREEMPT_COUNT),A1
@@ -839,14 +857,14 @@ preempt_schedule:
 	MVKH	.S1	restore_all,A0
 	MVKL	.S2	preempt_schedule_irq,B0
 	MVKH	.S2	preempt_schedule_irq,B0
-	AND	.D1	_TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
+	AND	.D1	TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
  [!A1]	BNOP	.S2X	A0,5
 	B	B0
 	ADDKPC	.S2	preempt_schedule,B3,4
-	.endif
+#endif
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	.def    enable_exception
+#ifdef CONFIG_TMS320C64XPLUS
+	.global enable_exception
 enable_exception:
 	DINT
 	MVC	.S2	TSR,B0
@@ -856,7 +874,7 @@ enable_exception:
 	MVC	.S2	B0,TSR			;  Set GEE and XEN in TSR
 	B	.S2	NRP
 	NOP	5
-	.endif
+#endif
 
 	;;
 	;; Special system calls
@@ -968,6 +986,7 @@ sys_fallocate_c6x:
 	;; A6 = thread offset
 	;; B6 = shared flags (mm structure is shared between tasks)
 	;;
+	.global resume
 resume:
 	ADD	.D1	A6,A4,A0		; ptr to thread struct
  ||	MVC	.S2	CSR,B2
@@ -998,6 +1017,7 @@ resume:
 	BNOP	.S2	B3,4		; return in next E1
 	MVC	.S2	B2,CSR
 
+#ifdef CONFIG_TI_C6X_COMPILER
 	;;
 	;; void * current_text_addr(void)
 	;; Return current PC
@@ -1007,6 +1027,7 @@ current_text_addr:
 	BNOP	.S2	B3,4
 	MV	.D1X	B3,A4
 	MVC	.S2	PC,B4
+#endif
 
 	;;
 	;; unsigned int get_current(void):
@@ -1015,28 +1036,33 @@ current_text_addr:
 	.global	__current_thread_info
 __current_thread_info:
 	BNOP	.S2	B3,3
-	CLR	.S2	SP,0,KTHREAD_SHIFT-1,B4
+	CLR	.S2	SP,0,THREAD_SHIFT-1,B4
 	MV	.D1X	B4,A4
 
 	;;
 	;; System calls table
 	;;
-SYSCALL_ENTRY .macro handler
+_DEFINE_MACRO(SYSCALL_ENTRY,handler)
+#ifdef CONFIG_TI_C6X_COMPILER
 	.ref   handler
+#endif
 	.word  handler
 	.endm
 
-SYSCALL_NI .macro
-	.ref   sys_ni_syscall
+_DEFINE_MACRO(SYSCALL_NI)
 	.word  sys_ni_syscall
 	.endm
-	
-SYSCALL_LOCAL .macro handler
+
+_DEFINE_MACRO(SYSCALL_LOCAL,handler)
 	.word  handler
 	.endm
 
 	.sect 	".data"
+#ifdef CONFIG_TI_C6X_COMPILER
 	.align 32
+#else
+	.align 5
+#endif
 _sys_call_table:
 	SYSCALL_NI				; 0
 	SYSCALL_ENTRY	sys_exit
