@@ -18,7 +18,16 @@
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
-void *current_text_addr(void);
+#ifdef CONFIG_TI_C6X_COMPILER
+extern void *current_text_addr(void);
+#else
+#define current_text_addr()			\
+({						\
+	void *__pc;				\
+	asm("mvc .S2 pce1,%0\n" : "=b"(__pc));	\
+	__pc;					\
+})
+#endif
 
 #include <asm/segment.h>
 #include <asm/ptrace.h>
