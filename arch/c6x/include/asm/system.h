@@ -62,7 +62,6 @@ extern cregister volatile unsigned int TSCL;    /* Time Stamp Counter Register -
 extern cregister volatile unsigned int TSCH;    /* Time Stamp Counter Register - High Half */
 extern cregister volatile unsigned int DNUM;    /* Core number */
 
-
 #define get_creg(reg)    reg
 #define set_creg(reg, v) reg = (v)
 #define or_creg(reg, n)  reg |= (n)
@@ -152,7 +151,7 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 			      : "=&b"(__x) : "b"(__n));	  \
 	} while(0)
 
-#define get_coreid() get_creg(DNUM)
+#define get_coreid() (get_creg(DNUM) & 0xff)
 
 /*
  * Interrupt management
@@ -167,12 +166,19 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #define get_IST()                get_creg(ISTP)
 
 #ifdef __TMS320C6XPLUS__
-#define __dint()                 asm(" DINT\n")
-#define __rint()                 asm(" RINT\n")
+#define __dint()                 asm volatile (" DINT\n")
+#define __rint()                 asm volatile (" RINT\n")
 #endif
 
 #define global_sti()             or_creg(CSR, 1)
-#define global_cli()             and_creg(CSR, -2)
+#define global_cli() \
+	do { unsigned __x;				  \
+		asm volatile (" mvc .s2 CSR,%0\n"	  \
+			      " and .l2 -2,%0,%0\n"	  \
+			      " mvc .s2 %0,CSR\n"	  \
+			      " nop\n"			  \
+			      : "=b"(__x));		  \
+	} while(0)
 
 #define enable_irq_mask(x)	 or_creg(IER, (x))
 #define disable_irq_mask(x)      and_creg(IER, ~(x))
