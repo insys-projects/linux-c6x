@@ -1,6 +1,6 @@
 /*****************************************************************************/
 /*  TRGMSG.C v6.0.13                                                          */
-/*  Copyright (c) 1995-2007 Texas Instruments Incorporated                   */
+/*  Copyright (c) 1995-2007, 2010 Texas Instruments Incorporated                   */
 /*****************************************************************************/
 
 /*****************************************************************************/
@@ -26,8 +26,10 @@
 #define DEFCIO(size) volatile unsigned char _CIOBUF_[size]
 
 #elif defined(_TMS320C6X)
+#ifdef CONFIG_TI_C6X_COMPILER
 #pragma DATA_SECTION (_CIOBUF_, ".cio");
 #pragma DATA_ALIGN   (_CIOBUF_, 4);
+#endif
 #define DEFCIO(size) _DATA_ACCESS volatile unsigned char _CIOBUF_[size]
 
 #elif defined(_TMS370C8)

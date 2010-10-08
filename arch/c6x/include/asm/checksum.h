@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -109,6 +109,7 @@ csum_tcpudp_magic(__be32 saddr, __be32 daddr, unsigned short len,
 static inline __sum16
 ip_compute_csum(const void *buff, int len)
 {
+	extern unsigned int do_csum(const unsigned char *, size_t);
 	return (__force __sum16)~do_csum(buff, len);
 }
 

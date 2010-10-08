@@ -31,6 +31,10 @@
 #include <asm/gmdio.h>
 #include <asm/gemac.h>
 
+static int emac_open(struct net_device *dev);
+static int emac_close(struct net_device *dev);
+static int emac_reset(struct net_device *dev, int reset_mode);
+
 #if defined(CONFIG_SOC_TMS320C6472) | defined(CONFIG_SOC_TMS320C6474)
 #define EMAC_HAS_SEPARATE_RXTX_IRQS
 #endif
@@ -242,7 +246,7 @@ static int emac_tx(struct net_device *dev, struct emac_desc *desc_ack)
 		       dev->name, desc_ack, desc, (desc_ack - desc));
 #endif
 		if (ep->tx_skbuff[ep->skb_tx_dirty] == NULL) {
-			printk(KERN_ERR "%s: SKB NULL desc =0x%x desc_ack =0x%x, skb_tx_dirty=%d count=%d\n",
+			printk(KERN_ERR "%s: SKB NULL desc =%p desc_ack =%p, skb_tx_dirty=%ld count=%ld\n",
 			       dev->name, desc, desc_ack, ep->skb_tx_dirty, ep->count_tx);
 			break;
 		}
@@ -681,10 +685,10 @@ static irqreturn_t emac_interrupt(int irq, void * netdev_id)
 			printk(KERN_ERR "%s: EMAC rx ring full\n", dev->name);
 			ep->stats.rx_dropped++;
 		} else
-			printk(KERN_ERR "%s: EMAC fatal host error 0x%x\n",
+			printk(KERN_ERR "%s: EMAC fatal host error 0x%lx\n",
 			       dev->name, status);
 
-		printk(KERN_ERR "%s: Error head=0x%x desc=0x%x dirty=0x%x skb_tx_dirty=%d count=%d\n",
+		printk(KERN_ERR "%s: Error head=%p desc=%p dirty=%p skb_tx_dirty=%ld count=%ld\n",
 		       dev->name, ep->head_tx, ep->cur_tx,
 		       ep->dirty_tx, ep->skb_tx_dirty, ep->count_tx);
 
@@ -803,7 +807,6 @@ static int emac_reset(struct net_device *dev, int reset_mode)
 
 	unsigned long val;
 	volatile u32 *preg;
-	int res = 0;
 	int i;
 
 #ifdef CONFIG_TMS320DM648
@@ -1171,7 +1174,6 @@ static int emac_close(struct net_device *dev)
 int emac_setup_ring(struct emac_private *ep)
 {
 	struct emac_desc *desc;
-	u8 *buff;
 	int i;
 	struct sk_buff *skb;
 
@@ -1410,8 +1412,9 @@ static void emac_set_rx_mode(struct net_device *dev)
  * periodic basis of 100mS (10 times a second). It is used to check the
  * status of the EMAC and MDIO device.
  */
-static void emac_timer_tick(struct net_device *dev)
+static void emac_timer_tick(unsigned long data)
 {
+	struct net_device *dev = (struct net_device *)data;
 	struct emac_private *ep = netdev_priv(dev);
 	unsigned int link_status;
 	unsigned int link_event = mdio_timer_tick();
@@ -1494,10 +1497,11 @@ static int __init emac_probe(struct platform_device *pdev)
 {
 	struct net_device *netdev;
 	struct emac_private *ep;
-	unsigned long val;
 	int res = -EINVAL;
 	int i, irq;
+#ifdef EMAC_ARCH_HAS_MAC_ADDR
 	char i2c_emac_addr[6];
+#endif
 	struct resource *cur_res;
 	static int ndevs = 0;
 

@@ -40,10 +40,12 @@ static unsigned int phy_timeout[] = { 2,  /* MDIO_PHY_MDIOINIT  - min-delay  */
 
 #ifdef CONFIG_SOC_TMS320C6455
 /* ratio choices are limited to 2 and 5 */
+#if 0
 static unsigned int phy_clock_src[] = { PLLDIV_RATIO(5),    /* MII    */
 					PLLDIV_RATIO(5),    /* RMII   */
 					PLLDIV_RATIO(2),    /* GMII   */
 					PLLDIV_RATIO(2) };  /* RGMII  */
+#endif
 #endif
 
 static void mdio_init_state_machine(void)
@@ -59,13 +61,13 @@ static void mdio_init_state_machine(void)
  */
 int mdio_init(unsigned int txid_version)
 {
-	unsigned int ratio;
-
 #ifdef CONFIG_SOC_TMS320C6455
 	/* Get MAC interface */
 	mdios.macsel = (dscr_get_reg(DSCR_DEVSTAT) >> DEVSTAT_MACSEL_OFFSET) &
 		DEVSTAT_MACSEL_MASK;
 #if 0
+	unsigned int ratio;
+
 	/* Get MDIO source clock frequency */
 	ratio = pll2_get_reg(PLLDIV1) & PLLDIV_RATIO_MASK;
 
@@ -161,8 +163,8 @@ static unsigned int mdio_init_phy_1(volatile unsigned int phy_addr)
 		if((lval & 1) && (i != phy_addr)) {
 			mdio_phy_write(MDIO_PHY_REG_CONTROL,
 				       i,
-				       MDIO_PHY_B_ISOLATE |
-				       MDIO_PHY_B_POWERDOWN);
+				       (MDIO_PHY_B_ISOLATE |
+					MDIO_PHY_B_POWERDOWN));
 			mdio_phy_wait();
 		}
 
@@ -245,8 +247,6 @@ static unsigned int mdio_init_phy_1(volatile unsigned int phy_addr)
 static unsigned int mdio_init_phy_2(volatile unsigned int phy_addr)
 {
 	unsigned short   val,val2, valgig;
-	unsigned int     lval;
-	unsigned int     i;
 
 	mdios.phy_addr    = phy_addr;
 
@@ -298,7 +298,7 @@ static unsigned int mdio_init_phy_2(volatile unsigned int phy_addr)
 
 		mdio_phy_write(MDIO_PHY_REG_CONTROL,
 			       phy_addr,
-			       MDIO_PHY_B_AUTONEGEN | MDIO_PHY_B_AUTORESTART);
+			       (MDIO_PHY_B_AUTONEGEN | MDIO_PHY_B_AUTORESTART));
 		mdio_phy_wait();
 
 		/* Setup current state */
@@ -355,7 +355,7 @@ static unsigned int mdio_init_phy_2(volatile unsigned int phy_addr)
 
 		/* Configure PHY */
 		mdio_phy_write(MDIO_PHY_REG_CONTROL, phy_addr,
-			       val2 | MDIO_PHY_B_AUTORESTART);
+			       (val2 | MDIO_PHY_B_AUTORESTART));
 		mdio_phy_wait();
 
 		/* Add in external loopback with plug if user wanted it */
@@ -417,8 +417,8 @@ unsigned int mdio_timer_tick(void)
 
 					mdio_phy_write(MDIO_PHY_REG_CONTROL,
 						       mdios.phy_addr,
-						       MDIO_PHY_B_AUTONEGEN |
-						       MDIO_PHY_B_AUTORESTART);
+						       (MDIO_PHY_B_AUTONEGEN |
+							MDIO_PHY_B_AUTORESTART));
 					mdio_phy_wait();
 				} else
 					/* We have a Link - re-read NWAY params */

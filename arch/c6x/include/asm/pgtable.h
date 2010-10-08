@@ -36,6 +36,11 @@ extern void paging_init(void);
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(swp)	((pte_t) (swp).val)
 
+static inline int pte_file(pte_t pte)
+{
+	return 0;
+}
+
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
@@ -60,5 +65,9 @@ extern unsigned long get_fb_unmapped_area(struct file *, unsigned long,
 #define get_videoin_unmapped_area get_fb_unmapped_area
 
 #define arch_start_context_switch(prev)	do {} while (0)
+
+extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
+extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
+extern void consistent_sync(void *vaddr, size_t size, int direction);
 
 #endif /* __ASM_C6X_PGTABLE_H */

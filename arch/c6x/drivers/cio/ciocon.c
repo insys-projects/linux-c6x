@@ -38,6 +38,8 @@
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <asm/uaccess.h>
+#include "linkage.h"
+#include "trgdrv.h"
 
 #define DRIVER_VERSION "v0.2"
 #define DRIVER_AUTHOR "William Mills <wmills@ti.com>"
@@ -76,7 +78,7 @@ static struct uart_cio_port cio_table[CIO_TTY_MINORS];
 static int __devinit cio_probe(struct platform_device *dev)
 {
 	struct uart_cio_port *uart;
-	int ret, i;
+	int i;
 
 	for (i = 0; i < CIO_TTY_MINORS; i++) {
 		uart = &cio_table[i];
@@ -157,9 +159,7 @@ static int __init cio_init(void)
 		goto out;
 
 	platform_device_del(&cio_devices);
-put_dev:
 	platform_device_put(&cio_devices);
-unreg_uart_drv:
 	uart_unregister_driver(&cio_serial_reg);
 out:
 	return ret;
@@ -355,8 +355,8 @@ console_initcall(cio_console_init);
 /*
  *	Register device.
  */
-static __init void cio_arch_init(void)
+static int __init cio_arch_init(void)
 {
-        platform_device_register(&cio_devices);
+        return platform_device_register(&cio_devices);
 }
 arch_initcall(cio_arch_init);

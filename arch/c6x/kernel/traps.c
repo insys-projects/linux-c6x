@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -35,6 +35,8 @@
 #include <asm/machdep.h>
 #include <asm/bitops.h>
 #include <asm/irq.h>
+
+void die_if_kernel(char *str, struct pt_regs *fp, int nr);
 
 void __init unmask_eexception(void)
 {
@@ -68,6 +70,39 @@ void __init trap_init (void)
 	enable_exception();
 #endif
 }
+
+void dump_stack(void)
+{
+	unsigned long stack;
+
+	show_stack(current, &stack);
+}
+EXPORT_SYMBOL(dump_stack);
+
+
+void die(char *str, struct pt_regs *fp, int nr)
+{
+	console_verbose();
+	printk("%s: %08x\n",str,nr);
+	show_regs(fp);
+
+	if (*((unsigned long *) (PAGE_SIZE + (unsigned long) current)) != STACK_MAGIC)
+		printk("Corrupted stack page\n");
+	printk("Process %s (pid: %d, stackpage=%08lx)\n",
+	       current->comm, current->pid, (PAGE_SIZE + (unsigned long) current));
+
+	dump_stack();
+	while (1);
+}
+
+void die_if_kernel(char *str, struct pt_regs *fp, int nr)
+{
+	if (user_mode(fp))
+		return;
+
+	die(str, fp ,nr);
+}
+
 
 #ifdef CONFIG_TMS320C64XPLUS
 
@@ -225,7 +260,7 @@ void do_trap(struct exception_info *except_info, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
-	printk("TRAP: %s PC[0x%x] signo[%d] code[%d]\n",
+	printk("TRAP: %s PC[0x%lx] signo[%d] code[%d]\n",
 	       except_info->kernel_str, regs->pc,
 	       except_info->signo, except_info->code);
 
@@ -251,7 +286,7 @@ static int process_iexcept(struct pt_regs *regs)
 
 	local_irq_disable(); /* needed for NK */	
 
-	printk("IEXCEPT: PC[0x%x]\n", regs->pc);
+	printk("IEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	while(iexcept_report) {
 		iexcept_num = __ffs(iexcept_report);
@@ -304,7 +339,7 @@ static void process_eexcept(struct pt_regs *regs)
 
 	local_irq_disable(); /* needed for NK */	
 
-	printk("EEXCEPT: PC[0x%x]\n", regs->pc);
+	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	for (; reg <= (unsigned int *) IRQ_MEXPMASK3_REG; reg++) {
 		while(*reg) {
@@ -329,7 +364,7 @@ asmlinkage int process_exception(struct pt_regs *regs)
 	unsigned int type_num;
 	unsigned int ie_num = 9; /* default is unknown exception */
 
-	while (type = get_except_type()) {
+	while ((type = get_except_type()) != 0) {
 		type_num = fls(type) - 1;
 
 		switch(type_num) {
@@ -363,37 +398,6 @@ asmlinkage int process_exception(struct pt_regs *regs)
 
 #endif /* CONFIG_TMS320C64XPLUS */
 
-void dump_stack(void)
-{
-	unsigned long stack;
-
-	show_stack(current, &stack);
-}
-EXPORT_SYMBOL(dump_stack);
-
-
-void die(char *str, struct pt_regs *fp, int nr)
-{
-	console_verbose();
-	printk("%s: %08x\n",str,nr);
-	show_regs(fp);
-
-	if (*((unsigned long *) (PAGE_SIZE + (unsigned long) current)) != STACK_MAGIC)
-		printk("Corrupted stack page\n");
-	printk("Process %s (pid: %d, stackpage=%08lx)\n",
-	       current->comm, current->pid, (PAGE_SIZE + (unsigned long) current));
-
-	dump_stack();
-	while (1);
-}
-
-void die_if_kernel(char *str, struct pt_regs *fp, int nr)
-{
-	if (user_mode(fp))
-    		return;
-
-	die(str, fp ,nr);
-}
 
 int kstack_depth_to_print = 48;
 

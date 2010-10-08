@@ -1,6 +1,6 @@
 /*****************************************************************************/
 /*  TRGDRV.C v6.0.13                                                          */
-/*  Copyright (c) 1996-2007 Texas Instruments Incorporated                   */
+/*  Copyright (c) 1996-2007, 2010 Texas Instruments Incorporated                   */
 /*****************************************************************************/
 
 /****************************************************************************/
@@ -18,6 +18,7 @@
 /*    HOSTCLK()     -    Get the target clock value (CLK register)          */
 /****************************************************************************/
 #include <linux/types.h>
+#include <linux/string.h>
 #include "linkage.h"
 #include "_lock.h"
 

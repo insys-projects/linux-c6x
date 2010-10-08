@@ -196,9 +196,9 @@
 #ifndef __ASSEMBLY__
 
 #ifdef _BIG_ENDIAN
-#define REG_PAIR(odd,even) int odd; int even
+#define REG_PAIR(odd,even) unsigned long odd; unsigned long even
 #else
-#define REG_PAIR(odd,even) int even; int odd
+#define REG_PAIR(odd,even) unsigned long even; unsigned long odd
 #endif
 
 /*

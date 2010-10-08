@@ -113,6 +113,4 @@ dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nents,
 	BUG_ON(!valid_dma_direction(dir));
 }
 
-
-
 #endif  /* _C6X_DMA_MAPPING_H */
