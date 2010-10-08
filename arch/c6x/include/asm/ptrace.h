@@ -273,8 +273,8 @@ struct switch_stack {
 	REG_PAIR(b11,b10);
 	REG_PAIR(b13,b12);
 
-	int retpc;
-	int pad;
+	unsigned long retpc;
+	unsigned long pad;
 };
 
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
