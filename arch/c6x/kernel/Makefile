@@ -6,18 +6,15 @@ extra-y	 := head.o vmlinux.lds
 
 obj-y 	 := process.o traps.o irq.o signal.o ptrace.o \
 	    setup.o bios32.o sys_c6x.o time.o \
-            entry.o vectors.o c6x_ksyms.o tags.o unaligned.o
+            entry.o vectors.o c6x_ksyms.o tags.o
 
 obj-$(CONFIG_MODULES)          += module.o
 obj-$(CONFIG_COMMON_CLKDEV)    += clkdev.o
 
 ifdef CONFIG_TI_C6X_COMPILER
 
-include $(srctree)/arch/c6x/Makefile.lib
-
-$(obj)/unaligned.o: $(src)/unaligned.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
-$(obj)/entry.o:    $(src)/entry.S64 $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
-$(obj)/head.o:     $(src)/head.S64 $(obj)/c6x_config.inc
+$(obj)/entry.o:    $(obj)/c6x_defs.inc $(obj)/c6x_config.inc
+$(obj)/head.o:     $(obj)/c6x_config.inc
 
 config-preempt-y += "CONFIG_PREEMPT    		.set 1"
 config-preempt-  += "CONFIG_PREEMPT    		.set 0"

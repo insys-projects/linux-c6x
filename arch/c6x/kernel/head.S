@@ -1,15 +1,17 @@
-; 
+;
 ;  linux/arch/c6x/kernel/head.s
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
 ;  Copyright (C) 2004, 2009 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
-; 
+;
 ;  This program is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License version 2 as
 ;  published by the Free Software Foundation.
-; 
+;
+
+#ifdef CONFIG_TI_C6X_COMPILER
 	.include	"c6x_defs.inc"
 
 	.ref    current_ksp
@@ -18,14 +20,13 @@
 	.ref	_bss_end
 	.ref	c6x_tags_pointer
 	.ref	c6x_mtd_early_init
-	.global	_c_int00
 
 	.include	"c6x_config.inc"
+#else
+#include "tags.h"
+#endif
 
-	.if (CONFIG_NK == 1)
-	.ref	_nkctx
-	.endif
-	
+	.global	_c_int00
 _c_int00:
 	;; Save tag magic and pointer
 	MV 	.S1	A4,A10
@@ -38,14 +39,14 @@ _c_int00:
 	NOP	4
 	AND	.D2	~7,B15,B15
 
-	.if (CONFIG_MTD_UCLINUX == 1)
+#ifdef CONFIG_MTD_UCLINUX
 	MVKL	.S2	c6x_mtd_early_init,B0
 	MVKH	.S2	c6x_mtd_early_init,B0
 	B	.S2	B0
 	ADDKPC	.S2	_ret_from_mtd_early_init,B3,4
 
 _ret_from_mtd_early_init:
-	.endif
+#endif
 
 	;; Set global page pointer in B14
 	MVKL	.S2	_bss_start,B14
@@ -78,7 +79,7 @@ __bss_done:
 	MVC	.S2	CSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,CSR
-	.if	(CONFIG_TMS320C64XPLUS == 1)
+#ifdef CONFIG_TMS320C64XPLUS
 	MVC	.S2	TSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,TSR
@@ -88,14 +89,15 @@ __bss_done:
 	MVC	.S2	NTSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,NTSR
-	.endif
+#endif
 
-	.if (CONFIG_NK == 1)
+#ifdef CONFIG_NK
+	.ref	_nkctx
 	;; Save NK2 OS context pointer given in B4
 	MVKL	.S1	_nkctx,A0
 	MVKH	.S1	_nkctx,A0
 	STW	.D1T2	B4,*A0
-	.endif
+#endif
 
 	MVKL	.S2	TAGS_MAGIC,B0
 	MVKH	.S2	TAGS_MAGIC,B0
