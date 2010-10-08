@@ -11,6 +11,8 @@
 ;  published by the Free Software Foundation.
 ;
 
+#define GAS_SPKERNEL_BUG
+
 ;
 ;unsigned int csum_partial_copy(const char *src, char * dst,
 ;				int len, int sum)
@@ -54,7 +56,11 @@ csum_partial_copy:
 ||	MPYU	.M2	B7,B2,B8
 ||	ADD	.L1	A16,A9,A9
 	NOP
+#ifdef GAS_SPKERNEL_BUG
+	SPKERNEL	4,0
+#else
 	SPKERNEL	8,0
+#endif
 ||	ADD	.L2	B8,B9,B9
 
 	ZERO	.D1	A1
@@ -76,7 +82,11 @@ L6:
  ||	MPYU	.M1	A7,A2,A8
 
 	ADD	.L1	A16,A9,A9
+#ifdef GAS_SPKERNEL_BUG
+        SPKERNEL        12,0
+#else
         SPKERNEL        6,0
+#endif
  ||     STNW	.D2T2	B7,*B4++
  ||	ADD	.L1	A8,A9,A9
 
@@ -208,7 +218,11 @@ ip_fast_csum:
 	LDHU	.D1T1	*A4++,A3
 	NOP	3
 	NOP
+#ifdef GAS_SPKERNEL_BUG
+	SPKERNEL	40,0
+#else
 	SPKERNEL	5,0
+#endif
  ||     ADD	.L1	A3,A5,A5
 
 L12:	SHRU	.S1	A5,16,A0
@@ -340,7 +354,11 @@ L22:
            ADD     .L1     A0,A1,A0
            ADD     .L1     A2,A0,A2
 
+#ifdef GAS_SPKERNEL_BUG
+           SPKERNEL 8,2
+#else
            SPKERNEL 1,2
+#endif
 ||         CMPGTU  .L1     A1,A2,A0
 
            ADD     .L1     A0,A2,A6
