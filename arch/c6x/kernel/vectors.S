@@ -55,7 +55,11 @@ __name:    STW	.D2T1     A0,*B15--[2]
 	.endm
 #endif
 
+#ifdef CONFIG_TI_C6X_COMPILER
            .sect ".vectors"
+#else
+           .sect ".vectors","ax"
+#endif
 
 	   .align ALIGNMENT
 RESET:     MVKL	.S1	_c_int00,A0		; branch to _c_int00
