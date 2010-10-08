@@ -226,6 +226,7 @@ void ptrace_disable(struct task_struct *child)
  */
 long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 {
+	struct pt_regs *regs, newregs;
 	unsigned long tmp;
 	int ret;
 
@@ -345,8 +346,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		 * get all gp regs from the child.
 		 */
 	case PTRACE_GETREGS:
-		struct pt_regs *regs = task_pt_regs(child);
-		
+		regs = task_pt_regs(child);
 		ret = 0;
 		if (copy_to_user((void *)data, regs,
 				 sizeof(struct pt_regs)))
@@ -357,12 +357,10 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		 * set all gp regs in the child.
 		 */
 	case PTRACE_SETREGS:
-		struct pt_regs newregs;
-		
 		ret = -EFAULT;
 		if (copy_from_user(&newregs, (void *)data,
 				   sizeof(struct pt_regs)) == 0) {
-			struct pt_regs *regs = task_pt_regs(child);
+			regs = task_pt_regs(child);
 			*regs = newregs;
 			ret = 0;
 		}

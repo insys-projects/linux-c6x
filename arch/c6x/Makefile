@@ -19,9 +19,19 @@ LDSCRIPT = $(obj)/arch/c6x/kernel/vmlinux.lds
 ifdef CONFIG_TI_C6X_COMPILER
 include $(srctree)/arch/c6x/Makefile.lib
 
+nk-flags-                 := 0
+nk-flags-y                := 1
+be-flags-                 := 0
+be-flags-y                := 1
+
+arch-$(CONFIG_TMS320C64X)     := -march=6400
+arch-$(CONFIG_TMS320C64XPLUS) := -march=6400+
+
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
-KBUILD_AFLAGS   = -P -Wa,-d__ASSEMBLY__ -Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel
+KBUILD_AFLAGS   = -P -Wa,-d__ASSEMBLY__  -Wa,-d__NK__=$(nk-flags-$(CONFIG_NK)) \
+	-Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel \
+	-Wa,-d__BIG_ENDIAN__=$(be-flags-$(CONFIG_CPU_BIG_ENDIAN))
 
 AS		 = $(CROSS_COMPILE)gcc -c
 
@@ -30,6 +40,9 @@ export HOSTCFLAGS_kallsyms.o
 
 # native works well enough but cross toolchain should have one
 NM		= /usr/bin/nm
+else
+arch-$(CONFIG_TMS320C64X)     := -march=c64x
+arch-$(CONFIG_TMS320C64XPLUS) := -march=c64x+ -msdata=none
 endif
 
 ifdef CONFIG_TI_C6X_LINKER
@@ -67,13 +80,6 @@ endif
 # Select CPU dependent flags.  Note that order of declaration is important;
 # the options further down the list override previous items.
 
-arch-$(CONFIG_TMS320C64X)     := -march=6400
-arch-$(CONFIG_TMS320C64XPLUS) := -march=6400+
-nk-flags-                 := 0
-nk-flags-y                := 1
-be-flags-                 := 0
-be-flags-y                := 1
-
 ifdef CONFIG_CPU_BIG_ENDIAN
 KBUILD_CFLAGS   += -mbig-endian
 KBUILD_AFLAGS	+= -mbig-endian
@@ -82,8 +88,7 @@ KBUILD_LDFLAGS	+= -mbig-endian
 endif
 
 KBUILD_CFLAGS	+= $(arch-y)
-KBUILD_AFLAGS	+= $(arch-y) -Wa,-d__NK__=$(nk-flags-$(CONFIG_NK)) \
-                   -Wa,-d__BIG_ENDIAN__=$(be-flags-$(CONFIG_CPU_BIG_ENDIAN))
+KBUILD_AFLAGS	+= $(arch-y)
 
 head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/

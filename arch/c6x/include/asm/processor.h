@@ -52,8 +52,6 @@ void *current_text_addr(void);
 #define wp_works_ok__is_a_macro	1
 #define wp_works_ok 1
 
-typedef unsigned long mm_segment_t; /* Domain register */
-
 struct thread_struct {
 	unsigned long  ksp;		/* kernel stack pointer */
 	unsigned long  usp;		/* user stack pointer */
@@ -113,6 +111,7 @@ extern unsigned long __kstk_eip(struct task_struct *p);
 
 #define cpu_relax()             do { } while (0)
 
+#ifdef CONFIG_TI_C6X_COMPILER
 #define ARCH_HAS_PREFETCH
 #define prefetch(x) (0)
 
@@ -121,6 +120,6 @@ extern unsigned long __kstk_eip(struct task_struct *p);
 
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define spin_lock_prefetch(x) (0)
-
+#endif
 
 #endif /* ASM_C6X_PROCESSOR_H */

@@ -14,7 +14,6 @@
 
 #ifdef CONFIG_TI_C6X_COMPILER
 #define _DEFINE_MACRO(name,args...) name .macro args
-#define _ARG(x) x
 
 #define THREAD_SHIFT	  KTHREAD_SHIFT
 #define THREAD_START_SP	  KTHREAD_START_SP
@@ -26,8 +25,8 @@
 		.include	"c6x_defs.inc"
 		.include	"c6x_config.inc"
 #else
+	.altmacro
 #define _DEFINE_MACRO(name,args...) .macro name args
-#define _ARG(x) \x
 
 #include <linux/sys.h>
 #include <linux/linkage.h>
@@ -48,27 +47,27 @@
 #define resume_kernel restore_all
 #endif
 
-#ifdef CONFIG_TI_C6X_COMPILER
 	;; Entry management functions
-		.def 	resume
-		.def 	ret_from_exception
-		.def 	ret_from_interrupt
+		.global	resume
+		.global	ret_from_exception
+		.global	ret_from_interrupt
 
 	;; Interrupt handlers
-		.def 	_int4_handler
-		.def 	_int5_handler
-		.def 	_int7_handler
-		.def 	_int8_handler
-		.def 	_int9_handler
-		.def 	_int10_handler
-		.def 	_int11_handler
-		.def 	_int12_handler
-		.def 	_int13_handler
-		.def 	_int14_handler
-		.def 	_int15_handler
-		.def	_bad_interrupt
-		.def	_nmi_handler
+		.global	_int4_handler
+		.global	_int5_handler
+		.global	_int7_handler
+		.global	_int8_handler
+		.global	_int9_handler
+		.global	_int10_handler
+		.global	_int11_handler
+		.global	_int12_handler
+		.global	_int13_handler
+		.global	_int14_handler
+		.global	_int15_handler
+		.global	_bad_interrupt
+		.global	_nmi_handler
 
+#ifdef CONFIG_TI_C6X_COMPILER
 	;; Syscalls
 		.def 	sys_fork
 		.def	sys_clone
@@ -146,7 +145,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 
 	STDW	.D2T2	B13:B12,*SP--[1]
  ||	STDW	.D1T1	A13:A12,*A15--[1]
- ||	MVC	.S2	_ARG(__rp),B13
+ ||	MVC	.S2	__rp,B13
 
 	STDW	.D2T2	B11:B10,*SP--[1]
  ||	STDW	.D1T1	A11:A10,*A15--[1]
@@ -171,7 +170,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 
 	STDW	.D2T2	B3:B2,*SP--[1]
  ||	STDW	.D1T1	A3:A2,*A15--[1]
- ||	MVC	.S2	_ARG(__tsr),B5
+ ||	MVC	.S2	__tsr,B5
 
 	STDW	.D2T2	B1:B0,*SP--[1]
  ||	STDW	.D1T1	A1:A0,*A15--[1]
@@ -270,7 +269,7 @@ _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 #ifdef HAVE_32_REGS
 	LDDW	.D1T1	*++A15[1],A3:A2
  ||	LDDW	.D2T2	*++SP[1],B3:B2
- ||	MVC	.S2	B9,_ARG(__tsr)
+ ||	MVC	.S2	B9,__tsr
 	LDDW	.D1T1	*++A15[1],A5:A4
  ||	LDDW	.D2T2	*++SP[1],B5:B4
  ||	MVC	.S2	B11,RILC
@@ -288,7 +287,7 @@ _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 
 	LDDW	.D1T1	*++A15[1],A9:A8
  ||	LDDW	.D2T2	*++SP[1],B9:B8
- ||	MVC	.S2	B13,_ARG(__rp)
+ ||	MVC	.S2	B13,__rp
 
 	LDDW	.D1T1	*++A15[1],A11:A10
  ||	LDDW	.D2T2	*++SP[1],B11:B10
@@ -305,7 +304,7 @@ _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 
 	LDDW	.D2T1	*++SP[1],A15:A14
 
-	B	.S2	_ARG(__rp)		; return from interruption
+	B	.S2	__rp		; return from interruption
 	LDDW	.D2T2	*+SP[1],SP:DP
 	NOP	4
 	.endm
@@ -326,7 +325,7 @@ _DEFINE_MACRO(RESTORE_ALL_INT)
 #endif
 	.endm
 
-_DEFINE_MACRO(MASK_SYSCALL,tmp)
+_DEFINE_MACRO(MASK_SYSCALL)
 #ifndef CONFIG_TMS320C64XPLUS
 	MVC	.S2	IER,B1
 	CLR	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
@@ -433,7 +432,7 @@ _DEFINE_MACRO(RESTORE_SWITCH_STACK)
 	;; Call c6x_do_IRQ with the corresponding int number and regs
 	;;
 _DEFINE_MACRO(CALL_INT,int)
-	MVK	.S1	_ARG(int),A4
+	MVK	.S1	int,A4
  ||	ADDAW	.D2	SP,2,B4
 	MVKL	.S1	c6x_do_IRQ,A0
 	MVKH	.S1	c6x_do_IRQ,A0
@@ -443,8 +442,8 @@ _DEFINE_MACRO(CALL_INT,int)
 	.endm
 
 _DEFINE_MACRO(GET_THREAD_INFO,reg)
-	SHR	.S1X	SP,THREAD_SHIFT,_ARG(reg)
-	SHL	.S1	_ARG(reg),THREAD_SHIFT,_ARG(reg)
+	SHR	.S1X	SP,THREAD_SHIFT,reg
+	SHL	.S1	reg,THREAD_SHIFT,reg
 	.endm
 
 	.sect 	".data"

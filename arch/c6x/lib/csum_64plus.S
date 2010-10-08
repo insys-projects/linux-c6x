@@ -36,10 +36,10 @@ csum_partial_copy:
 	;; Check alignment and size
 	AND	.S1	3,A4,A1
 ||	AND	.S2	3,B4,B0
-	OR	.L2	B0,A1,B0	; non aligned condition
+	OR	.L2X	B0,A1,B0	; non aligned condition
 ||	MVC	.S2	B5,ILC
 ||	MVK	.D2	1,B2
-||	MV	.D1	B5,A1		; words condition
+||	MV	.D1X	B5,A1		; words condition
   [!A1]	B	.S1	L8
    [B0] BNOP	.S1	L6,5
 
@@ -47,7 +47,7 @@ csum_partial_copy:
 
 	;; Main loop for aligned words
 	LDW	.D1T1	*A4++,A7
-	NOP		4
+	NOP	4
 	MV	.S2X	A7,B7
 ||	EXTU	.S1	A7,0,16,A16
 	STW	.D2T2	B7,*B4++
@@ -57,15 +57,15 @@ csum_partial_copy:
 	SPKERNEL	8,0
 ||	ADD	.L2	B8,B9,B9
 
-	ZERO		A1
-||	ADD	.L1X	B9,A9,A9	;  add csum from a and b sides
+	ZERO	.D1	A1
+||	ADD	.L1X	A9,B9,A9	;  add csum from a and b sides
 
 L6:
   [!A1]	BNOP	.S1	L8,5
 
 	;; Main loop for non-aligned words
 	SPLOOP		2
- ||	MVK		1,A2
+ ||	MVK	.L1	1,A2
 
 	LDNW	.D1T1	*A4++,A7
         NOP             3
@@ -80,13 +80,13 @@ L6:
  ||     STNW	.D2T2	B7,*B4++
  ||	ADD	.L1	A8,A9,A9
 
-L8:	AND	.S2	2,A6,B5
+L8:	AND	.S2X	2,A6,B5
 	CMPGT	.L2	B5,0,B0
   [!B0]	BNOP	.S1	L82,4
 
 	;; Manage half-word
-	ZERO	A7
-||	ZERO	A8
+	ZERO	.L1	A7
+||	ZERO	.D1	A8
 
 #ifdef CONFIG_CPU_BIG_ENDIAN
 
@@ -114,10 +114,10 @@ L8:	AND	.S2	2,A6,B5
 #endif
 
 	;; Manage eventually the last byte
-L82:	AND	.S2	1,A6,B0
+L82:	AND	.S2X	1,A6,B0
   [!B0]	BNOP	.S1	L9,5
 
-||	ZERO	A7
+||	ZERO	.L1	A7
 
 L83:	LDBU	.D1T1	*A4++,A7
 	NOP		4
@@ -143,7 +143,7 @@ L9:	SHRU	.S2X	A9,16,B0
 
 L91:	SHRU	.S2X	A9,16,B4
 ||	EXTU	.S1	A9,16,16,A3
-	ADD	.D1X	B4,A3,A9
+	ADD	.D1X	A3,B4,A9
 
 	SHRU	.S1	A9,16,A0
    [A0]	BNOP	.S1	L91,5
@@ -199,14 +199,14 @@ ip_fast_csum:
   [!B1] BNOP	.S1	L15,4
   [!B1]	ZERO	.D1	A3
 
-  [!B0]	BNOP	.S1	L12
+  [!B0]	B	.S1	L12
 	SHRU	.S2	B0,1,B0
 	MVC	.S2	B0,ILC
-	NOP		3
+	NOP	3
 
-	SPLOOP		1
+	SPLOOP	1
 	LDHU	.D1T1	*A4++,A3
-	NOP		3
+	NOP	3
 	NOP
 	SPKERNEL	5,0
  ||     ADD	.L1	A3,A5,A5
@@ -216,14 +216,14 @@ L12:	SHRU	.S1	A5,16,A0
 
 L13:	SHRU	.S2X	A5,16,B4
 	EXTU	.S1	A5,16,16,A3
-	ADD	.D1X	B4,A3,A5
+	ADD	.D1X	A3,B4,A5
 	SHRU	.S1	A5,16,A0
-  [ A0]	BNOP	.S1	L13,5
+  [A0]	BNOP	.S1	L13,5
 
 L14:	NOT	.D1	A5,A3
 	EXTU	.S1	A3,16,16,A3
 
-L15:	RETNOP	.S2	B3,3
+L15:	BNOP	.S2	B3,3
 	MVC	.S2	B30,ILC
 	MV	.D1	A3,A4
 
@@ -305,11 +305,11 @@ do_csum:
 ||         ZERO    .D1     A1
 
 #ifdef CONFIG_CPU_BIG_ENDIAN
-   [ A0]   SUB     .L2     B3,1,B3
-|| [ A0]   LDBU    .D1T1   *A4++,A1
+   [A0]    SUB     .L2     B3,1,B3
+|| [A0]    LDBU    .D1T1   *A4++,A1
 #else
    [!A0]   BNOP    .S1     L21,5
-|| [ A0]   LDBU    .D1T1   *A4++,A0
+|| [A0]    LDBU    .D1T1   *A4++,A0
            SUB     .L2     B3,1,B3
 ||         SHL     .S1     A0,8,A1
 L21:
@@ -320,7 +320,7 @@ L21:
            AND     .L1     A4,A0,A0
 
    [!A0]   BNOP    .S1     L22,5
-|| [ A0]   LDHU    .D1T1   *A4++,A0
+|| [A0]    LDHU    .D1T1   *A4++,A0
            SUB     .L2     B0,1,B0
 ||         SUB     .S2     B3,2,B3
 ||         ADD     .L1     A0,A1,A1
@@ -329,14 +329,14 @@ L22:
 ||         ZERO    .L1     A0
 
    [!B0]   BNOP    .S1     L23,5
-|| [ B0]   MVC     .S2     B0,ILC
+|| [B0]    MVC     .S2     B0,ILC
 
-           SPLOOP  	   3
-           SPMASK          L1
+           SPLOOP  3
+           SPMASK  L1
 ||         MV      .L1     A1,A2
 ||         LDW     .D1T1   *A4++,A1
 
-           NOP             4
+           NOP     4
            ADD     .L1     A0,A1,A0
            ADD     .L1     A2,A0,A2
 
@@ -347,30 +347,30 @@ L22:
            EXTU    .S1     A6,16,16,A7
            SHRU    .S2X    A6,16,B0
            NOP             1
-           ADD     .L1X    B0,A7,A1
+           ADD     .L1X    A7,B0,A1
 L23:
            MVK     .L2     2,B0
            AND     .L2     B3,B0,B0
-   [ B0]   LDHU    .D1T1   *A4++,A0
-           NOP             4
-   [ B0]   ADD     .L1     A0,A1,A1
+   [B0]    LDHU    .D1T1   *A4++,A0
+           NOP     4
+   [B0]    ADD     .L1     A0,A1,A1
 L24:
            EXTU    .S2     B3,31,31,B0
 #ifdef CONFIG_CPU_BIG_ENDIAN
    [!B0]   BNOP    .S1     L25,4
-|| [ B0]   LDBU    .D1T1   *A4,A0
+|| [B0]    LDBU    .D1T1   *A4,A0
            SHL     .S1     A0,8,A0
            ADD     .L1     A0,A1,A1
 L25:
 #else
-   [ B0]   LDBU    .D1T1   *A4,A0
-           NOP             4
-   [ B0]   ADD     .L1     A0,A1,A1
+   [B0]    LDBU    .D1T1   *A4,A0
+           NOP     4
+   [B0]    ADD     .L1     A0,A1,A1
 #endif
            EXTU    .S1     A1,16,16,A0
            SHRU    .S2X    A1,16,B0
-           NOP             1
-           ADD     .L1X    B0,A0,A0
+           NOP     1
+           ADD     .L1X    A0,B0,A0
            SHRU    .S1     A0,16,A1
            ADD     .L1     A0,A1,A0
            EXTU    .S1     A0,16,16,A1
@@ -379,10 +379,10 @@ L25:
            EXTU    .S1     A1,24,16,A0
 ||         MV      .L2X    A3,B0
 
-   [ B0]   OR      .L1     A0,A2,A1
+   [B0]    OR      .L1     A0,A2,A1
 L26:
-           NOP             1
-           RETNOP  .S2X    A5,4
+           NOP     1
+           BNOP    .S2X    A5,4
            MV      .L1     A1,A4
 
 ;__wsum csum_partial(const void *buff, int len, __wsum wsum)
@@ -402,7 +402,7 @@ csum_partial:
            MV      .L1X    B3,A9
 ||         CALLP   .S2     do_csum,B3
 ||         MV      .S1     A6,A8
-           RETNOP  .S2X    A9,2
+           BNOP    .S2X    A9,2
            ADD     .L1     A8,A4,A1
            CMPGTU  .L1     A8,A1,A0
            ADD     .L1     A1,A0,A4

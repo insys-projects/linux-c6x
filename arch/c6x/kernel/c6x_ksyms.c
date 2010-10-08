@@ -93,7 +93,10 @@ EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL(_c6x_delay);
 
 /* platform dependent support */
+#ifdef CONFIG_TI_C6X_COMPILER
+/* These are inlined when using GCC */
 EXPORT_SYMBOL(current_text_addr);
+#endif
 EXPORT_SYMBOL(irq_IER);
 EXPORT_SYMBOL(alloca);
 EXPORT_SYMBOL(__current_thread_info);
