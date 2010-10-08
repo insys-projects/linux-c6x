@@ -102,11 +102,10 @@ static struct platform_device emac_dev0 = {
         .num_resources  = ARRAY_SIZE(emac_resources0),
 };
 
-static void setup_emac(void)
+static int setup_emac(void)
 {
         int status;
 	unsigned long val;
-	unsigned int addr;
 
         status  = platform_device_register(&emac_dev0);
         if (status != 0)
@@ -123,9 +122,10 @@ static void setup_emac(void)
 			val = ((val & 0x1C0) >> 6);
 		}
 	}
+	return status;
 }
 #else
-static void setup_emac(void) {}
+static inline int setup_emac(void) { return 0; }
 #endif
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
@@ -134,7 +134,7 @@ static void dummy_progress(unsigned int step, char *s) {}
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
-	int i, ret;
+	int i;
 
 	printk("Designed for the DSK6455 board, Spectrum Digital Inc.\n");
 
@@ -156,9 +156,9 @@ void c6x_board_setup_arch(void)
 	mach_progress(1, "End of EVM6486 specific initialization");
 }
 
-__init void evm_init(void)
+static int __init evm_init(void)
 {
-        setup_emac();
+        return setup_emac();
 }
 
 arch_initcall(evm_init);

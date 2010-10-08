@@ -787,10 +787,6 @@ _nmi_handler:
 	NOP	5
 
 #else
-
-#ifdef CONFIG_TI_C6X_COMPILER
-#endif
-
 	SAVE_ALL_EXCEPT
 
 	MVC	.S2	EFR,B2

@@ -67,7 +67,7 @@ asmlinkage int sys_sigaction(int sig,
 	int ret;
 
 	if (act) {
-		old_sigset_t mask;
+		old_sigset_t mask = 0;
 		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))

@@ -41,11 +41,13 @@
  * Resources present on the SoC
  */
 static struct resource c6x_soc_res = {
-	"C64X+ SOC peripherals",
+	.name = "C64X+ SOC peripherals",
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
-	0x01800000, 0x02f60000
+	.start = 0x01800000,
+	.end = 0x02f60000,
 #elif defined (CONFIG_SOC_TMS320C6455)
-	0x01800000, 0x2cffffff
+	.start = 0x01800000,
+	.end = 0x2cffffff,
 #else
 #error "No SoC peripheral address space defined"
 #endif
@@ -87,9 +89,9 @@ static struct platform_device c6x_platram_device = {
 #ifndef CONFIG_NK
 static void init_pll(void)
 {
+#if defined(CONFIG_SOC_TMS320C6474) /* should be done elsewhere */
 	int i;
 
-#if defined(CONFIG_SOC_TMS320C6474) /* should be done elsewhere */
 	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLENSRC);
 	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLEN);
 
@@ -129,6 +131,8 @@ static void init_pll(void)
 #endif
 
 #if defined(CONFIG_SOC_TMS320C6472) && defined(CONFIG_TMS320C64X_GEMAC)
+	int i;
+
 	/* PLL2 configuration (EMAC) */
 	pll2_clearbit_reg(PLLCTL, PLLCTL_PLLENSRC);
 	pll2_clearbit_reg(PLLCTL, PLLCTL_PLLEN);
@@ -247,9 +251,9 @@ void c6x_soc_setup_arch(void)
 
 static int __init platform_arch_init(void)
 {
+	int status = 0;
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
-		int status;
 
 		c6x_platram_resource.start = c6x_platram_start;
 		c6x_platram_resource.end = c6x_platram_start + c6x_platram_size - 1;
@@ -258,6 +262,7 @@ static int __init platform_arch_init(void)
 			printk(KERN_ERR "Could not register platram device: %d\n", status);
 	}
 #endif
+	return status;
 }
 
 arch_initcall(platform_arch_init);
