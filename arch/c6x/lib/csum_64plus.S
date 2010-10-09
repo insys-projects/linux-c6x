@@ -11,7 +11,9 @@
 ;  published by the Free Software Foundation.
 ;
 
+#ifndef CONFIG_TI_C6X_COMPILER
 #define GAS_SPKERNEL_BUG
+#endif
 
 ;
 ;unsigned int csum_partial_copy(const char *src, char * dst,
