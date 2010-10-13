@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -23,7 +23,7 @@ struct sgmii_config_s {
 };
 
 extern int sgmii_reset(void);
-extern sgmii_config(struct sgmii_config_s *);
+extern int sgmii_config(struct sgmii_config_s *);
 
 #ifdef __KERNEL__
 #include <asm/hardware.h>

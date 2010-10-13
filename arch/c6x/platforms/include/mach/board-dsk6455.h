@@ -24,7 +24,6 @@
 #define IRQ_EMAC        INT6
 
 
-
 #define DSK6455_CPLD_REG_BASE                    0xa0000000
 
 /* DSK6455 CPLD registers */

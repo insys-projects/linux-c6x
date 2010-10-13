@@ -107,7 +107,7 @@ struct emac_config {
                 (w) = stat; \
         } while(0)
 
-#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
 #define ectl_setbit_reg(reg, val) \
         *((volatile u32 *) (ep->ectl_reg_base + (reg))) |= (u32) (val)
 	    

@@ -29,6 +29,20 @@
 #define PLL_RESET_TIME		128
 #define PLL_LOCK_TIME		2000
 
+#elif defined(CONFIG_SOC_TMS320C6457)
+#define ARCH_PLL1_BASE 0x029A0000
+
+/*
+ * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
+ * PLL has switched to bypass mode. Delay of 1us ensures we are good for
+ * all > 4MHz CLKIN inputs. Typically the input is ~25MHz.
+ * Units are micro seconds.
+ */
+#define PLL_BYPASS_TIME		1
+
+#define PLL_RESET_TIME		1000
+#define PLL_LOCK_TIME		2000
+
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define ARCH_PLL1_BASE 0x029A0000
 #define ARCH_PLL2_BASE 0x029C0000
@@ -68,6 +82,7 @@
 #define PLLDIV1         0x118
 #define PLLDIV2         0x11c
 #define PLLDIV3         0x120
+#define PLLPOSTDIV      0x128
 #define PLLCMD		0x138
 #define PLLSTAT		0x13c
 #define PLLALNCTL	0x140

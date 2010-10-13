@@ -17,7 +17,7 @@
 /*
  * Timers register base
  */
-#if defined(CONFIG_SOC_TMS320C6455)
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 #define TIMER_BASE_ADDR   0x02940000
 #define TIMER_CHAN_MULT   0x40000
 #elif defined(CONFIG_SOC_TMS320C6472)

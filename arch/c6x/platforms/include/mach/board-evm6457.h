@@ -1,0 +1,47 @@
+/*
+ *  linux/arch/c6x/platforms/mach/board-evm6457.h
+ *
+ *  Port on Texas Instruments TMS320C6x architecture
+ *
+ *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Author: Mark Salter <msalter@redhat.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ */
+#include <asm/gpio.h>
+
+/* I2C UART Bridge (14.7456MHz / 16) */
+#define BASE_BAUD	921600
+
+
+/* board memory map */
+#define VECTADDR        0xE0000000
+#define TEXTADDR	0xE0000400
+#define TEXTLEN         0x0FFFFC00
+#define RAMEND		0xF0000000
+
+/* davinci i2c bus specs */
+#define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
+#define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
+
+/*
+ * Interrupt Assignments
+ */
+#define IRQ_CLOCKEVENTS INT15
+
+/* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
+#define IRQ_EMAC_TX   INT7
+#define IRQ_EMAC_RX   INT6
+
+#define IRQ_UART_BRIDGE	INT5
+#define IRQ_DAVINCI_I2C	INT4
+
+#ifdef CONFIG_IDLE_LED
+#ifndef __ASSEMBLY__
+static inline void c6x_arch_idle_led(int state)
+{
+}
+#endif
+#endif

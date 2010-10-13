@@ -149,8 +149,8 @@ config USE_RT_TIMER
 	default n
 
 config SGMII
-	bool
-	default y if SOC_TMS320C6474
+	bool "Ethernet SGMII support"
+	default n
 
 config TMS320C6X_EMAC
 	bool "Ethernet (EMAC/MDIO interface)"

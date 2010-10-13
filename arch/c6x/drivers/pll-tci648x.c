@@ -313,7 +313,7 @@ static unsigned long clk_pllclk_recalc(struct clk *clk)
 }
 
 
-int __init c6x_clk_init(struct clk_lookup *clocks)
+int __init c6x_clk_init(struct clk_lookup *clocks, int nclks)
 {
 	struct clk_lookup *c;
 	struct clk *clk;

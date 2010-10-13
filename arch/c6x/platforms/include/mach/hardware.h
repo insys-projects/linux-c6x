@@ -22,7 +22,14 @@
  * Memory address space
  */
 #if defined(CONFIG_SOC_TMS320C6455)
-#define RAM_IRAM          0x00000000
+#define RAM_EMIFA_CE2     0xa0000000
+#define RAM_EMIFA_CE3     0xb0000000
+#define RAM_EMIFA_CE4     0xc0000000
+#define RAM_EMIFA_CE5     0xd0000000
+#define RAM_DDR2_CE0      0xe0000000
+#define RAM_MEMORY_START  RAM_DDR2_CE0
+
+#elif defined(CONFIG_SOC_TMS320C6457)
 #define RAM_EMIFA_CE2     0xa0000000
 #define RAM_EMIFA_CE3     0xb0000000
 #define RAM_EMIFA_CE4     0xc0000000
