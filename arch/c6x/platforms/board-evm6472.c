@@ -305,6 +305,7 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
 	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK(NULL, NULL, NULL)
 };
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
