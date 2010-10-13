@@ -14,6 +14,8 @@
 #ifndef __MACH_C6X_DSCR_H
 #define __MACH_C6X_DSCR_H
 
+#include <linux/bitops.h>
+
 /*
  * Device State Control Registers
  */
@@ -29,23 +31,44 @@
 
 #define DSCR_LOCKVAL                 0x0f0a0b00
 
-#define DSCR_B_PERCFG0_TCP           0x00000001
-#define DSCR_B_PERCFG0_VCP           0x00000004
-#define DSCR_B_PERCFG0_EMAC          0x00000010
-#define DSCR_B_PERCFG0_TIMER0        0x00000040
-#define DSCR_B_PERCFG0_TIMER1        0x00000100
-#define DSCR_B_PERCFG0_GPIO          0x00000400
-#define DSCR_B_PERCFG0_I2C           0x00001000
-#define DSCR_B_PERCFG0_BSP0          0x00004000
-#define DSCR_B_PERCFG0_BSP1          0x00010000
-#define DSCR_B_PERCFG0_HPI           0x00040000
-#define DSCR_B_PERCFG0_PCI           0x00100000
-#define DSCR_B_PERCFG0_UTOPIA        0x00400000
-#define DSCR_B_PERCFG1_EMIFA         0xc0000001
-#define DSCR_B_PERCFG1_DDR2          0x00000002
+#define DSCR_B_PERCFG0_TCP           BIT(0)
+#define DSCR_B_PERCFG0_VCP           BIT(2)
+#define DSCR_B_PERCFG0_EMAC          BIT(4)
+#define DSCR_B_PERCFG0_TIMER0        BIT(6)
+#define DSCR_B_PERCFG0_TIMER1        BIT(8)
+#define DSCR_B_PERCFG0_GPIO          BIT(10)
+#define DSCR_B_PERCFG0_I2C           BIT(12)
+#define DSCR_B_PERCFG0_BSP0          BIT(14)
+#define DSCR_B_PERCFG0_BSP1          BIT(16)
+#define DSCR_B_PERCFG0_HPI           BIT(18)
+#define DSCR_B_PERCFG0_PCI           BIT(20)
+#define DSCR_B_PERCFG0_UTOPIA        BIT(22)
+
+#define DSCR_B_PERCFG1_EMIFA         BIT(0)
+#define DSCR_B_PERCFG1_DDR2          BIT(1)
 
 #define DSCR_B_EMACCFG_RMIIRST       (1<<19)
 #endif  /* CONFIG_SOC_TMS320C6455 */
+
+#if defined(CONFIG_SOC_TMS320C6457)
+#define DSCR_JTAGID                  0x02880818
+#define DSCR_DEVSTAT                 0x02880820
+#define DSCR_KICK0                   0x02880838
+#define DSCR_KICK1                   0x0288083c
+#define DSCR_BOOTADDR                0x02880840
+#define DSCR_DEVCFG                  0x02880910
+#define DSCR_MACID1                  0x02880914
+#define DSCR_MACID2                  0x02880918
+#define DSCR_PRI_ALLOC               0x0288091c
+#define DSCR_WDRSTSEL                0x02880920
+
+#define DSCR_KICK0_KEY               0x83E70B13
+#define DSCR_KICK1_KEY               0x95A4F1E0
+
+#define DSCR_B_DEVSTAT_LENDIAN       BIT(0)
+#define DSCR_B_DEVSTAT_HPIWIDTH      BIT(14)
+#define DSCR_B_DEVSTAT_ECLKINSEL     BIT(15)
+#endif  /* CONFIG_SOC_TMS320C6457 */
 
 #if defined(CONFIG_SOC_TMS320C6474)
 #define DSCR_DEVSTAT                 0x02880804
@@ -59,20 +82,21 @@
 
 #define DSCR_LOCKVAL                 0x0f0a0b00
 
-#define DSCR_B_PERCFG0_TCP           0x00000001
-#define DSCR_B_PERCFG0_VCP           0x00000004
-#define DSCR_B_PERCFG0_EMAC          0x00000010
-#define DSCR_B_PERCFG0_TIMER0        0x00000040
-#define DSCR_B_PERCFG0_TIMER1        0x00000100
-#define DSCR_B_PERCFG0_GPIO          0x00000400
-#define DSCR_B_PERCFG0_I2C           0x00001000
-#define DSCR_B_PERCFG0_BSP0          0x00004000
-#define DSCR_B_PERCFG0_BSP1          0x00010000
-#define DSCR_B_PERCFG0_HPI           0x00040000
-#define DSCR_B_PERCFG0_PCI           0x00100000
-#define DSCR_B_PERCFG0_UTOPIA        0x00400000
-#define DSCR_B_PERCFG1_EMIFA         0xc0000001
-#define DSCR_B_PERCFG1_DDR2          0x00000002
+#define DSCR_B_PERCFG0_TCP           BIT(0)
+#define DSCR_B_PERCFG0_VCP           BIT(2)
+#define DSCR_B_PERCFG0_EMAC          BIT(4)
+#define DSCR_B_PERCFG0_TIMER0        BIT(6)
+#define DSCR_B_PERCFG0_TIMER1        BIT(8)
+#define DSCR_B_PERCFG0_GPIO          BIT(10)
+#define DSCR_B_PERCFG0_I2C           BIT(12)
+#define DSCR_B_PERCFG0_BSP0          BIT(14)
+#define DSCR_B_PERCFG0_BSP1          BIT(16)
+#define DSCR_B_PERCFG0_HPI           BIT(18)
+#define DSCR_B_PERCFG0_PCI           BIT(20)
+#define DSCR_B_PERCFG0_UTOPIA        BIT(22)
+
+#define DSCR_B_PERCFG1_EMIFA         BIT(0)
+#define DSCR_B_PERCFG1_DDR2          BIT(1)
 
 #define DSCR_B_EMACCFG_RMIIRST       (1<<19)
 #endif  /* CONFIG_SOC_TMS320C6474 */
@@ -118,7 +142,7 @@
 
 #define DSCR_LOCKVAL                 0xa1e183a
 
-#define DSCR_B_DEVCTL_EMAC1          (1<<12)
+#define DSCR_B_DEVCTL_EMAC1          BIT(12)
 
 #define DEVSTAT_B_EMAC0_MACSEL       0x00000700
 #define DEVSTAT_B_EMAC0_OFFSET       8

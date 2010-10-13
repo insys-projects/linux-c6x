@@ -45,7 +45,7 @@ static struct resource c6x_soc_res = {
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
 	.start = 0x01800000,
 	.end = 0x02f60000,
-#elif defined (CONFIG_SOC_TMS320C6455)
+#elif defined (CONFIG_SOC_TMS320C6455) || defined (CONFIG_SOC_TMS320C6457)
 	.start = 0x01800000,
 	.end = 0x2cffffff,
 #else
@@ -192,8 +192,6 @@ static void init_power(void)
 
 void c6x_soc_setup_arch(void)
 {
-	unsigned long val;
-
  	/* Initialize C64x+ IRQs */          	
 #ifndef CONFIG_NK
 	clear_all_irq(); /* acknowledge all pending irqs */
@@ -206,6 +204,8 @@ void c6x_soc_setup_arch(void)
 	init_power();
 
 #if defined(CONFIG_SOC_TMS320C6474)
+	unsigned long val;
+
 	/* Enable timers and devices (in regs PERLOCK & PERCFG0) */
 	dscr_set_reg(DSCR_PERLOCK, DSCR_LOCKVAL);
 

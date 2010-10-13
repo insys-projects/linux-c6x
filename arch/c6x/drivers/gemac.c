@@ -35,11 +35,13 @@ static int emac_open(struct net_device *dev);
 static int emac_close(struct net_device *dev);
 static int emac_reset(struct net_device *dev, int reset_mode);
 
-#if defined(CONFIG_SOC_TMS320C6472) | defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6457) ||	\
+    defined(CONFIG_SOC_TMS320C6472) ||	\
+    defined(CONFIG_SOC_TMS320C6474)
 #define EMAC_HAS_SEPARATE_RXTX_IRQS
 #endif
 
-#if !defined(CONFIG_SOC_TMS320C6472) && !defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6455)
 #define EMAC_TIMER_TICK
 #endif
 
@@ -436,7 +438,8 @@ static irqreturn_t  emac_rx_interrupt(int irq, void * netdev_id)
 #endif
 #endif
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	ectl_set_reg(ECTL_RXEN + (get_coreid() << 4), 0);
 #endif
 	irq_flags = emac_get_reg(EMAC_MACINVECTOR);
@@ -529,7 +532,8 @@ static irqreturn_t  emac_rx_interrupt(int irq, void * netdev_id)
 		emac_rx(netdev_id, HW_TO_PTR(desc));
 	}
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	emac_set_reg(EMAC_MACEOIVECTOR, 0x1 + (get_coreid() << 2));
 
 	ectl_set_reg(ECTL_RXEN + (get_coreid() << 4), 1);
@@ -556,7 +560,8 @@ static irqreturn_t  emac_tx_interrupt(int irq, void * netdev_id)
 #endif
 #endif
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	ectl_set_reg(ECTL_TXEN + (get_coreid() << 4), 0);
 #endif
 	irq_flags = emac_get_reg(EMAC_MACINVECTOR);
@@ -645,7 +650,8 @@ static irqreturn_t  emac_tx_interrupt(int irq, void * netdev_id)
 		emac_tx(netdev_id, HW_TO_PTR(desc));
 	}
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	emac_set_reg(EMAC_MACEOIVECTOR, 0x2 + (get_coreid() << 2));
 
 	ectl_set_reg(ECTL_TXEN + (get_coreid() << 4), 1);
@@ -823,7 +829,8 @@ static int emac_reset(struct net_device *dev, int reset_mode)
 	while (ectl_get_reg(ECTL_SOFTRESET) != 0);
 #endif
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	/* Initialize EMAC Control Module */
 	ectl_set_reg(ECTL_INTCONTROL, 0);
 
@@ -851,7 +858,8 @@ static int emac_reset(struct net_device *dev, int reset_mode)
 	}
 
 	/* Set interrupt pacing */
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	ectl_set_reg(ECTL_INTCONTROL, gemac_int_prescaler() | (0x3 << 16));
 	ectl_set_reg(ECTL_RXIMAX + (get_coreid() << 3), 0x10);
 	ectl_set_reg(ECTL_TXIMAX + (get_coreid() << 3), 0x10);
@@ -882,7 +890,7 @@ static int emac_reset(struct net_device *dev, int reset_mode)
 	emac_set_reg(EMAC_TXCONTROL, 0);
 	emac_set_reg(EMAC_RXCONTROL, 0);
 
-#if !defined(CONFIG_SOC_TMS320C6472) && !defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6455)
 	/* MII/MDIO setup */
 	if (reset_mode == GEMAC_RESET_INIT)
 		mdio_init(emac_get_reg(EMAC_TXIDVER));
@@ -1084,7 +1092,8 @@ static int emac_open(struct net_device *dev)
 #endif
 	emac_setbit_reg(EMAC_MACCONTROL, EMAC_B_GMIIEN);
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	emac_setbit_reg(EMAC_MACCONTROL, EMAC_B_EXTEN);
 #ifdef CONFIG_TMS320DM648
 	emac_setbit_reg(EMAC_MACCONTROL, EMAC_B_FULLDUPLEX | EMAC_B_CTL_EN |
@@ -1099,7 +1108,8 @@ static int emac_open(struct net_device *dev)
 	emac_set_reg(EMAC_RX0HDP, PTR_TO_HW(ep->cur_rx));
 
 	/* Enable global EMAC interrupt */
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	ectl_set_reg(ECTL_RXEN + (get_coreid() << 4), 1);
 	ectl_set_reg(ECTL_TXEN + (get_coreid() << 4), 1);
 #elif defined(CONFIG_SOC_TMS320C6472)
@@ -1126,7 +1136,8 @@ static int emac_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
-#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
+#if defined(CONFIG_SOC_TMS320C6457) || \
+    defined(CONFIG_SOC_TMS320C6474)
 	ectl_set_reg(ECTL_INTCONTROL, 0);
 	ectl_set_reg(ECTL_MISCEN + (get_coreid() << 4), 0);
 	ectl_set_reg(ECTL_RXEN + (get_coreid() << 4), 0);

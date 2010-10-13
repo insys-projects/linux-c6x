@@ -29,7 +29,8 @@ struct davinci_i2c_platform_data {
 /*
  * I2C registers base
  */
-#if defined CONFIG_SOC_TMS320C6472
+#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || \
+    defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 #define ARCH_DAVINCI_I2C_BASE    0x02B04000
 #else
 #error "No I2C base address"

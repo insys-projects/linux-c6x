@@ -191,7 +191,10 @@
 #define EMAC_RX7INTACK            0x67c /* RX Channel 7 Interrupt Acknowledge Register */
 
 
-#if !defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6455)
+#define EMAC_EWCTL                0x1004 /* Interrupt Control Register */
+#define EMAC_EWINTTCNT            0x1008 /* Interrupt Timer Count */
+#endif
 
 #if defined(CONFIG_SOC_TMS320C6472)
 #define EMAC_EMIC_PID             0x1000
@@ -210,14 +213,9 @@
 #define EMAC_B_MDIOUSER           (1 << 4)
 #define EMAC_B_TX0                (1 << 8)
 #define EMAC_B_RX0                (1 << 16)
-
-#else
-#define EMAC_EWCTL                0x1004 /* Interrupt Control Register */
-#define EMAC_EWINTTCNT            0x1008 /* Interrupt Timer Count */
 #endif
 
-#else /* !defined(CONFIG_SOC_TMS320C6474) */
-
+#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6474)
 #define ECTL_IDVER                0x00
 #define ECTL_SOFTRESET            0x04
 #define ECTL_EMCONTROL            0x08
@@ -233,8 +231,7 @@
 #define ECTL_MISCSTAT             0x4c
 #define ECTL_RXIMAX               0x70
 #define ECTL_TXIMAX               0x74
-
-#endif /* !defined(CONFIG_SOC_TMS320C6474) */
+#endif
 
 #define EMAC_NUM_STATREGS         36
 
@@ -276,7 +273,7 @@
 #define EMAC_B_STATINT            (1 << 0)
 #define EMAC_B_HOSTINT            (1 << 1)  /* for MACINTMASKSET */
 
-#if defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6474)
 #define EMAC_B_RXPEND0            (1 << 0) /* for MACINVECTOR */
 #define EMAC_B_RXTHRESPEND0       (1 << 8)
 #define EMAC_B_TXPEND0            (1 << 16)
@@ -284,12 +281,14 @@
 #define EMAC_B_LINKINT            (1 << 25)
 #define EMAC_B_HOSTPEND           (1 << 26)
 #define EMAC_B_STATPEND           (1 << 27)
-#else /* defined(CONFIG_SOC_TMS320C6474) */
+#endif
+
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6472)
 #define EMAC_B_TXPEND0            (1 << 0)
 #define EMAC_B_RXPEND0            (1 << 8)
 #define EMAC_B_STATPEND           (1 << 16)
 #define EMAC_B_HOSTPEND           (1 << 17) /* for MACINVECTOR */
-#endif /* defined(CONFIG_SOC_TMS320C6474) */
+#endif
 
 #define EMAC_V_SOPERROR           1
 #define EMAC_V_OWNERSHIP          2
@@ -315,7 +314,6 @@
 #define EMAC_CONFIG_PASSCONTROL   0x20 /* pass control frames */
 
 
-#if defined(CONFIG_SOC_TMS320C6474)
 /* 
  * SGMII registers
  */ 
@@ -329,13 +327,16 @@
 #define SGMII_TXCFG_REG  (SGMII_REG_BASE + 0x030)
 #define SGMII_RXCFG_REG  (SGMII_REG_BASE + 0x034)
 #define SGMII_AUXCFG_REG (SGMII_REG_BASE + 0x038)
-#endif
+
 
 #ifdef CONFIG_SOC_TMS320C6474
 #define __REG_MAC_ADDR 0x2880834
 #endif
 #ifdef CONFIG_SOC_TMS320C6472
 #define __REG_MAC_ADDR 0x2a80700
+#endif
+#ifdef CONFIG_SOC_TMS320C6457
+#define __REG_MAC_ADDR DSCR_MACID1
 #endif
 
 #ifdef __REG_MAC_ADDR
@@ -356,7 +357,7 @@ static int inline emac_arch_get_mac_addr(char *x)
 	x[3] = addr0 & 0x000000ff;
 	x[4] = (addr1 & 0xff000000) >> 24;
 	x[5] = (addr1 & 0x00ff0000) >> 16;
-#elif defined(CONFIG_SOC_TMS320C6474)
+#elif defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)
 	x[0] = (addr1 & 0x0000ff00) >> 8;
 	x[1] = addr1 & 0x000000ff;
 	x[2] = (addr0 & 0xff000000) >> 24;
