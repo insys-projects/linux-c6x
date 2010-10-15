@@ -62,72 +62,6 @@ static struct resource *dsk_resources[NR_RESOURCES] =
 	{ &_flash_res, &_cpld_async_res };
 
 
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "MDIO_REG_BASE",
-		.start          =  MDIO_REG_BASE,
-		.end            =  MDIO_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
-};
-
-static void setup_emac(void)
-{
-        int status;
-	unsigned long val;
-	unsigned int addr;
-
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac --> %d\n", status);
-	else {
-		/* Enable EMAC device (in regs PERLOCK & PERCFG0) */
-		val = dscr_get_reg(DSCR_PERCFG0);
-		dscr_set_device(val | DSCR_B_PERCFG0_EMAC, DSCR_PERCFG0);
-
-		/* Wait for enabling (reg PERSTAT0) */
-		val = 0;
-		while (val != 0x1) {
-			val = dscr_get_reg(DSCR_PERSTAT0);
-			val = ((val & 0x1C0) >> 6);
-		}
-	}
-}
-#else
-static void setup_emac(void) {}
-#endif
-
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
@@ -143,10 +77,6 @@ void c6x_board_setup_arch(void)
 	for (i = 0; i < NR_RESOURCES; i++)
 		request_resource(&iomem_resource, dsk_resources[i]);
 
-	/* Map our IRQs */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-	irq_map(IRQ_EMACINT, IRQ_EMAC);
-
 	/* Initialize led register */
 	cpld_set_reg(DSK6455_CPLD_USER, 0x0);
 
@@ -158,7 +88,6 @@ void c6x_board_setup_arch(void)
 
 __init void evm_init(void)
 {
-        setup_emac();
 }
 
 arch_initcall(evm_init);

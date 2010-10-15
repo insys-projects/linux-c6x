@@ -38,104 +38,7 @@
 #include <asm/clock.h>
 
 #include <mach/i2c.h>
-#include <mach/gemac.h>
 #include <mach/board.h>
-
-#ifdef CONFIG_TMS320C64X_GEMAC
-#ifdef CONFIG_TMS320C64X_GEMAC_0
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC0_REG_BASE,
-		.end            =  EMAC0_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL0_REG_BASE,
-		.end            =  ECTL0_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC0_DSC_BASE,
-		.end            =  EMAC0_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
-};
-#endif
-
-#ifdef CONFIG_TMS320C64X_GEMAC_1
-static struct resource emac_resources1 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC1_REG_BASE,
-		.end            =  EMAC1_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL1_REG_BASE,
-		.end            =  ECTL1_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC1_DSC_BASE,
-		.end            =  EMAC1_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_1,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev1 = {
-        .name           = "EMAC",
-        .id             = 1,
-	.resource       = emac_resources1,
-        .num_resources  = ARRAY_SIZE(emac_resources1),
-};
-#endif
-
-static void setup_emac(void)
-{
-        int status;
-
-#ifdef CONFIG_TMS320C64X_GEMAC_0
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac0 --> %d\n", status);
-        //else
-        //  /* Power domain need to be activated here */
-#endif
-#ifdef CONFIG_TMS320C64X_GEMAC_1
-        status  = platform_device_register(&emac_dev1);
-        if (status != 0)
-                pr_debug("setup_emac1 --> %d\n", status);
-	else {
-		val = dscr_get_reg(DSCR_DEVCTL);
-		dscr_set_device(val | DSCR_B_DEVCTL_EMAC1, DSCR_DEVCTL);
-	}
-#endif
-}
-#else
-static void setup_emac(void) {}
-#endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -270,7 +173,7 @@ static struct clk pll1_sysclk8 = {
 	.name = "pll1_sysclk8",
 	.parent = &pll1_clk,
 	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
+	.div = 4,
 };
 
 static struct clk pll1_sysclk9 = {
@@ -284,7 +187,7 @@ static struct clk pll1_sysclk10 = {
 	.name = "pll1_sysclk10",
 	.parent = &pll1_clk,
 	.flags = CLK_PLL,
-	.div = PLLDIV10,
+	.div = 3,
 };
 
 static struct clk i2c_clk = {
@@ -317,20 +220,6 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6472 board, Texas Instruments.\n");
 
-	/* Configure the interupt selector MUX registers */
-  	irq_map(IRQ_TINT, IRQ_CLOCKEVENTS);
-#ifdef CONFIG_I2C
-	irq_map(IRQ_I2CINT, IRQ_DAVINCI_I2C);
-#endif
-#ifdef CONFIG_TMS320C64X_GEMAC_0
-	irq_map(IRQ_EMACRXINT0, IRQ_EMAC_RX_0);
-	irq_map(IRQ_EMACTXINT0, IRQ_EMAC_TX_0);
-#endif
-#ifdef CONFIG_TMS320C64X_GEMAC_1
-	irq_map(IRQ_EMACRXINT1, IRQ_EMAC_RX_1);
-	irq_map(IRQ_EMACTXINT1, IRQ_EMAC_TX_1);
-#endif
-
 	gpio_direction(0xFFFF);  /* all input */
 	
 	/* setup LED pins as outputs */
@@ -339,7 +228,7 @@ void c6x_board_setup_arch(void)
 
 #if defined(CONFIG_SERIAL_SC16IS7XX)
 	/* setup GP15 for interrupt from i2c UART */
-	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
+	gpio_int_edge_detection_set(GPIO_PIN15, GPIO_FALLING_EDGE);
 	gpio_bank_int_enable();
 	irq_map(IRQ_GPIO15, IRQ_UART_BRIDGE);
 #endif
@@ -349,13 +238,12 @@ void c6x_board_setup_arch(void)
 
 	c6x_clk_init(evm_clks);
 
-	mach_progress(1, "End of EVM6486 specific initialization");
+	mach_progress(1, "End of EVM6472 specific initialization");
 }
 
 __init void evm_init(void)
 {
 	evm_setup_i2c();
-        setup_emac();
 }
 
 arch_initcall(evm_init);

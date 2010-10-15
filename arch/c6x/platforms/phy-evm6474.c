@@ -1,9 +1,9 @@
 /*
- *  linux/arch/c6x/mach-evm6488/phy.c
+ *  linux/arch/c6x/mach-evm6488/phy-evm6474.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *
  *  This program is free software; you can redistribute it and/or modify

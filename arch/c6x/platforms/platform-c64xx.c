@@ -1,5 +1,5 @@
 /*
- *  linux/arch/c6x/platforms/platform-config.c
+ *  linux/arch/c6x/platforms/platform-c64xx.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
@@ -36,6 +36,9 @@
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/dscr.h>
+
+#include <mach/board.h>
+#include <mach/gemac.h>
 
 /*
  * Resources present on the SoC
@@ -82,6 +85,166 @@ static struct platform_device c6x_platram_device = {
 	.num_resources = 1,
 	.resource      = &c6x_platram_resource,
 };
+#endif
+
+#ifdef CONFIG_TMS320C64X_GEMAC
+#if defined(CONFIG_TMS320C64X_GEMAC_0) || !defined(CONFIG_SOC_TMS320C6472)
+static struct resource emac_resources0 [] = {
+	{
+		.name           = "EMAC_REG_BASE",
+		.start          =  EMAC0_REG_BASE,
+		.end            =  EMAC0_REG_BASE + 0xFFF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "ECTL_REG_BASE",
+		.start          =  ECTL0_REG_BASE,
+		.end            =  ECTL0_REG_BASE + 0x7FF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "EMAC_DSC_BASE",
+		.start          =  EMAC0_DSC_BASE,
+		.end            =  EMAC0_DSC_BASE + 0x17FF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "IRQ_SRC",
+		.start          =  IRQ_EMACRXINT, 
+		.end            =  IRQ_EMACTXINT,
+		.flags          =  IORESOURCE_IRQ,
+	},
+	{
+		.name           = "IRQ_DST",
+		.start          =  IRQ_EMAC_RX_0,
+		.end            =  IRQ_EMAC_TX_0,
+		.flags          =  IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device emac_dev0 = {
+        .name           = "EMAC",
+        .id             = 0,
+	.resource       = emac_resources0,
+        .num_resources  = ARRAY_SIZE(emac_resources0),
+};
+#endif
+
+#ifdef CONFIG_TMS320C64X_GEMAC_1
+static struct resource emac_resources1 [] = {
+	{
+		.name           = "EMAC_REG_BASE",
+		.start          =  EMAC1_REG_BASE,
+		.end            =  EMAC1_REG_BASE + 0xFFF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "ECTL_REG_BASE",
+		.start          =  ECTL1_REG_BASE,
+		.end            =  ECTL1_REG_BASE + 0x7FF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "EMAC_DSC_BASE",
+		.start          =  EMAC1_DSC_BASE,
+		.end            =  EMAC1_DSC_BASE + 0x17FF,
+		.flags          =  IORESOURCE_IO,
+	},
+	{
+		.name           = "IRQ_SRC",
+		.start          =  IRQ_EMACRXINT1, 
+		.end            =  IRQ_EMACTXINT1,
+		.flags          =  IORESOURCE_IRQ,
+	},
+	{
+		.name           = "IRQ_DST",
+		.start          =  IRQ_EMAC_RX_1,
+		.end            =  IRQ_EMAC_TX_1,
+		.flags          =  IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device emac_dev1 = {
+        .name           = "EMAC",
+        .id             = 1,
+	.resource       = emac_resources1,
+        .num_resources  = ARRAY_SIZE(emac_resources1),
+};
+#endif
+
+static void setup_emac(void)
+{
+        int status;
+
+#if defined(CONFIG_TMS320C64X_GEMAC_0) || !defined(CONFIG_SOC_TMS320C6472)
+        status  = platform_device_register(&emac_dev0);
+        if (status != 0)
+                pr_debug("setup_emac0 --> %d\n", status);
+#ifdef CONFIG_SOC_TMS320C6455
+	else {
+		unsigned long val;
+
+		/* Enable EMAC device (in regs PERLOCK & PERCFG0) */
+		val = dscr_get_reg(DSCR_PERCFG0);
+		dscr_set_device(val | DSCR_B_PERCFG0_EMAC, DSCR_PERCFG0);
+
+		/* Wait for enabling (reg PERSTAT0) */
+		val = 0;
+		while (val != 0x1) {
+			val = dscr_get_reg(DSCR_PERSTAT0);
+			val = ((val & 0x1C0) >> 6);
+		}
+	}
+#endif /* CONFIG_SOC_TMS320C6455 */
+#endif /* defined(CONFIG_TMS320C64X_GEMAC_0) || !defined(CONFIG_SOC_TMS320C6472) */
+
+#ifdef CONFIG_TMS320C64X_GEMAC_1
+        status  = platform_device_register(&emac_dev1);
+        if (status != 0)
+                pr_debug("setup_emac1 --> %d\n", status);
+#ifdef CONFIG_SOC_TMS320C6472
+	else {
+		unsigned long val;
+		val = dscr_get_reg(DSCR_DEVCTL);
+		dscr_set_device(val | DSCR_B_DEVCTL_EMAC1, DSCR_DEVCTL);
+	}
+#endif /* CONFIG_SOC_TMS320C6472 */
+#endif /* CONFIG_TMS320C64X_GEMAC_1 */
+}
+#else /* CONFIG_TMS320C64X_GEMAC */
+static void setup_emac(void) {}
+#endif
+
+#if defined(CONFIG_SOC_TMS320C6474)
+unsigned int arch_get_silicon_rev(void)
+{
+	u32   jtagid_val  = *(u32 *) DSCR_JTAGID;
+	u32   silicon_rev = (jtagid_val >> 28) & 0xf;
+
+	return silicon_rev;	
+}
+char* arch_compute_silicon_rev(u32 silicon_rev)
+{
+	char *str;
+	switch(silicon_rev) {
+	case 0x1:
+		str = "1.2";
+		break;
+	case 0x2:
+		str = "1.3";
+		break;
+	case 0x3:
+		str = "2.0";
+		break;
+	case 0x4:
+		str = "2.1";
+		break;
+	default:
+		str = "unknown";
+		break;
+	}
+	return str;
+}
 #endif
 
 #ifndef CONFIG_NK
@@ -154,36 +317,43 @@ static void init_pll(void)
 static void init_power(void)
 {
 #if defined(CONFIG_SOC_TMS320C6474)
-	*(int *)  PSC_PDCTL0 |= 0x00000001;
-	*(int *)  PSC_MDCTL0 |= 0x00000003;
-	*(int *)  PSC_MDCTL1 |= 0x00000003;
-	*(int *)  PSC_MDCTL2 |= 0x00000003;
+
+	*(volatile unsigned int *)  PSC_PDCTL0 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL0 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_MDCTL1 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_MDCTL2 |= 0x00000003;
  
-	*(int *)  PSC_PDCTL1 |= 0x00000001;
-	*(int *)  PSC_MDCTL6 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_PDCTL1 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL6 |= 0x00000003;
 
-	*(int *)  PSC_PDCTL2 |= 0x00000001;
-	*(int *)  PSC_MDCTL7 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_PDCTL2 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL7 |= 0x00000003;
 
-	*(int *)  PSC_PDCTL3 |= 0x00000001;
-	*(int *)  PSC_MDCTL8 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_PDCTL3 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL8 |= 0x00000003;
 
-	*(int *)  PSC_PDCTL4 |= 0x00000001;
-	*(int *)  PSC_MDCTL9 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_PDCTL4 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL9 |= 0x00000003;
 
-	*(int *)  PSC_PDCTL5 |= 0x00000001;
-	*(int *)  PSC_MDCTL10 |= 0x00000003;
+	*(volatile unsigned int *)  PSC_PDCTL5 |= 0x00000001;
+	*(volatile unsigned int *)  PSC_MDCTL10 |= 0x00000003;
 
-	*(int *)  PSC_PTCMD  |= 0x0000003f;
-#endif
+	*(volatile unsigned int *)  PSC_PTCMD  |= 0x0000003f;
+#endif /* CONFIG_SOC_TMS320C6474 */
 
-#if defined(CONFIG_SOC_TMS320C6472) && defined(CONFIG_TMS320C64X_GEMAC)
-	*(int *)  PSC_MDCTL8 |= 0x00000103; /* GEMAC0 */
+#ifdef CONFIG_SOC_TMS320C6472
+
+#ifdef CONFIG_TMS320C64X_GEMAC_0
+	*(volatile unsigned int *)  PSC_MDCTL7 |= 0x00000103; /* GEMAC0 */
+#endif /* CONFIG_TMS320C64X_GEMAC_0 */
+
 #ifdef CONFIG_TMS320C64X_GEMAC_1
-	*(int *)  PSC_MDCTL9 |= 0x00000103; /* GEMAC1 */
-#endif
+	*(volatile unsigned int *)  PSC_MDCTL8 |= 0x00000103; /* GEMAC1 */
+#endif /* CONFIG_TMS320C64X_GEMAC_1 */
+
 	*(int *)  PSC_PTCMD  |= 0x00000001;
-#endif
+
+#endif/* CONFIG_SOC_TMS320C6472 */
 }
 
 void c6x_soc_setup_arch(void)
@@ -217,14 +387,16 @@ void c6x_soc_setup_arch(void)
 
 	/* Wait 128 cycles */
 	_c6x_delay(22);
-#endif
+#endif /* defined(CONFIG_SOC_TMS320C6474) */
 
 #if defined(CONFIG_SOC_TMS320C6472)
+
 	/* Do not allow user mode to access SoC device I/O */
 	dscr_set_reg(DSCR_PRIVKEY,  0xbea7);
 	dscr_set_reg(DSCR_PRIVPERM, 0xaaaaaaaa);
 	dscr_set_reg(DSCR_PRIVKEY,  0x0);
-#endif
+
+#endif /*defined(CONFIG_SOC_TMS320C6472) */
 
 #if defined(CONFIG_SOC_TMS320C6455)
 	/* Enable timers (in regs PERLOCK & PERCFG0) */
@@ -237,7 +409,7 @@ void c6x_soc_setup_arch(void)
 	    val = dscr_get_reg(DSCR_PERSTAT0);
 	    val = ((val & 0x3E00) >> 9);
 	}
-#endif
+#endif /* defined(CONFIG_SOC_TMS320C6455) */
 
 	/* Initialize SoC resources */
 	iomem_resource.name = "Memory";
@@ -247,9 +419,13 @@ void c6x_soc_setup_arch(void)
 
 static int __init platform_arch_init(void)
 {
+	int status = 0;
+
+	/* Intialize EMAC SoC resources */
+	setup_emac();
+
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
-		int status;
 
 		c6x_platram_resource.start = c6x_platram_start;
 		c6x_platram_resource.end = c6x_platram_start + c6x_platram_size - 1;
@@ -258,6 +434,7 @@ static int __init platform_arch_init(void)
 			printk(KERN_ERR "Could not register platram device: %d\n", status);
 	}
 #endif
+	return status;
 }
 
 arch_initcall(platform_arch_init);

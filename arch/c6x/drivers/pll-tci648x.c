@@ -1,5 +1,5 @@
 /*
- * Clock and PLL control for TIC64X devices
+ * Clock and PLL control for TCI648x devices
  *
  * Copyright (C) 2010 Texas Instruments.
  * Contributed by: Mark Salter <msalter@redhat.com>
@@ -165,8 +165,8 @@ int clk_register(struct clk *clk)
 		return -EINVAL;
 
 	if (WARN(clk->parent && !clk->parent->rate,
-			"CLK: %s parent %s has no rate!\n",
-			clk->name, clk->parent->name))
+		 "CLK: %s parent %s has no rate!\n",
+		 clk->name, clk->parent->name))
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&clk->children);
@@ -380,7 +380,7 @@ dump_clock(struct seq_file *s, unsigned nest, struct clk *parent)
 	buf[sizeof(buf) - 1] = 0;
 	i = strlen(parent->name);
 	memcpy(buf + nest, parent->name,
-			min(i, (unsigned)(sizeof(buf) - 1 - nest)));
+	       min(i, (unsigned)(sizeof(buf) - 1 - nest)));
 
 	seq_printf(s, "%s users=%2d %-3s %9ld Hz\n",
 		   buf, parent->usecount, state, clk_get_rate(parent));
@@ -423,9 +423,9 @@ static const struct file_operations c6x_ck_operations = {
 static int __init c6x_clk_debugfs_init(void)
 {
 	debugfs_create_file("c6x_clocks", S_IFREG | S_IRUGO, NULL, NULL,
-						&c6x_ck_operations);
-	return 0;
+			    &c6x_ck_operations);
 
+	return 0;
 }
 device_initcall(c6x_clk_debugfs_init);
 #endif /* CONFIG_DEBUG_FS */

@@ -22,9 +22,11 @@
  * Number of C6x interrupts:
  * 16 processor interrupt sources
  * 32 platform interrupt sources
+ * 16 CIC output events
  */
 #define SYS_IRQS            16
 #define NR_IRQS             32
+#define CIC_IRQS            16
 
 /*
  * Processor interrupt definitions
@@ -46,5 +48,25 @@
 #define INT13		    13   /* level 13 interrupt */
 #define INT14		    14   /* level 14 interrupt */
 #define INT15		    15   /* level 15 interrupt */
+
+/*
+ * CIC output events
+ */
+#define CIC0                0
+#define CIC1		    1
+#define CIC2		    2
+#define CIC3		    3
+#define CIC4		    4
+#define CIC5		    5
+#define CIC6		    6
+#define CIC7		    7
+#define CIC8		    8
+#define CIC9		    9
+#define CIC10		    10
+#define CIC11		    11
+#define CIC12		    12
+#define CIC13		    13
+#define CIC14		    14
+#define CIC15		    15
 
 #endif /* __ASM_C6X_IRQ_H_ */

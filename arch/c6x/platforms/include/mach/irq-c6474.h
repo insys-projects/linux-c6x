@@ -135,12 +135,13 @@
 #define IRQ_TPCCINT5      67
 #define IRQ_TPCCINT6      68
 #define IRQ_TPCCINT7      69
-#define IRQ_RIOINT1       71  /* RapidIO interrupts */
-#define IRQ_RIOINT2       72
+#define IRQ_RIOINT0       71  /* RapidIO interrupts */
+#define IRQ_RIOINT1       72
 #define IRQ_AIFEVT0       73  /* error/alarm events*/
 #define IRQ_AIFEVT1       74 
 #define IRQ_IPCLOCAL      76  /* inter DSP interrupt from IPCGR */
 #define IRQ_CICEVT0       80  /* system events from CIC */
+#define IRQ_CICEVT_START  80
 #define IRQ_CICEVT1       81
 #define IRQ_CICEVT2       82
 #define IRQ_CICEVT3       83
@@ -154,6 +155,7 @@
 #define IRQ_CICEVT11      91
 #define IRQ_CICEVT12      92
 #define IRQ_CICEVT13      93
+#define IRQ_CICEVT_END    93
 #define IRQ_INTERR        96  /* interrupt controller dropped CPU interrupt event */
 #define IRQ_EMCIDMAERR    97  /* EMC invalid IDMA parameters */
 #define IRQ_EFINTA        100 /* EFI interrupt from side A */
@@ -174,7 +176,9 @@
 
 /*
  * C6x Chip Interrupt Controller (CIC) events
- */ 
+ */
+#define IRQ_USE_CIC
+
 #define CIC_EVT0          0   /* combined events */ 
 #define CIC_EVT1          1
 #define CIC_IICINT        4   /* I2C event */
@@ -231,5 +235,87 @@
 #define CIC_RACDEVENT0    56  /* debug events */
 #define CIC_RACDEVENT1    57
 #define CIC_SEMERR        58
+
+#define CIC0_REG_BASE     0x2880000
+#define CIC1_REG_BASE     0x2880100
+#define CIC2_REG_BASE     0x2880200
+#define CIC3_REG_BASE     0x2880300
+
+#define CIC_TPCC          3   /* CIC TPPC is CIC3 */
+
+#define CIC_TPCC_EVT0     0   /* combined events */ 
+#define CIC_TPCC_EVT1     1
+#define CIC_TPCC_FSEVT0   2   /* frame synchronization events */
+#define CIC_TPCC_FSEVT1   3
+#define CIC_TPCC_FSEVT2   4
+#define CIC_TPCC_FSEVT3   5
+#define CIC_TPCC_FSEVT14  6
+#define CIC_TPCC_FSEVT15  7
+#define CIC_TPCC_FSEVT16  8
+#define CIC_TPCC_FSEVT17  9
+#define CIC_TPCC_FSEVT18  10
+#define CIC_TPCC_FSEVT19  11
+#define CIC_TPCC_FSEVT20  12
+#define CIC_TPCC_FSEVT21  13
+#define CIC_TPCC_FSEVT22  14
+#define CIC_TPCC_FSEVT23  15
+#define CIC_TPCC_FSEVT24  16
+#define CIC_TPCC_FSEVT25  17
+#define CIC_TPCC_FSEVT26  18
+#define CIC_TPCC_FSEVT27  19
+#define CIC_TPCC_FSEVT28  20
+#define CIC_TPCC_RIOINT0  21
+#define CIC_TPCC_RIOINT1  22
+#define CIC_TPCC_RIOINT2  23
+#define CIC_TPCC_RIOINT3  24
+#define CIC_TPCC_RIOINT4  25
+#define CIC_TPCC_RIOINT5  26
+#define CIC_TPCC_RIOINT7  27
+#define CIC_TPCC_MACINT0  28
+#define CIC_TPCC_MACRINT0 29
+#define CIC_TPCC_MACTINT0 30
+#define CIC_TPCC_MACINT1  31
+#define CIC_TPCC_MACRINT1 32
+#define CIC_TPCC_MACTINT1 33
+#define CIC_TPCC_MACINT2  34
+#define CIC_TPCC_MACRINT2 35
+#define CIC_TPCC_MACTINT2 36
+#define CIC_TPCC_SEMERR0  37
+#define CIC_TPCC_SEMERR1  38
+#define CIC_TPCC_SEMERR2  39
+#define CIC_TPCC_TINT3L   43
+#define CIC_TPCC_TINT3H   44
+#define CIC_TPCC_TINT4L   45
+#define CIC_TPCC_TINT4H   46
+#define CIC_TPCC_TINT5L   47
+#define CIC_TPCC_TINT5H   48
+#define CIC_TPCC_AIFTEVT0 49
+#define CIC_TPCC_AIFTEVT1 50
+#define CIC_TPCC_GPINT0   53
+#define CIC_TPCC_GPINT1   54
+#define CIC_TPCC_GPINT2   55
+#define CIC_TPCC_GPINT3   56
+#define CIC_TPCC_GPINT4   57
+#define CIC_TPCC_CIC0E14  58
+#define CIC_TPCC_CIC0E15  59
+#define CIC_TPCC_CIC1E14  60
+#define CIC_TPCC_CIC1E15  61
+#define CIC_TPCC_CIC2E14  62
+#define CIC_TPCC_CIC2E15  63
+
+#define CIC_EVTFLAG0_REG  0x00
+#define CIC_EVTFLAG1_REG  0x04
+#define CIC_EVTSET0_REG   0x10
+#define CIC_EVTSET1_REG   0x14
+#define CIC_EVTCLR0_REG   0x20
+#define CIC_EVTCLR1_REG   0x24
+#define CIC_EVTMASK0_REG  0x30
+#define CIC_EVTMASK1_REG  0x34
+#define CIC_MEVTMASK0_REG 0x40
+#define CIC_MEVTMASK1_REG 0x44
+#define CIC_EVTMUX0_REG   0x50
+#define CIC_EVTMUX1_REG   0x54
+#define CIC_EVTMUX2_REG   0x58
+#define CIC_EVTMUX3_REG   0x5c
 
 #endif /* __MACH_IRQ_C6474_H */

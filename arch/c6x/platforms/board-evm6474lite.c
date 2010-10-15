@@ -40,54 +40,6 @@
 #include <mach/gemac.h>
 #include <mach/board.h>
 
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
-};
-
-static void setup_emac(void)
-{
-        int status;
-
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac0 --> %d\n", status);
-        //else
-        //  /* Power domain need to be activated here */
-}
-#else
-static void setup_emac(void) {}
-#endif
-
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
@@ -97,9 +49,6 @@ void c6x_board_setup_arch(void)
 	int i, ret;
 
 	printk("Designed for the EVM6474 Lite EVM\n");
-
-	/* Configure the interupt selector MUX registers */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
 
 	gpio_direction(0xFFFF);  /* all input */
 
@@ -113,7 +62,6 @@ void c6x_board_setup_arch(void)
 
 __init void evm_init(void)
 {
-	setup_emac();
 }
 
 arch_initcall(evm_init);

@@ -64,7 +64,7 @@
 #define IRQ_IDMAINT0      13  /* IDMA channel 0 event */
 #define IRQ_IDMAINT1      14  /* IDMA channel 1 event */
 #define IRQ_DSPINT        15  /* HPI/PCI-to-DSP event */
-#define IRQ_IICINT        16  /* I2C event */
+#define IRQ_I2CINT        16  /* I2C event */
 #define IRQ_EMACINT       17  /* EMAC event */
 #define IRQ_AEASYNCERR    18  /* EMIFA error event */
 #define IRQ_RIOINT0       20  /* RapidIO events */

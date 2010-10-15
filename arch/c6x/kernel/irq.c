@@ -35,19 +35,25 @@
 
 DECLARE_PER_CPU(struct kernel_stat, kstat);
 
+#ifdef CONFIG_NK
 extern void nk_process_xirq(int irq, void *dev_id, struct pt_regs * regs);
-static spinlock_t irq_lock;
+#endif
 
 /*
  * Software content of IER register
  */
 unsigned int irq_IER;
 
+static spinlock_t irq_lock;
+
 /*
  * Mach dep functions
  */ 
 /* table for system interrupt handlers */
 static unsigned int irq_mux[SYS_IRQS];
+#ifdef IRQ_USE_CIC
+static unsigned int cic_mux[CIC_IRQS];
+#endif
 
 static void c64x_unmask_irq(unsigned int irq)
 {
@@ -167,6 +173,77 @@ void irq_map(unsigned int irq_src, unsigned int cpu_irq)
 	irq_mux[cpu_irq] = irq_src;
 }
 EXPORT_SYMBOL(irq_map);
+
+#ifdef IRQ_USE_CIC
+/*
+ * Acknowledge a given CIC input event
+ */
+void cic_raw_ack(unsigned int cic_src, unsigned int cic_id)
+{
+	unsigned int src;
+	unsigned int offset1;
+	unsigned int offset2;
+	unsigned int reg_base = CIC0_REG_BASE + ((CIC1_REG_BASE - CIC0_REG_BASE) * cic_id);
+
+	if (cic_src < 32) {
+	        offset1 = CIC_EVTFLAG0_REG;
+		offset2 = CIC_EVTCLR0_REG;
+		src = cic_src;
+	} else {
+	        offset1 = CIC_EVTFLAG1_REG;
+		offset2 = CIC_EVTCLR1_REG;
+		src = cic_src - 32;
+	}
+
+	*((volatile unsigned int *)(reg_base + offset2)) = *((volatile unsigned int *)(reg_base + offset1))
+	    & (1 << src);
+}
+
+void cic_ack(unsigned int cic_src)
+{
+	cic_raw_ack(cic_src, get_coreid());
+}
+
+/*
+ * Map one of the 64 CIC input events to one of the 16 CIC output events for a given CIC
+ */
+void cic_raw_map(unsigned int cic_src, unsigned int cic_evt, unsigned int cic_id)
+{
+	unsigned int offset;
+	unsigned int reg_base;
+
+        if (cic_evt > CIC15)
+	        return;
+
+	/* ACK the CIC source */
+	cic_raw_ack(cic_src, cic_id);
+
+	cic_mux[cic_evt] = cic_src;
+
+	reg_base = CIC0_REG_BASE + ((CIC1_REG_BASE - CIC0_REG_BASE) * cic_id);
+	offset   = CIC_EVTMUX0_REG + ((cic_evt >> 2) << 2);
+
+	__dint();
+	*((volatile unsigned int *)(reg_base + offset))
+		&= ~(0x3f << ((cic_evt & 0x3) << 3));
+	*((volatile unsigned int *)(reg_base + offset))
+		|= (cic_src & 0x3f) << ((cic_evt & 0x3) << 3);
+	__rint();
+}
+
+/*
+ * Map one of the 64 CIC input events to one of the 16 CIC IRQ events of the C64x+ core 
+ */
+void cic_map(unsigned int cic_src, unsigned int cic_irq)
+{
+	cic_raw_map(cic_src, cic_irq, get_coreid());
+}
+
+EXPORT_SYMBOL(cic_raw_ack);
+EXPORT_SYMBOL(cic_ack);
+EXPORT_SYMBOL(cic_raw_map);
+EXPORT_SYMBOL(cic_map);
+#endif /* IRQ_USE_CIC */
 #endif /* CONFIG_TMS320C64XPLUS */
 
 static atomic_t irq_err_count;
@@ -193,6 +270,13 @@ asmlinkage void c6x_do_IRQ(unsigned int irq, struct pt_regs *regs)
 		handle_bad_irq(irq, &bad_irq_desc);
 	else
 		generic_handle_irq(irq);
+
+#ifdef IRQ_USE_CIC
+	/* Eventually ACK the CIC interrupt */
+	if ((irq_mux[irq] >= IRQ_CICEVT_START) && 
+	    (irq_mux[irq] <= IRQ_CICEVT_END))
+	        cic_ack(cic_mux[irq_mux[irq] - IRQ_CICEVT0]);
+#endif
 
 	irq_exit();
 
