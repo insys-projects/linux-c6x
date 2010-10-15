@@ -14,10 +14,7 @@
 /* 
  * Board memory
  */
-#define VECTADDR        0xE0000000
-#define TEXTADDR	0xE0000400
-#define TEXTLEN         0x07FFFC00
-#define RAMEND		0xE8000000
+#define BOARD_RAM_SIZE	0x08000000
 
 /* 
  * I2C bus specs 

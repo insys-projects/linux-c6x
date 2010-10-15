@@ -12,18 +12,15 @@
  */
 #include <asm/gpio.h>
 
+/*
+ * Board memory 
+ */
+#define BOARD_RAM_SIZE	0x10000000
+
 /* 
  * I2C UART Bridge (14.7456MHz / 16)
  */
 #define BASE_BAUD	921600
-
-/*
- * Board memory 
- */
-#define VECTADDR        0xE0000000
-#define TEXTADDR	0xE0000400
-#define TEXTLEN         0x07FFFC00
-#define RAMEND		0xE8000000
 
 /* 
  * I2C bus specs 

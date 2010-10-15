@@ -70,8 +70,8 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
  		                   asm("	NOP	5"); }
 
 /* Set/get IST */
-#define set_IST(x)               ISTP = x
-#define get_IST()                ISTP
+#define set_ist(x)               ISTP = (x)
+#define get_ist()                ISTP
 
 /* Enable/disable interrupts */
 extern unsigned int irq_IER;

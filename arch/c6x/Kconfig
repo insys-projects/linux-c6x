@@ -170,6 +170,12 @@ config TMS320C6X_SYSCALL_COMPAT
 	depends on TMS320C64XPLUS_CORE
 	default n
 
+config PAGE_OFFSET
+	hex "Virtual address of memory base"
+	default 0xe0000000 if SOC_TMS320C6455
+	default 0xe0000000 if SOC_TMS320C6472
+	default 0x80000000
+
 config CONTIGUOUS_PAGE_ALLOC
 	bool
 	default y
