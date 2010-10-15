@@ -5,6 +5,11 @@
  * Copyright 2005 MontaVista Software, Inc.
  * Matt Porter <mporter@kernel.crashing.org>
  *
+ * Enhancements for discovery/enumeration and DirectI/O support
+ *
+ * Copyright 2010 Texas Instruments Incorporated
+ * Aurelien Jacquiot <a-jacquiot@ti.com>
+ *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -196,6 +201,7 @@ rio_setup_inb_dbell(struct rio_mport *mport, void *dev_id, struct resource *res,
 	dbell->res = res;
 	dbell->dinb = dinb;
 	dbell->dev_id = dev_id;
+	dbell->mport = mport;
 
 	list_add_tail(&dbell->node, &mport->dbells);
 
@@ -332,6 +338,23 @@ int rio_release_outb_dbell(struct rio_dev *rdev, struct resource *res)
 	return rc;
 }
 
+struct rio_dbell *rio_retrieve_dbell(u32 dbell_num)
+{
+	struct rio_mport *port;
+	struct rio_dbell *dbell;
+
+	list_for_each_entry(port, &rio_mports, node) {
+		list_for_each_entry(dbell, &port->dbells, node) {
+			if ((dbell->res->start <= dbell_num) &&
+			    (dbell->res->end   >= dbell_num)) {
+				return dbell;
+				break;
+			}
+		}
+	}
+	return NULL;
+}
+
 /**
  * rio_mport_get_feature - query for devices' extended features
  * @port: Master port to issue transaction
@@ -451,8 +474,39 @@ struct rio_dev *rio_get_device(u16 vid, u16 did, struct rio_dev *from)
 	return rio_get_asm(vid, did, RIO_ANY_ID, RIO_ANY_ID, from);
 }
 
-static void rio_fixup_device(struct rio_dev *dev)
+/**
+ * rio_get_dest_device - Begin or continue searching for a RIO device by destid
+ * @destid: RIO Network destination ID
+ */
+struct rio_dev *rio_get_dest_device(u16 destid, struct rio_dev *from)
 {
+	struct list_head *n;
+	struct rio_dev   *rdev;
+
+	WARN_ON(in_interrupt());
+	spin_lock(&rio_global_list_lock);
+	n = from ? from->global_list.next : rio_devices.next;
+
+	while (n && (n != &rio_devices)) {
+		rdev = rio_dev_g(n);
+		if (destid == RIO_ANY_DESTID(rdev->net->hport->sys_size) ||
+		    (rdev->destid == destid))
+			goto exit;
+		n = n->next;
+	}
+	rdev = NULL;
+      exit:
+	rio_dev_put(from);
+	rdev = rio_dev_get(rdev);
+	spin_unlock(&rio_global_list_lock);
+	return rdev;
+}
+
+static void rio_fixup_device(struct rio_dev *rdev)
+{
+	struct rio_mport *mport = rdev->net->hport;
+	if (mport->ops->fixup)
+		mport->ops->fixup(mport, rdev);
 }
 
 static int __devinit rio_init(void)
@@ -483,7 +537,7 @@ int __devinit rio_init_mports(void)
 			goto out;
 		}
 
-		if (port->host_deviceid >= 0)
+		if ((port->init == RIO_DO_ENUMERATION) && (port->host_deviceid >= 0))
 			rio_enum_mport(port);
 		else
 			rio_disc_mport(port);
@@ -500,6 +554,7 @@ void rio_register_mport(struct rio_mport *port)
 
 EXPORT_SYMBOL_GPL(rio_local_get_device_id);
 EXPORT_SYMBOL_GPL(rio_get_device);
+EXPORT_SYMBOL_GPL(rio_get_dest_device);
 EXPORT_SYMBOL_GPL(rio_get_asm);
 EXPORT_SYMBOL_GPL(rio_request_inb_dbell);
 EXPORT_SYMBOL_GPL(rio_release_inb_dbell);
@@ -509,3 +564,4 @@ EXPORT_SYMBOL_GPL(rio_request_inb_mbox);
 EXPORT_SYMBOL_GPL(rio_release_inb_mbox);
 EXPORT_SYMBOL_GPL(rio_request_outb_mbox);
 EXPORT_SYMBOL_GPL(rio_release_outb_mbox);
+EXPORT_SYMBOL_GPL(rio_retrieve_dbell);

@@ -12,4 +12,6 @@ obj-$(CONFIG_TMS320C64X_GEMAC) += gemac.o gmdio.o
 obj-$(CONFIG_TMS320C6X_EMAC)   += emac.o mdio.o
 obj-$(CONFIG_SGMII)            += sgmii.o
 
-obj-$(CONFIG_I2C_DAVINCI)      += i2c-davinci.o
+obj-$(CONFIG_RAPIDIO_TCI648X)  += rio-tci648x.o
+
+obj-$(CONFIG_I2C_DAVINCI)      += i2c.o

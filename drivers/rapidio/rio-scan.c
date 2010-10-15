@@ -4,6 +4,11 @@
  * Copyright 2005 MontaVista Software, Inc.
  * Matt Porter <mporter@kernel.crashing.org>
  *
+ * Add DirectI/O and /dev interface
+ *
+ * Copyright 2010 Texas Instruments Incorporated
+ * Aurelien Jacquiot <a-jacquiot@ti.com>
+ *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -55,6 +60,7 @@ static int rio_mport_phys_table[] = {
 static int rio_sport_phys_table[] = {
 	RIO_EFB_PAR_EP_FREE_ID,
 	RIO_EFB_SER_EP_FREE_ID,
+	RIO_EFB_SER_EP_FREC_ID,
 	-1,
 };
 
@@ -122,8 +128,8 @@ static int rio_clear_locks(struct rio_mport *port)
 	rio_local_write_config_32(port, RIO_COMPONENT_TAG_CSR,
 				  RIO_ENUM_CMPL_MAGIC);
 	list_for_each_entry(rdev, &rio_devices, global_list)
-	    rio_write_config_32(rdev, RIO_COMPONENT_TAG_CSR,
-				RIO_ENUM_CMPL_MAGIC);
+		rio_write_config_32(rdev, RIO_COMPONENT_TAG_CSR,
+				    RIO_ENUM_CMPL_MAGIC);
 
 	/* Release host device id locks */
 	rio_local_write_config_32(port, RIO_HOST_DID_LOCK_CSR,
@@ -175,6 +181,24 @@ static int rio_enum_host(struct rio_mport *port)
 
 	if (next_destid == port->host_deviceid)
 		next_destid++;
+
+	return 0;
+}
+
+/**
+ * rio_release_host- Release host lock
+ * @port: Master port to issue transaction
+ *
+ */
+static int rio_release_host(struct rio_mport *port)
+{
+	u32 result;
+
+	rio_local_read_config_32(port, RIO_HOST_DID_LOCK_CSR, &result);
+	if ((result & 0xffff) == port->host_deviceid)
+		/* Release master port host device id lock */
+		rio_local_write_config_32(port, RIO_HOST_DID_LOCK_CSR,
+				  port->host_deviceid);
 
 	return 0;
 }
@@ -338,11 +362,11 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 			rio_set_device_id(port, destid, hopcount, next_destid);
 			rdev->destid = next_destid++;
 			if (next_destid == port->host_deviceid)
-				next_destid++;
+				next_destid++; 
 		} else
 			rdev->destid = rio_get_device_id(port, destid, hopcount);
 	} else
-		/* Switch device has an associated destID */
+		/* Switch device has not an associated destID */
 		rdev->destid = RIO_INVALID_DESTID;
 
 	/* If a PE has both switch and other functions, show it as a switch */
@@ -371,12 +395,12 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 
 		list_add_tail(&rswitch->node, &rio_switches);
 
-	} else
+	} else {
 		dev_set_name(&rdev->dev, "%02x:e:%04x", rdev->net->id,
 			     rdev->destid);
+	}
 
 	rdev->dev.bus = &rio_bus_type;
-
 	device_initialize(&rdev->dev);
 	rdev->dev.release = rio_release_dev;
 	rio_dev_get(rdev);
@@ -390,10 +414,19 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 		rio_init_dbell_res(&rdev->riores[RIO_DOORBELL_RESOURCE],
 				   0, 0xffff);
 
+	/* Synchronous write by default */
+	rdev->dio.write_mode  = RIO_DIO_MODE_WRITER;
+
 	ret = rio_add_device(rdev);
 	if (ret)
 		goto cleanup;
 
+#ifdef CONFIG_RAPIDIO_DEV
+	if (!rio_is_switch(rdev))
+		rio_dev_add(rdev);
+#endif
+
+out:
 	return rdev;
 
 cleanup:
@@ -402,6 +435,7 @@ cleanup:
 		kfree(rswitch);
 	}
 	kfree(rdev);
+
 	return NULL;
 }
 
@@ -460,8 +494,8 @@ static int rio_route_add_entry(struct rio_mport *mport, struct rio_switch *rswit
 			       u16 table, u16 route_destid, u8 route_port)
 {
 	return rswitch->add_entry(mport, rswitch->destid,
-					rswitch->hopcount, table,
-					route_destid, route_port);
+				  rswitch->hopcount, table,
+				  route_destid, route_port);
 }
 
 /**
@@ -484,8 +518,8 @@ rio_route_get_entry(struct rio_mport *mport, struct rio_switch *rswitch, u16 tab
 		    u16 route_destid, u8 * route_port)
 {
 	return rswitch->get_entry(mport, rswitch->destid,
-					rswitch->hopcount, table,
-					route_destid, route_port);
+				  rswitch->hopcount, table,
+				  route_destid, route_port);
 }
 
 /**
@@ -581,7 +615,7 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 	int tmp;
 
 	if (rio_get_host_deviceid_lock(port, hopcount) == port->host_deviceid) {
-		pr_debug("RIO: PE already discovered by this host\n");
+		pr_debug("RIO: PE already discovered by this host (hopcount = %d)\n", hopcount);
 		/*
 		 * Already discovered by this host. Add it as another
 		 * master port for the current network.
@@ -606,24 +640,34 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 	}
 
 	if (rio_get_host_deviceid_lock(port, hopcount) > port->host_deviceid) {
-		pr_debug(
-		    "RIO: PE locked by a higher priority host...retreating\n");
+		pr_debug("RIO: PE locked by a higher priority host...retreating\n");
 		return -1;
 	}
 
 	/* Setup new RIO device */
 	rdev = rio_setup_device(net, port, RIO_ANY_DESTID(port->sys_size),
-					hopcount, 1);
+				hopcount, 1);
 	if (rdev) {
 		/* Add device to the global and bus/net specific list. */
 		list_add_tail(&rdev->net_list, &net->devices);
-	} else
+	} else {
+		/* Clear device lock in case of error */
+		rio_mport_write_config_32(port, RIO_ANY_DESTID(port->sys_size),
+					  hopcount,
+					  RIO_HOST_DID_LOCK_CSR, port->host_deviceid);
+		if (rio_get_host_deviceid_lock(port, hopcount) == port->host_deviceid)
+			printk(KERN_INFO
+			       "RIO: badness when releasing host to PE (hopcount = %d)\n",
+			       hopcount);
 		return -1;
+	}
 
 	if (rio_is_switch(rdev)) {
 		next_switchid++;
 		sw_inport = rio_get_swpinfo_inport(port,
-				RIO_ANY_DESTID(port->sys_size), hopcount);
+						   RIO_ANY_DESTID(port->sys_size),
+						   hopcount);
+
 		rio_route_add_entry(port, rdev->rswitch, RIO_GLOBAL_TABLE,
 				    port->host_deviceid, sw_inport);
 		rdev->rswitch->route_table[port->host_deviceid] = sw_inport;
@@ -636,33 +680,30 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 			rdev->rswitch->route_table[destid] = sw_inport;
 		}
 
-		num_ports =
-		    rio_get_swpinfo_tports(port, RIO_ANY_DESTID(port->sys_size),
-						hopcount);
-		pr_debug(
-		    "RIO: found %s (vid %4.4x did %4.4x) with %d ports\n",
-		    rio_name(rdev), rdev->vid, rdev->did, num_ports);
-		sw_destid = next_destid;
+		num_ports = rio_get_swpinfo_tports(port, 
+						   RIO_ANY_DESTID(port->sys_size),
+						   hopcount);
+		pr_debug("RIO: found %s (vid %4.4x did %4.4x) with %d ports\n",
+			 rio_name(rdev), rdev->vid, rdev->did, num_ports);
+		sw_destid = next_switchid;
 		for (port_num = 0; port_num < num_ports; port_num++) {
 			if (sw_inport == port_num)
 				continue;
 
 			cur_destid = next_destid;
-
+			
 			if (rio_sport_is_active
 			    (port, RIO_ANY_DESTID(port->sys_size), hopcount,
 			     port_num)) {
-				pr_debug(
-				    "RIO: scanning device on port %d\n",
-				    port_num);
+				pr_debug("RIO: scanning device on port %d\n", port_num);
 				rio_route_add_entry(port, rdev->rswitch,
-						RIO_GLOBAL_TABLE,
-						RIO_ANY_DESTID(port->sys_size),
-						port_num);
-
+						    RIO_GLOBAL_TABLE,
+						    RIO_ANY_DESTID(port->sys_size),
+						    port_num);
+				
 				if (rio_enum_peer(net, port, hopcount + 1) < 0)
 					return -1;
-
+				
 				/* Update routing tables */
 				if (next_destid > cur_destid) {
 					for (destid = cur_destid;
@@ -674,24 +715,16 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 								    destid,
 								    port_num);
 						rdev->rswitch->
-						    route_table[destid] =
-						    port_num;
+							route_table[destid] =
+							port_num;
 					}
 				}
 			}
 		}
-
-		/* Check for empty switch */
-		if (next_destid == sw_destid) {
-			next_destid++;
-			if (next_destid == port->host_deviceid)
-				next_destid++;
-		}
-
 		rdev->rswitch->destid = sw_destid;
 	} else
 		pr_debug("RIO: found %s (vid %4.4x did %4.4x)\n",
-		    rio_name(rdev), rdev->vid, rdev->did);
+			 rio_name(rdev), rdev->vid, rdev->did);
 
 	return 0;
 }
@@ -733,6 +766,7 @@ rio_disc_peer(struct rio_net *net, struct rio_mport *port, u16 destid,
 {
 	u8 port_num, route_port;
 	int num_ports;
+	int sw_destid;
 	struct rio_dev *rdev;
 	u16 ndestid;
 
@@ -744,15 +778,15 @@ rio_disc_peer(struct rio_net *net, struct rio_mport *port, u16 destid,
 		return -1;
 
 	if (rio_is_switch(rdev)) {
-		next_switchid++;
+		
+		sw_destid = next_switchid++;
 
 		/* Associated destid is how we accessed this switch */
-		rdev->rswitch->destid = destid;
+		rdev->rswitch->destid = sw_destid;
 
 		num_ports = rio_get_swpinfo_tports(port, destid, hopcount);
-		pr_debug(
-		    "RIO: found %s (vid %4.4x did %4.4x) with %d ports\n",
-		    rio_name(rdev), rdev->vid, rdev->did, num_ports);
+		pr_debug("RIO: found %s (vid %4.4x did %4.4x) with %d ports\n",
+			 rio_name(rdev), rdev->vid, rdev->did, num_ports);
 		for (port_num = 0; port_num < num_ports; port_num++) {
 			if (rio_get_swpinfo_inport(port, destid, hopcount) ==
 			    port_num)
@@ -926,6 +960,8 @@ int __devinit rio_enum_mport(struct rio_mport *mport)
 		printk(KERN_INFO "RIO: master port %d link inactive\n",
 		       mport->id);
 		rc = -EINVAL;
+
+		rio_release_host(mport);
 	}
 
       out:
@@ -995,34 +1031,35 @@ int __devinit rio_disc_mport(struct rio_mport *mport)
 			printk(KERN_ERR "RIO: Failed to allocate new net\n");
 			goto bail;
 		}
-
-		pr_debug("RIO: wait for enumeration complete...");
-
-		rio_enum_timer.expires =
-		    jiffies + CONFIG_RAPIDIO_DISC_TIMEOUT * HZ;
-		rio_enum_timer.data = (unsigned long)&enum_timeout_flag;
-		add_timer(&rio_enum_timer);
-		while (!rio_enum_complete(mport)) {
-			mdelay(1);
-			if (enum_timeout_flag) {
+		if (mport->init == RIO_DO_DISCOVERY_WAIT) {
+			pr_debug("RIO: wait for enumeration complete...");
+			
+			rio_enum_timer.expires =
+				jiffies + CONFIG_RAPIDIO_DISC_TIMEOUT * HZ;
+			rio_enum_timer.data = (unsigned long)&enum_timeout_flag;
+			add_timer(&rio_enum_timer);
+			while (!rio_enum_complete(mport)) {
+				mdelay(1);
+				if (enum_timeout_flag) {
+					del_timer_sync(&rio_enum_timer);
+					goto timeout;
+				}
 				del_timer_sync(&rio_enum_timer);
-				goto timeout;
+				pr_debug("done\n");				
 			}
 		}
-		del_timer_sync(&rio_enum_timer);
-
-		pr_debug("done\n");
+		
 		if (rio_disc_peer(net, mport, RIO_ANY_DESTID(mport->sys_size),
-					0) < 0) {
+				  0) < 0) {
 			printk(KERN_INFO
 			       "RIO: master port %d device has failed discovery\n",
 			       mport->id);
 			goto bail;
 		}
-
+		
 		rio_build_route_tables();
 	}
-
+	
 	return 0;
 
       timeout:

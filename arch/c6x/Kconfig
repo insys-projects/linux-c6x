@@ -161,6 +161,28 @@ config DAVINCI_MCBSP
 	help
 	  DaVinci McBSP driver.  Auto-enabled by sound driver.
 
+config RAPIDIO_TCI648X
+        bool "RapidIO support"
+	depends on SOC_TMS320C6474 || SOC_TMS320C6472 || SOC_TMS320C6455
+	default y
+        help
+          If you say Y here, the kernel will include drivers and
+          infrastructure code to support RapidIO interconnect devices.
+
+config RAPIDIO_DEV
+	bool "sRIO user-level interface through /dev"
+	default y
+	depends on RAPIDIO_TCI648X
+
+config RAPIDIO
+        bool
+	depends on RAPIDIO_TCI648X
+	default y
+
+if RAPIDIO_TCI648X
+source "drivers/rapidio/Kconfig"
+endif
+
 config TMS320C6X_CACHES_ON
 	bool "L2 cache support"
 	default y

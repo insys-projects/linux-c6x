@@ -40,6 +40,32 @@
 #include <mach/i2c.h>
 #include <mach/board.h>
 
+#ifdef CONFIG_RAPIDIO_TCI648X
+#include <linux/rio.h>
+#include <asm/rio.h>
+
+struct tci648x_rio_board_controller_info evm6472_rio_controller = {
+	0x3,                         /* bitfield of port(s) to probe on this controller */
+	TCI648X_RIO_MODE_0,          /* SERDES configuration (BOOTMODE8) */
+	0,                           /* host id */
+	RIO_DO_ENUMERATION,          /* initialisation method */
+	1                            /* large size (16bit)*/
+};
+
+static struct platform_device evm6472_rio_device = {
+	.name           = "tci648x-rapidio",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6472_rio_controller },
+};
+
+static void __init evm_init_rio(void)
+{
+	platform_device_register(&evm6472_rio_device);
+}
+
+core_initcall(evm_init_rio);
+#endif
+
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
 	.byte_len	= 0x100000 / 8,

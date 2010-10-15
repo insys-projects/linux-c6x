@@ -325,6 +325,7 @@ unifdef-y += irqnr.h
 unifdef-y += reboot.h
 unifdef-y += reiserfs_fs.h
 unifdef-y += reiserfs_xattr.h
+unifdef-y += rio.h
 unifdef-y += route.h
 unifdef-y += rtc.h
 unifdef-y += rtnetlink.h

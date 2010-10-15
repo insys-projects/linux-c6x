@@ -42,6 +42,32 @@
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
+#ifdef CONFIG_RAPIDIO_TCI648X
+#include <linux/rio.h>
+#include <asm/rio.h>
+
+struct tci648x_rio_board_controller_info evm6474_rio_controller = {
+	0x3,                         /* bitfield of port(s) to probe on this controller */
+	TCI648X_RIO_MODE_0,          /* SERDES configuration (BOOTMODE8) */
+	0,                           /* host id */
+	RIO_DO_ENUMERATION,          /* initialisation method */
+	1                            /* large size (16bit)*/
+};
+
+static struct platform_device evm6474_rio_device = {
+	.name           = "tci648x-rapidio",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_rio_controller },
+};
+
+static void __init evm_init_rio(void)
+{
+	platform_device_register(&evm6474_rio_device);
+}
+
+core_initcall(evm_init_rio);
+#endif
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   

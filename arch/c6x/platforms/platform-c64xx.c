@@ -339,6 +339,13 @@ static void init_power(void)
 	*(volatile unsigned int *)  PSC_MDCTL10 |= 0x00000003;
 
 	*(volatile unsigned int *)  PSC_PTCMD  |= 0x0000003f;
+
+#ifdef CONFIG_RAPIDIO_TCI648X
+	*(volatile unsigned int *)  PSC_PDCTL2 |= 1;
+	*(volatile unsigned int *)  PSC_MDCTL7 |= 3; /* sRIO */
+	*(volatile unsigned int *)  PSC_PTCMD  |= 4;
+
+#endif /* CONFIG_RAPIDIO_TCI648X */
 #endif /* CONFIG_SOC_TMS320C6474 */
 
 #ifdef CONFIG_SOC_TMS320C6472
@@ -350,6 +357,10 @@ static void init_power(void)
 #ifdef CONFIG_TMS320C64X_GEMAC_1
 	*(volatile unsigned int *)  PSC_MDCTL8 |= 0x00000103; /* GEMAC1 */
 #endif /* CONFIG_TMS320C64X_GEMAC_1 */
+
+#ifdef CONFIG_RAPIDIO_TCI648X
+	*(volatile unsigned int *)  PSC_MDCTL6 |= 0x00000103; /* SRIO */
+#endif /* CONFIG_RAPIDIO_TCI648X */
 
 	*(int *)  PSC_PTCMD  |= 0x00000001;
 
