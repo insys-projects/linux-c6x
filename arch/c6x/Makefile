@@ -42,7 +42,7 @@ export HOSTCFLAGS_kallsyms.o
 NM		= /usr/bin/nm
 else
 arch-$(CONFIG_TMS320C64X)     := -march=c64x
-arch-$(CONFIG_TMS320C64XPLUS) := -march=c64x+ -msdata=none
+arch-$(CONFIG_TMS320C64XPLUS) := -march=c64x+ -msdata=none -mno-dsbt
 endif
 
 ifdef CONFIG_TI_C6X_LINKER
