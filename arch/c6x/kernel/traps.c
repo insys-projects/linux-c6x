@@ -401,15 +401,12 @@ asmlinkage int process_exception(struct pt_regs *regs)
 
 int kstack_depth_to_print = 48;
 
-void show_trace(unsigned long *stack)
+static void show_trace(unsigned long *stack, unsigned long *endstack)
 {
-	unsigned long *endstack;
 	unsigned long addr;
 	int i;
 
 	printk("Call trace:");
-	addr = (unsigned long)stack + THREAD_SIZE - 1;
-	endstack = (unsigned long *)(addr & -THREAD_SIZE);
 	i = 0;
 	while (stack + 1 <= endstack) {
 		addr = *stack++;
@@ -436,27 +433,28 @@ void show_trace(unsigned long *stack)
 
 void show_stack(struct task_struct *task, unsigned long *stack)
 {
-	unsigned long *endstack;
+	unsigned long *p, *endstack;
 	int i;
 
 	if (!stack) {
 		if (task)
-			stack = (unsigned long *)(task_stack_page(task) + THREAD_SIZE);
+			/* We know this is a kernel stack, so this is the start/end */
+			stack = (unsigned long *)task->thread.ksp;
 		else
 			stack = (unsigned long *)&stack;
 	}
 	endstack = (unsigned long *)(((unsigned long)stack + THREAD_SIZE - 1) & -THREAD_SIZE);
 
 	printk("Stack from %08lx:", (unsigned long)stack);
-	for (i = 0; i < kstack_depth_to_print; i++) {
-		if (stack + 1 > endstack)
+	for (i = 0, p = stack; i < kstack_depth_to_print; i++) {
+		if (p + 1 > endstack)
 			break;
 		if (i % 8 == 0)
 			printk("\n       ");
-		printk(" %08lx", *stack++);
+		printk(" %08lx", *p++);
 	}
 	printk("\n");
-	show_trace(stack);
+	show_trace(stack, endstack);
 }
 
 int is_valid_bugaddr(unsigned long addr)
