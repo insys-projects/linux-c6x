@@ -85,6 +85,8 @@ static int __devinit cio_probe(struct platform_device *dev)
 
 		memset(&uart->port, 0, sizeof(struct uart_port));
 
+		spin_lock_init(&uart->port.lock);
+
 		uart->port.type		= PORT_8250; /* whatever */
 		uart->port.uartclk	= 921600 * 16;
 		uart->port.dev		= &dev->dev;
