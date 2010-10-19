@@ -14,9 +14,6 @@
 #define __ASM_C6X_TIMER_H
 
 #include <linux/interrupt.h>
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-#endif
 #include <mach/timer.h>
 
 #ifdef CONFIG_USE_RT_TIMER

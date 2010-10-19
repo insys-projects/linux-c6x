@@ -86,7 +86,6 @@ static struct platform_device c6x_platram_device = {
 };
 #endif
 
-#ifndef CONFIG_NK
 static void init_pll(void)
 {
 #if defined(CONFIG_SOC_TMS320C6474) /* should be done elsewhere */
@@ -153,7 +152,6 @@ static void init_pll(void)
 	pll2_setbit_reg(PLLCTL, PLLCTL_PLLEN);
 #endif
 }
-#endif
 
 static void init_power(void)
 {
@@ -193,13 +191,9 @@ static void init_power(void)
 void c6x_soc_setup_arch(void)
 {
  	/* Initialize C64x+ IRQs */          	
-#ifndef CONFIG_NK
 	clear_all_irq(); /* acknowledge all pending irqs */
 
 	init_pll();
-#else
-	irq_IER = 0;
-#endif
 
 	init_power();
 
@@ -231,6 +225,8 @@ void c6x_soc_setup_arch(void)
 #endif
 
 #if defined(CONFIG_SOC_TMS320C6455)
+	unsigned long val;
+
 	/* Enable timers (in regs PERLOCK & PERCFG0) */
 	val = dscr_get_reg(DSCR_PERCFG0);
 	dscr_set_device(val | DSCR_B_PERCFG0_TIMER0 | DSCR_B_PERCFG0_TIMER1, DSCR_PERCFG0);

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -30,10 +30,6 @@
 #include <asm/machdep.h>
 #include <asm/uaccess.h>
 #include <asm/cache.h>
-
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-#endif
 
 extern void die_if_kernel(char *,struct pt_regs *,long);
 extern void show_net_buffers(void);

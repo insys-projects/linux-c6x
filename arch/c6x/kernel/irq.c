@@ -35,13 +35,6 @@
 
 DECLARE_PER_CPU(struct kernel_stat, kstat);
 
-extern void nk_process_xirq(int irq, void *dev_id, struct pt_regs * regs);
-
-/*
- * Software content of IER register
- */
-unsigned int irq_IER;
-
 /*
  * Mach dep functions
  */ 
@@ -202,12 +195,6 @@ void __init init_IRQ(void)
 		set_irq_handler(i, handle_level_irq);
 	}
 
-#ifdef CONFIG_NK
-	/* Register INT5 for XIRQ */
-	if (request_irq(INT5, nk_process_xirq, SA_INTERRUPT, "XIRQ", NULL) != 0)
-		printk("XIRQ irq handler not registered\n");
-
-#endif
 	if (mach_init_IRQ != NULL)
 		mach_init_IRQ();
 }

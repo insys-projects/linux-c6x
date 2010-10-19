@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -15,10 +15,6 @@
 
 #include <linux/kernel.h>
 #include <asm/timer.h>
-
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-#endif
 
 extern asmlinkage void _c6x_delay(unsigned long);
 
@@ -37,17 +33,7 @@ static inline void __delay(unsigned long loop)
 static inline void udelay(unsigned long usecs)
 {
 	/* A loop takes 6 cycles on C6x */
-#ifndef CONFIG_NK
 	_c6x_delay((usecs * CONFIG_TMS320C6X_MHZ) / 6);
-#else
-	_c6x_delay((usecs * (nkctx->boot_info->clocksrc ?
-#ifdef CONFIG_TMS320C645X
-			     ((6 * nkctx->boot_info->clocksrc) / 1000000) :
-#else
-			     ((8 * nkctx->boot_info->clocksrc) / 1000000) :
-#endif
-			     CONFIG_TMS320C6X_MHZ)) / 6);
-#endif
 }
 
 #define muldiv(a, b, c)    (((a)*(b))/(c))

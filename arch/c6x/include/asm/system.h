@@ -16,9 +16,6 @@
 #include <linux/linkage.h>
 #include <asm/segment.h>
 
-/* Enable/disable interrupts */
-extern unsigned int irq_IER;
-
 /*
  * switch_to() saves the extra registers, that are not saved
  * automatically by SAVE_SWITCH_STACK in resume().
@@ -100,8 +97,6 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 
 #define save_global_flags(x)     x = CSR
 #define restore_global_flags(x)  CSR = x
-#define save_partial_flags(x)    x = IER
-#define restore_partial_flags(x) IER = x
 
 #else /* CONFIG_TI_C6X_COMPILER */
 
@@ -204,25 +199,13 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 
 #define save_global_flags(x)     (x) = get_creg(CSR)
 #define restore_global_flags(x)  set_creg(CSR, (x))
-#define save_partial_flags(x)    (x) = get_creg(IER)
-#define restore_partial_flags(x) set_creg(IER, x)
 
 #endif  /* CONFIG_TI_C6X_COMPILER */
 
-#define partial_sti()            do { global_cli(); enable_irq_mask(irq_IER); global_sti(); } while(0)
-#define partial_cli()            do { global_cli(); disable_irq_mask(irq_IER); global_sti(); } while(0)
-
-#ifdef CONFIG_NK
-#define __cli()                  partial_cli()
-#define __sti()                  partial_sti()
-#define __save_flags(x)          save_partial_flags(x)
-#define __restore_flags(x)       restore_partial_flags(x)
-#else
 #define __cli()                  global_cli()
 #define __sti()                  global_sti()
 #define __save_flags(x)          save_global_flags(x)
 #define __restore_flags(x)       restore_global_flags(x)
-#endif /* CONFIG_NK */
 
 /* For spinlocks etc */
 #define local_irq_save(x)	 do { __save_flags(x); __cli(); } while(0)
@@ -232,21 +215,12 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 
 #define local_save_flags(x)      __save_flags(x)
 
-#ifdef CONFIG_NK
-#define	irqs_disabled()			\
-({					\
-	unsigned long flags;		\
-	local_save_flags(flags);	\
-	(!(flags & irq_IER));	        \
-})
-#else
 #define	irqs_disabled()			\
 ({					\
 	unsigned long flags;		\
 	local_save_flags(flags);	\
 	(!(flags & 0x1));	        \
 })
-#endif
 
 /* 
  * Exception management

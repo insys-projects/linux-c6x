@@ -29,7 +29,7 @@ arch-$(CONFIG_TMS320C64XPLUS) := -march=6400+
 
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
-KBUILD_AFLAGS   = -P -Wa,-d__ASSEMBLY__  -Wa,-d__NK__=$(nk-flags-$(CONFIG_NK)) \
+KBUILD_AFLAGS   = -P -Wa,-d__ASSEMBLY__  \
 	-Wa,-I$(srctree)/arch/c6x/include/asm -Wa,-I$(obj)/arch/c6x/kernel \
 	-Wa,-d__BIG_ENDIAN__=$(be-flags-$(CONFIG_CPU_BIG_ENDIAN))
 
@@ -93,10 +93,6 @@ KBUILD_AFLAGS	+= $(arch-y)
 head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/
 libs-y		+= arch/c6x/lib/
-
-ifdef CONFIG_NK
-core-y         	+= arch/c6x/nkernel/
-endif
 
 ifdef CONFIG_TI_C6X_COMPILER
 LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)

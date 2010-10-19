@@ -42,10 +42,6 @@
 
 #include <mach/board.h>  /* for c6x_arch_idle_led() */
 
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-#endif
-
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 /*
@@ -83,15 +79,11 @@ EXPORT_SYMBOL(pm_idle);
 
 static void default_idle(void)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_NK)
+#if defined(CONFIG_PM)
 	pwrd_set(PWRD_PD1A);
 #endif
-#ifdef CONFIG_NK
-	(void) nkctx->ops.idle(nkctx);
-#else
 #ifndef CONFIG_ARCH_SIM
 	do_idle(); /* do nothing until interrupt */
-#endif
 #endif
 }
 

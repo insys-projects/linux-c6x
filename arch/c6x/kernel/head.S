@@ -3,7 +3,7 @@
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
-;  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+;  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
 ;
 ;  This program is free software; you can redistribute it and/or modify
@@ -89,14 +89,6 @@ __bss_done:
 	MVC	.S2	NTSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,NTSR
-#endif
-
-#ifdef CONFIG_NK
-	.ref	_nkctx
-	;; Save NK2 OS context pointer given in B4
-	MVKL	.S1	_nkctx,A0
-	MVKH	.S1	_nkctx,A0
-	STW	.D1T2	B4,*A0
 #endif
 
 	MVKL	.S2	TAGS_MAGIC,B0
