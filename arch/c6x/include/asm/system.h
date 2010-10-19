@@ -135,6 +135,7 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 		asm volatile (" mvc .s2 " #reg ",%0\n"	  \
 			      " or  .l2 %1,%0,%0   \n"    \
 			      " mvc .s2 %0," #reg "\n"    \
+			      " nop\n"    \
 			      : "=&b"(__x) : "b"(__n));	  \
 	} while(0)
 
@@ -143,6 +144,7 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 		asm volatile (" mvc .s2 " #reg ",%0\n"	  \
 			      " and .l2 %1,%0,%0   \n"    \
 			      " mvc .s2 %0," #reg "\n"    \
+			      " nop\n"    \
 			      : "=&b"(__x) : "b"(__n));	  \
 	} while(0)
 
@@ -183,6 +185,7 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 		asm volatile (" mvc .s2 IFR,%0\n"	  \
 			      " or  .l2 %1,%0,%0   \n"    \
 			      " mvc .s2 %0,ISR\n"	  \
+			      " nop\n"			  \
 			      : "=&b"(__x) : "b"(__n));	  \
 	} while(0)
 
@@ -191,6 +194,7 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 		asm volatile (" mvc .s2 IFR,%0\n"	  \
 			      " and .l2 %1,%0,%0   \n"    \
 			      " mvc .s2 %0,ICR\n"	  \
+			      " nop\n"			  \
 			      : "=&b"(__x) : "b"(__n));	  \
 	} while(0)
 
