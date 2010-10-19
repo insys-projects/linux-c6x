@@ -17,10 +17,6 @@
 
 #define THREAD_SHIFT	  KTHREAD_SHIFT
 #define THREAD_START_SP	  KTHREAD_START_SP
-#define TIF_SYSCALL_TRACE _TIF_SYSCALL_TRACE
-#define TIF_NEED_RESCHED  _TIF_NEED_RESCHED
-#define TIF_WORK_MASK     _TIF_WORK_MASK
-#define TIF_ALLWORK_MASK  _TIF_ALLWORK_MASK
 
 		.include	"c6x_defs.inc"
 		.include	"c6x_config.inc"
@@ -486,7 +482,7 @@ ret_from_syscall_trace:
  ||	LDW	.D2T1	*+SP(REGS_ORIG_A4+8),A4
 
 syscall_exit_work:
-	AND	.D1	TIF_SYSCALL_TRACE,A2,A0
+	AND	.D1	_TIF_SYSCALL_TRACE,A2,A0
  [!A0]	BNOP	.S1	work_pending,5
  [A0]	B	.S2	syscall_trace_exit
 	ADDKPC	.S2	resume_userspace,B3,1
@@ -495,7 +491,7 @@ syscall_exit_work:
 	MVC	.S2	B1,CSR		; enable ints
 
 work_pending:
-	AND	.D1	TIF_NEED_RESCHED,A2,A0
+	AND	.D1	_TIF_NEED_RESCHED,A2,A0
  [!A0]	BNOP	.S1	work_notifysig,5
 
 work_resched:
@@ -509,8 +505,8 @@ work_rescheduled:
 	MASK_INT B2
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	.S1	TIF_WORK_MASK,A1
-	MVK	.S1	TIF_NEED_RESCHED,A3
+	MVK	.S1	_TIF_WORK_MASK,A1
+	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
 	AND	.D1	A1,A2,A0
  ||	AND	.S1	A3,A2,A1
@@ -569,8 +565,8 @@ resume_userspace:
 	MASK_INT B2
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	.S1	TIF_WORK_MASK,A1
-	MVK	.S1	TIF_NEED_RESCHED,A3
+	MVK	.S1	_TIF_WORK_MASK,A1
+	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
 	AND	.D1	A1,A2,A0
  [A0]	BNOP	.S1	work_pending,5
@@ -617,7 +613,7 @@ system_call_saved_noack:
 	GET_THREAD_INFO A12
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	NOP	4
-	AND	.D1	TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
+	AND	.D1	_TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
  [A2]	BNOP	.S1	tracesys_on,5		 ; call syscall_trace_entry before syscall function
 
 	;; Branch to the corresponding syscall
@@ -634,7 +630,7 @@ syscall_exit:
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	MVKL	.S1	syscall_exit_work,A0
 	MVKH	.S1	syscall_exit_work,A0
-	MVK	.S1	TIF_ALLWORK_MASK,A1
+	MVK	.S1	_TIF_ALLWORK_MASK,A1
 	NOP
 	AND	.D1	A1,A2,A2 ; check for work to do
  [A2]	BNOP	.S1	syscall_exit_work,5
@@ -811,7 +807,7 @@ preempt_schedule:
 	MVKH	.S1	restore_all,A0
 	MVKL	.S2	preempt_schedule_irq,B0
 	MVKH	.S2	preempt_schedule_irq,B0
-	AND	.D1	TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
+	AND	.D1	_TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
  [!A1]	BNOP	.S2X	A0,5
 	B	B0
 	ADDKPC	.S2	preempt_schedule,B3,4
