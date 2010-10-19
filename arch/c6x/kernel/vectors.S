@@ -92,8 +92,3 @@ RESET:     MVKL	.S1	_c_int00,A0		; branch to _c_int00
            IRQVEC INT13,_int13_handler
            IRQVEC INT14,_int14_handler
            IRQVEC INT15,_int15_handler
-
-#ifdef CONFIG_NK
-           IRQVEC XIRQ,_xirq_handler
-#endif
-

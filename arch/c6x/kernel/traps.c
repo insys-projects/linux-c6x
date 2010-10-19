@@ -59,10 +59,6 @@ void __init unmask_eexception(void)
 void __init trap_init (void)
 {
 #ifdef CONFIG_TMS320C64XPLUS
-	/* External exceptions are not yet managed with NK */
-#if defined(CONFIG_TMS320C64XPLUS_EEXCEPTION) && !defined(CONFIG_NK)
-	unmask_eexception();
-#endif
 	ack_exception(EXCEPT_TYPE_NXF);
 	ack_exception(EXCEPT_TYPE_EXC);
 	ack_exception(EXCEPT_TYPE_IXF);
@@ -284,8 +280,6 @@ static int process_iexcept(struct pt_regs *regs)
 
 	ack_exception(EXCEPT_TYPE_IXF);
 
-	local_irq_disable(); /* needed for NK */	
-
 	printk("IEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	while(iexcept_report) {
@@ -337,8 +331,6 @@ static void process_eexcept(struct pt_regs *regs)
 	unsigned int eexcept_num;
 	unsigned int bank = 0;
 
-	local_irq_disable(); /* needed for NK */	
-
 	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	for (; reg <= (unsigned int *) IRQ_MEXPMASK3_REG; reg++) {
@@ -370,7 +362,6 @@ asmlinkage int process_exception(struct pt_regs *regs)
 		switch(type_num) {
 		case EXCEPT_TYPE_NXF:
 			ack_exception(EXCEPT_TYPE_NXF);
-			local_irq_disable(); /* needed for NK */
 			die("Oops - NMI detected", regs, instruction_pointer(regs));
 			break;
 
@@ -387,8 +378,6 @@ asmlinkage int process_exception(struct pt_regs *regs)
 			ie_num = 8;
 		default:
 			ack_exception(type_num);
-			local_irq_disable(); /* needed for NK */
-			
 			do_trap(&iexcept_table[ie_num], regs);
 			break;
 		}

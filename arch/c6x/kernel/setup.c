@@ -44,11 +44,6 @@
 #include <asm/pm.h>
 #include <asm/hardware.h>
 
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-extern void nk_ddi_init(void);
-#endif
-
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/initrd.h>
 #include <asm/pgtable.h>
@@ -345,7 +340,6 @@ void __init setup_arch(char **cmdline_p)
 	if (!c6x_tags_are_valid(c6x_tags_pointer))
 		c6x_tags_pointer = NULL;
 
-#ifndef CONFIG_NK
 	/* interrupts must be masked */
 	local_irq_disable();
 
@@ -365,9 +359,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_PM
 	pwr_pdctl_set(PWR_PDCTL_ALL);
 #endif
-#else  /* CONFIG_NK */
-	NkLinuxPrivate* private = (NkLinuxPrivate*) nkctx->private;
-#endif /* CONFIG_NK */
 
   	/* Call SOC configuration function */
 	c6x_soc_setup_arch();
@@ -394,13 +385,7 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = PAGE_ALIGN((unsigned int) &_bss_end);
 #endif  
 
-#ifndef CONFIG_NK
 	memory_end   = PAGE_ALIGN((unsigned int) &_ramend);
-#else
-	memory_end   = PAGE_ALIGN((unsigned int) nkctx->mem.memstart +
-				  (unsigned int) nkctx->mem.memsize);
-#endif
-
 	memory_size  = (memory_end - memory_start);
 
 	mach_print_value("memory_start:", memory_start);
@@ -425,15 +410,7 @@ void __init setup_arch(char **cmdline_p)
 
 	strlcpy(tmp_command_line, default_command_line, COMMAND_LINE_SIZE);
 
-#ifdef CONFIG_NK
-	/* Get eventually the command line given by the primary OS */
-	if (private->cmdline[0])
-		*cmdline_p = (char *) &(private->cmdline);
-	else
-		*cmdline_p = tmp_command_line;
-#else
 	*cmdline_p = tmp_command_line;
-#endif /* CONFIG_NK */
 
 	/* Let cmdline passed through tag array override CONFIG_CMDLINE */
 	tcmd = c6x_tag_find(c6x_tags_pointer, TAG_CMDLINE);
@@ -501,13 +478,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	mach_progress(7, "Initializing paging");
 	paging_init();
-
-#ifdef CONFIG_NK
-	/*
-	 * Initialize NK-DDI
-	 */
-	nk_ddi_init();
-#endif
 
 	mach_progress(8, "End of C6x arch dep initialization");
 

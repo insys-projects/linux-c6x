@@ -18,8 +18,6 @@ $(obj)/head.o:     $(obj)/c6x_config.inc
 
 config-preempt-y += "CONFIG_PREEMPT    		.set 1"
 config-preempt-  += "CONFIG_PREEMPT    		.set 0"
-config-nk-y      += "CONFIG_NK         		.set 1"
-config-nk-       += "CONFIG_NK         		.set 0"
 config-c64-y     += "CONFIG_TMS320C64X 		.set 1"
 config-c64-      += "CONFIG_TMS320C64X 		.set 0"
 config-c64plus-y += "CONFIG_TMS320C64XPLUS	.set 1"
@@ -33,7 +31,6 @@ $(obj)/c6x_defs.inc: include/generated/asm-offsets.h $(srctree)/arch/c6x/kernel/
 
 $(obj)/c6x_config.inc: include/generated/autoconf.h
 	@echo $(config-preempt-$(CONFIG_PREEMPT)) > $(obj)/c6x_config.inc
-	@echo $(config-nk-$(CONFIG_NK))          >> $(obj)/c6x_config.inc
 	@echo $(config-c64-$(CONFIG_TMS320C64X)) >> $(obj)/c6x_config.inc
 	@echo $(config-c64plus-$(CONFIG_TMS320C64XPLUS)) >> $(obj)/c6x_config.inc
 	@echo $(config-mtduclinux-$(CONFIG_MTD_UCLINUX)) >> $(obj)/c6x_config.inc

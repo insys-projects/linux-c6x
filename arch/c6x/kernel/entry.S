@@ -106,7 +106,6 @@
 	;; External variables
 		.ref	irq_stat
 		.ref	_edata
-		.ref    irq_IER
 
 	;; Internal variables
 		.def	_sys_call_table
@@ -352,24 +351,6 @@ _DEFINE_MACRO(UNMASK_INT,reg)
 	MVC	.S2	CSR,reg
 	SET	.S2	reg,0,0,reg
 	MVC	.S2	reg,CSR
-	.endm
-
-
-_DEFINE_MACRO(RESTORE_NK_INT)
-
-	MVC	.S2	CSR,B2
-	CLR	.S2	B2,0,0,B2
-	MVC	.S2	B2,CSR		; cut global IRQ
-
-#ifdef CONFIG_NK
-	MVC	.S2	IER,B4
-	MVKL	.S2	irq_IER,B2
-	MVKH	.S2	irq_IER,B2
-	LDW	.D2T2	*B2,B2
-	NOP	4
-	OR	.L2	B2,B4,B4	; enable IT set in irq_IER
-	MVC	.S2	B4,IER
-#endif
 	.endm
 
 #ifndef CONFIG_TMS320C64XPLUS
@@ -650,20 +631,6 @@ syscall_exit:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
-
-	;; Disable IT
-#ifdef CONFIG_NK
-	MVC	.S2	IER,B4
-	MVKL	.S2	irq_IER,B2
-	MVKH	.S2	irq_IER,B2
-	LDW	.D2	*B2,B2
-	NOP	4
-	ANDN	.L2	B4,B2,B4
-	MVC	.S2	B4,IER			; change IER
-
-	UNMASK_INT B2
-#endif
-
 	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	MVKL	.S1	syscall_exit_work,A0
 	MVKH	.S1	syscall_exit_work,A0
@@ -759,14 +726,6 @@ _int15_handler:
 	SAVE_ALL_INT
 	MASK_SYSCALL
 	CALL_INT 15
-
-#ifdef CONFIG_NK
-	.global	_xirq_handler
-_xirq_handler:
-	SAVE_ALL_INT
-	MASK_SYSCALL
-	CALL_INT 5
-#endif
 
 	;;
 	;; Handler for uninitialized and spurious interrupts
