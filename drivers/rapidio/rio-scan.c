@@ -270,8 +270,18 @@ static void rio_route_set_ops(struct rio_dev *rdev)
 			pr_debug("RIO: adding routing ops for %s\n", rio_name(rdev));
 			rdev->rswitch->add_entry = cur->add_hook;
 			rdev->rswitch->get_entry = cur->get_hook;
+			rdev->rswitch->clr_table = cur->clr_hook;
+			break;			
 		}
 		cur++;
+	}
+
+	if ((cur >= end) && (rdev->pef & RIO_PEF_STD_RT)) {
+		pr_debug("RIO: adding STD routing ops for %s\n",
+			rio_name(rdev));
+		rdev->rswitch->add_entry = rio_std_route_add_entry;
+		rdev->rswitch->get_entry = rio_std_route_get_entry;
+		rdev->rswitch->clr_table = rio_std_route_clr_table;
 	}
 
 	if (!rdev->rswitch->add_entry || !rdev->rswitch->get_entry)
@@ -373,7 +383,7 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 	if (rio_is_switch(rdev)) {
 		rio_mport_read_config_32(port, destid, hopcount,
 					 RIO_SWP_INFO_CAR, &rdev->swpinfo);
-		rswitch = kmalloc(sizeof(struct rio_switch), GFP_KERNEL);
+		rswitch = kzalloc(sizeof(struct rio_switch), GFP_KERNEL);
 		if (!rswitch)
 			goto cleanup;
 		rswitch->switchid = next_switchid;
@@ -392,6 +402,10 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 		dev_set_name(&rdev->dev, "%02x:s:%04x", rdev->net->id,
 			     rdev->rswitch->switchid);
 		rio_route_set_ops(rdev);
+
+		if (do_enum && rdev->rswitch->clr_table)
+			rdev->rswitch->clr_table(port, destid, hopcount,
+						 RIO_GLOBAL_TABLE);
 
 		list_add_tail(&rswitch->node, &rio_switches);
 
@@ -900,7 +914,10 @@ static void rio_update_route_tables(struct rio_mport *port)
 				continue;
 
 			if (RIO_INVALID_ROUTE == rswitch->route_table[destid]) {
-
+				/* Skip if destid ends in empty switch*/
+				if (rswitch->destid == destid)
+					continue;
+ 
 				sport = rio_get_swpinfo_inport(port,
 						rswitch->destid, rswitch->hopcount);
 
