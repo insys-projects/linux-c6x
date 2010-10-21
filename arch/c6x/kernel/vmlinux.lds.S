@@ -115,10 +115,13 @@ SECTIONS
 	__end_builtin_fw = .;
     }
 
-    .rio_route  : ALIGN(4) {
+    .rio_rops  : ALIGN(4) {
 	__start_rio_route_ops = .;
 	*(.rio_route_ops)
 	__end_rio_route_ops = .;
+	__start_rio_em_ops = .;
+	*(.rio_em_ops)
+	__end_rio_em_ops = .;	
     }
 
     .tracedata : ALIGN(4) {

@@ -10,7 +10,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -30,6 +29,7 @@
 #include <linux/ioport.h>
 #include <linux/rio.h>
 #include <linux/rio_drv.h>
+#include <linux/kfifo.h>
 
 #include <asm/setup.h>
 #include <asm/virtconvert.h>
@@ -60,6 +60,13 @@ static char banner[] __initdata = KERN_INFO "TCI648x RapidIO driver v2.1\n";
 static u32 rio_regs;
 static u32 rio_conf_regs;
 
+struct port_write_msg {
+	union rio_pw_msg msg;
+	u32              msg_count;
+	u32              err_count;
+	u32              discard_count;
+};
+
 /*
  * Main TCI648x RapidIO driver data
  */
@@ -79,6 +86,10 @@ struct tci648x_rio_data {
 #endif
 	wait_queue_head_t      dbell_waitq[TCI648X_RIO_DBELL_VALUE_MAX];
 	spinlock_t             dbell_i_lock;
+	struct port_write_msg  port_write_msg;
+	struct work_struct     pw_work;
+	struct kfifo           pw_fifo;
+	spinlock_t             pw_fifo_lock;
 };
 
 static struct tci648x_rio_data _tci648x_rio;
@@ -120,6 +131,7 @@ static struct tci648x_serdes_config _tci648x_serdes_config[4] = {
 };
 
 static void dbell_handler(struct tci648x_rio_data *p_rio);
+static void tci648x_rio_port_write_handler(struct tci648x_rio_data *p_rio);
 static void cppi_tx_handler(u32 queue);
 static void cppi_rx_handler(u32 queue);
 
@@ -284,7 +296,6 @@ static void tci648x_rio_start(void)
 /**
  * tci648x_add_flow_control - Add flow control for a given device ID
  */
- 
 static int tci648x_add_flow_control(struct rio_dev *rdev)
 {
 	static int free_entry = 0;
@@ -347,7 +358,7 @@ static int tci648x_rio_port_status(int port)
 		value =	DEVICE_REG32_R(TCI648X_RIO_REG_BASE
 				       + TCI648X_RIO_SP0_ERR_STAT + (port << 5));
 		
-		if ((value & PORT_N_ERR_STS_PORT_OK) !=0) {
+		if ((value & RIO_PORT_N_ERR_STS_PORT_OK) !=0) {
 			portok++;
 			if (portok >= 50) 
 				break; /* port must be solid OK */
@@ -387,10 +398,6 @@ static int tci648x_rio_port_init(u32 port, u32 mode)
 		       0xffffffff); 
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + (TCI648X_RIO_PF8B_CNTL0 + (idx << 1)),
 		       0x0003ffff);
-
-	/* Clear port-write-in capture */
-	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + (TCI648X_RIO_SP_IP_PW_IN_CAPT0 + idx),
-		       0x00000000);
 
 	/* Silence timer */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + (TCI648X_RIO_SP0_SILENCE_TIMER + (idx << 6)),
@@ -433,13 +440,18 @@ static int tci648x_rio_init(void)
 	/* Initialize interrupts */
 	tci648x_rio_interrupt_setup();
 
+	/* Init port write interface */
+	res = tci648x_rio_port_write_init(&_tci648x_rio);
+	if (res)
+		goto out;
+
 #ifdef CONFIG_EDMA3	
 	/* EDMA setup */
 	res = tci648x_rio_edma_setup();
-	return res;
-#else
-	return 0;
 #endif
+
+out:
+	return res;
 }
 
 static int tci648x_rio_release(void) {
@@ -600,9 +612,7 @@ static void special_interrupt_handler(int ics)
 
 	case TCI648X_RIO_PORT_WRITEIN_INT:
 		/* Port-write-in request received on any port */
-		reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
-		DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
-			       reg | (1 << 0));
+		tci648x_rio_port_write_handler(&_tci648x_rio);
 		break;
 
 	case TCI648X_RIO_EVT_CAP_ERROR_INT:
@@ -1609,6 +1619,147 @@ tci648x_rio_config_write(struct rio_mport *mport, int index, u16 destid, u8 hopc
 	return res;
 }
 
+/*------------------------------- Port-Write management --------------------------*/
+/**
+ * tci648x_rio_pw_enable - enable/disable port-write interface init
+ * @mport: Master port implementing the port write unit
+ * @enable:    1=enable; 0=disable port-write message handling
+ */
+static int tci648x_rio_pwenable(struct rio_mport *mport, int enable)
+{
+	u32 reg;
+
+	/* Enable/Disable port-write-in interrupt */
+	reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
+	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
+		       (reg & ~(1 << 1)) | ((enable & 1) << 1));
+	return 0;
+}
+
+static void tci648x_rio_pw_dpc(struct work_struct *work)
+{
+	struct tci648x_rio_data *p_rio = container_of(work, struct tci648x_rio_data, pw_work);
+	unsigned long            flags;
+	u32                      msg_buffer[RIO_PW_MSG_SIZE/sizeof(u32)];
+
+	/*
+	 * Process port-write messages
+	 */
+	spin_lock_irqsave(&p_rio->pw_fifo_lock, flags);
+	while (kfifo_out(&p_rio->pw_fifo, 
+			 (unsigned char *) msg_buffer,
+			 RIO_PW_MSG_SIZE)) {
+
+		/* Process one message */
+		spin_unlock_irqrestore(&p_rio->pw_fifo_lock, flags);
+
+#ifdef TCI648X_RIO_DEBUG_PW
+
+		{
+		u32 i;
+		printk("%s : Port-Write Message:", __func__);
+		for (i = 0; i < RIO_PW_MSG_SIZE/sizeof(u32); i++) {
+			if ((i%4) == 0)
+				printk("\n0x%02x: 0x%08x", i*4,
+					msg_buffer[i]);
+			else
+				printk(" 0x%08x", msg_buffer[i]);
+		}
+		printk("\n");
+		}
+
+#endif /* TCI648X_RIO_DEBUG_PW */
+
+		/* Pass the port-write message to RIO core for processing */
+		rio_inb_pwrite_handler((union rio_pw_msg *) msg_buffer);
+		spin_lock_irqsave(&p_rio->pw_fifo_lock, flags);
+	}
+	spin_unlock_irqrestore(&p_rio->pw_fifo_lock, flags);
+}
+
+
+/**
+ *  tci648x_rio_port_write_handler - TCI648x port write interrupt handler
+ *
+ * Handles port write interrupts. Parses a list of registered
+ * port write event handlers and executes a matching event handler.
+ */
+static void tci648x_rio_port_write_handler(struct tci648x_rio_data *p_rio)
+{
+	u32        reg;
+	int        pw;
+
+	/* Check that we have a port-write-in case */
+	pw = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE) & (1 << 0);
+
+	/* Schedule deferred processing if PW was received */
+	if (pw) {
+		/* 
+		 * Retrieve PW message
+		 */
+		p_rio->port_write_msg.msg.em.comptag =
+			DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_PW_IN_CAPT0);
+		p_rio->port_write_msg.msg.em.errdetect =
+			DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_PW_IN_CAPT1);
+		p_rio->port_write_msg.msg.em.is_port =
+			DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_PW_IN_CAPT2);
+		p_rio->port_write_msg.msg.em.ltlerrdet =
+			DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_PW_IN_CAPT3);
+
+		/* 
+		 * Save PW message (if there is room in FIFO), otherwise discard it.
+		 */
+		if (kfifo_avail(&p_rio->pw_fifo) >= RIO_PW_MSG_SIZE) {
+			p_rio->port_write_msg.msg_count++;
+			kfifo_in(&p_rio->pw_fifo,
+				 (void const *) &p_rio->port_write_msg.msg,
+				 RIO_PW_MSG_SIZE);
+		} else {
+			p_rio->port_write_msg.discard_count++;
+			printk("RIO: ISR Discarded Port-Write Msg(s) (%d)\n",
+				 p_rio->port_write_msg.discard_count);
+		}
+		schedule_work(&p_rio->pw_work);
+	}
+
+	/* Acknowledge port-write-in */
+	reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
+	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
+		       reg | (1 << 0));
+
+	return;
+}
+
+/**
+ * tci648x_rio_port_write_init - TCI648x port write interface init
+ * @mport: Master port implementing the port write unit
+ *
+ * Initializes port write unit hardware and buffer
+ * ring. Called from tci648x_rio_setup(). Returns %0 on success
+ * or %-ENOMEM on failure.
+ */
+static int tci648x_rio_port_write_init(struct tci648x_rio_data *p_rio)
+{
+	int i;
+
+	/* Following configurations require a disabled port write controller */
+	tci648x_rio_pwenable(NULL, 0);
+
+	/* Clear port-write-in capture registers */
+	for (i = 0; i < 4; i++)
+		DEVICE_REG32_W(TCI648X_RIO_REG_BASE
+			       + (TCI648X_RIO_SP_IP_PW_IN_CAPT0 + (i << 2)),
+			       0x00000000);
+
+	INIT_WORK(&p_rio->pw_work, tci648x_rio_pw_dpc);
+	spin_lock_init(&p_rio->pw_fifo_lock);
+	if (kfifo_alloc(&p_rio->pw_fifo, RIO_PW_MSG_SIZE * 32, GFP_KERNEL)) {
+		printk("RIO: FIFO allocation failed\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
 /*----------------------------- Message passing management  ----------------------*/
 
 /**
@@ -2459,6 +2610,7 @@ int tci648x_rio_register_mport(u32 port_id, u32 hostid, u32 init)
 	ops->dwait        = tci648x_rio_dbell_wait;
 	ops->transfer     = tci648x_rio_dio_transfer;
 	ops->fixup        = tci648x_rio_fixup;
+	ops->pwenable     = tci648x_rio_pwenable;
 
 	port = kzalloc(sizeof(struct rio_mport), GFP_KERNEL);
 	port->id          = port_id;
