@@ -9,6 +9,10 @@
  * Copyright 2010 Texas Instruments Incorporated
  * Aurelien Jacquiot <a-jacquiot@ti.com>
  *
+ * Copyright 2009 Integrated Device Technology, Inc.
+ * Alex Bounine <alexandre.bounine@idt.com>
+ * - Added Port-Write/Error Management initialization and handling
+ *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -36,15 +40,16 @@
 LIST_HEAD(rio_devices);
 static LIST_HEAD(rio_switches);
 
-#define RIO_ENUM_CMPL_MAGIC	0xdeadbeef
-
 static void rio_enum_timeout(unsigned long);
+
+static void rio_init_em(struct rio_dev *rdev);
 
 DEFINE_SPINLOCK(rio_global_list_lock);
 
 static int next_destid = 0;
 static int next_switchid = 0;
 static int next_net = 0;
+static int next_comptag;
 
 static struct timer_list rio_enum_timer =
 TIMER_INITIALIZER(rio_enum_timeout, 0, 0);
@@ -54,13 +59,6 @@ static int rio_mport_phys_table[] = {
 	RIO_EFB_PAR_EP_REC_ID,
 	RIO_EFB_SER_EP_ID,
 	RIO_EFB_SER_EP_REC_ID,
-	-1,
-};
-
-static int rio_sport_phys_table[] = {
-	RIO_EFB_PAR_EP_FREE_ID,
-	RIO_EFB_SER_EP_FREE_ID,
-	RIO_EFB_SER_EP_FREC_ID,
 	-1,
 };
 
@@ -124,12 +122,26 @@ static int rio_clear_locks(struct rio_mport *port)
 	u32 result;
 	int ret = 0;
 
-	/* Write component tag CSR magic complete value */
-	rio_local_write_config_32(port, RIO_COMPONENT_TAG_CSR,
-				  RIO_ENUM_CMPL_MAGIC);
-	list_for_each_entry(rdev, &rio_devices, global_list)
-		rio_write_config_32(rdev, RIO_COMPONENT_TAG_CSR,
-				    RIO_ENUM_CMPL_MAGIC);
+	/* Assign component tag to all devices */
+	next_comptag = 1;
+	rio_local_write_config_32(port, RIO_COMPONENT_TAG_CSR, next_comptag++);
+
+	list_for_each_entry(rdev, &rio_devices, global_list) {
+		/* Mark device as discovered */
+		rio_read_config_32(rdev,
+				   rdev->phys_efptr + RIO_PORT_GEN_CTL_CSR,
+				   &result);
+		rio_write_config_32(rdev,
+				    rdev->phys_efptr + RIO_PORT_GEN_CTL_CSR,
+				    result | RIO_PORT_GEN_DISCOVERED);
+
+		rio_write_config_32(rdev, RIO_COMPONENT_TAG_CSR, next_comptag);
+		rdev->comp_tag = next_comptag++;
+		if (next_comptag >= 0x10000) {
+			pr_err("RIO: Component Tag Counter Overflow\n");
+			break;
+		}
+	}
 
 	/* Release host device id locks */
 	rio_local_write_config_32(port, RIO_HOST_DID_LOCK_CSR,
@@ -290,6 +302,30 @@ static void rio_route_set_ops(struct rio_dev *rdev)
 }
 
 /**
+ * rio_em_set_ops- Sets Error Managment operations for a particular vendor switch
+ * @rdev: RIO device
+ *
+ * Searches the RIO EM ops table for known switch types. If the vid
+ * and did match a switch table entry, then set the em_init() and
+ * em_handle() ops to the table entry values.
+ */
+static void rio_em_set_ops(struct rio_dev *rdev)
+{
+	struct rio_em_ops *cur = __start_rio_em_ops;
+	struct rio_em_ops *end = __end_rio_em_ops;
+
+	while (cur < end) {
+		if ((cur->vid == rdev->vid) && (cur->did == rdev->did)) {
+			pr_debug("RIO: adding EM ops for %s\n", rio_name(rdev));
+			rdev->rswitch->em_init = cur->init_hook;
+			rdev->rswitch->em_handle = cur->handler_hook;
+			break;
+		}
+		cur++;
+	}
+}
+
+/**
  * rio_add_device- Adds a RIO device to the device model
  * @rdev: RIO device
  *
@@ -359,8 +395,15 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 	rdev->asm_rev = result >> 16;
 	rio_mport_read_config_32(port, destid, hopcount, RIO_PEF_CAR,
 				 &rdev->pef);
-	if (rdev->pef & RIO_PEF_EXT_FEATURES)
-		rdev->efptr = result & 0xffff;
+
+	if (rdev->pef & RIO_PEF_EXT_FEATURES) {
+ 		rdev->efptr = result & 0xffff;
+		rdev->phys_efptr = rio_mport_get_physefb(port, 0, destid,
+							 hopcount);
+
+		rdev->em_efptr = rio_mport_get_feature(port, 0, destid,
+						hopcount, RIO_EFB_ERR_MGMNT);
+	}
 
 	rio_mport_read_config_32(port, destid, hopcount, RIO_SRC_OPS_CAR,
 				 &rdev->src_ops);
@@ -389,6 +432,7 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 		rswitch->switchid = next_switchid;
 		rswitch->hopcount = hopcount;
 		rswitch->destid = destid;
+		rswitch->port_ok = 0;
 		rswitch->route_table = kzalloc(sizeof(u8)*
 					RIO_MAX_ROUTE_ENTRIES(port->sys_size),
 					GFP_KERNEL);
@@ -402,6 +446,7 @@ static struct rio_dev __devinit *rio_setup_device(struct rio_net *net,
 		dev_set_name(&rdev->dev, "%02x:s:%04x", rdev->net->id,
 			     rdev->rswitch->switchid);
 		rio_route_set_ops(rdev);
+		rio_em_set_ops(rdev);
 
 		if (do_enum && rdev->rswitch->clr_table)
 			rdev->rswitch->clr_table(port, destid, hopcount,
@@ -462,23 +507,29 @@ cleanup:
  *
  * Reads the port error status CSR for a particular switch port to
  * determine if the port has an active link.  Returns
- * %PORT_N_ERR_STS_PORT_OK if the port is active or %0 if it is
+ * %RIO_PORT_N_ERR_STS_PORT_OK if the port is active or %0 if it is
  * inactive.
  */
 static int
 rio_sport_is_active(struct rio_mport *port, u16 destid, u8 hopcount, int sport)
 {
-	u32 result;
+	u32 result = 0;
 	u32 ext_ftr_ptr;
 
-	int *entry = rio_sport_phys_table;
+	ext_ftr_ptr = rio_mport_get_efb(port, 0, destid, hopcount, 0);
+ 
+	while (ext_ftr_ptr) {
+		rio_mport_read_config_32(port, destid, hopcount,
+					 ext_ftr_ptr, &result);
+		result = RIO_GET_BLOCK_ID(result);
+		if ((result == RIO_EFB_SER_EP_FREE_ID) ||
+		    (result == RIO_EFB_SER_EP_FREE_ID_V13P) ||
+		    (result == RIO_EFB_SER_EP_FREC_ID))
+ 			break;
 
-	do {
-		if ((ext_ftr_ptr =
-		     rio_mport_get_feature(port, 0, destid, hopcount, *entry)))
-
-			break;
-	} while (*++entry >= 0);
+		ext_ftr_ptr = rio_mport_get_efb(port, 0, destid, hopcount,
+						ext_ftr_ptr);
+	}
 
 	if (ext_ftr_ptr)
 		rio_mport_read_config_32(port, destid, hopcount,
@@ -486,7 +537,7 @@ rio_sport_is_active(struct rio_mport *port, u16 destid, u8 hopcount, int sport)
 					 RIO_PORT_N_ERR_STS_CSR(sport),
 					 &result);
 
-	return (result & PORT_N_ERR_STS_PORT_OK);
+	return result & RIO_PORT_N_ERR_STS_PORT_OK;
 }
 
 /**
@@ -804,8 +855,10 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 			 rio_name(rdev), rdev->vid, rdev->did, num_ports);
 		sw_destid = next_switchid;
 		for (port_num = 0; port_num < num_ports; port_num++) {
-			if (sw_inport == port_num)
+			if (sw_inport == port_num) {
+				rdev->rswitch->port_ok |= (1 << port_num);
 				continue;
+			}
 
 			cur_destid = next_destid;
 			
@@ -813,6 +866,7 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 			    (port, RIO_ANY_DESTID(port->sys_size), hopcount,
 			     port_num)) {
 				pr_debug("RIO: scanning device on port %d\n", port_num);
+				rdev->rswitch->port_ok |= (1 << port_num);
 				rio_route_add_entry(port, rdev->rswitch,
 						    RIO_GLOBAL_TABLE,
 						    RIO_ANY_DESTID(port->sys_size),
@@ -837,8 +891,27 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
 							port_num;
 					}
 				}
+			} else {
+				/* If switch supports Error Management,
+				 * set PORT_LOCKOUT bit for unused port
+				 */
+				if (rdev->em_efptr)
+					rio_set_port_lockout(rdev, port_num, 1);
+
+				rdev->rswitch->port_ok &= ~(1 << port_num);
 			}
 		}
+		/* Direct Port-write messages to the enumeratiing host */
+		if ((rdev->src_ops & RIO_SRC_OPS_PORT_WRITE) &&
+		    (rdev->em_efptr)) {
+			rio_write_config_32(rdev,
+					    rdev->em_efptr + RIO_EM_PW_TGT_DEVID,
+					    (port->host_deviceid << 16) |
+					    (port->sys_size << 15));
+		}
+		
+		rio_init_em(rdev);
+
 		rdev->rswitch->destid = sw_destid;
 	} else
 		pr_debug("RIO: found %s (vid %4.4x did %4.4x)\n",
@@ -851,21 +924,16 @@ static int __devinit rio_enum_peer(struct rio_net *net, struct rio_mport *port,
  * rio_enum_complete- Tests if enumeration of a network is complete
  * @port: Master port to send transaction
  *
- * Tests the Component Tag CSR for presence of the magic enumeration
- * complete flag. Return %1 if enumeration is complete or %0 if
+ * Tests the Component Tag CSR for non-zero value (enumeration
+ * complete flag). Return %1 if enumeration is complete or %0 if
  * enumeration is incomplete.
  */
 static int rio_enum_complete(struct rio_mport *port)
 {
 	u32 tag_csr;
-	int ret = 0;
 
 	rio_local_read_config_32(port, RIO_COMPONENT_TAG_CSR, &tag_csr);
-
-	if (tag_csr == RIO_ENUM_CMPL_MAGIC)
-		ret = 1;
-
-	return ret;
+	return (tag_csr & 0xffff) ? 1 : 0;
 }
 
 /**
@@ -948,7 +1016,7 @@ rio_disc_peer(struct rio_net *net, struct rio_mport *port, u16 destid,
  *
  * Reads the port error status CSR for the master port to
  * determine if the port has an active link.  Returns
- * %PORT_N_ERR_STS_PORT_OK if the  master port is active
+ * %RIO_PORT_N_ERR_STS_PORT_OK if the  master port is active
  * or %0 if it is inactive.
  */
 static int rio_mport_is_active(struct rio_mport *port)
@@ -969,7 +1037,7 @@ static int rio_mport_is_active(struct rio_mport *port)
 					 RIO_PORT_N_ERR_STS_CSR(port->index),
 					 &result);
 
-	return (result & PORT_N_ERR_STS_PORT_OK);
+	return result & RIO_PORT_N_ERR_STS_PORT_OK;
 }
 
 /**
@@ -1040,6 +1108,32 @@ static void rio_update_route_tables(struct rio_mport *port)
 	}
 }
 
+ /**
+ * rio_init_em - Initializes RIO Error Management (for switches)
+ * @port: Master port associated with the RIO network
+ *
+ * For each enumerated switch, call device-specific error management
+ * initialization routine (if supplied by the switch driver).
+ */
+static void rio_init_em(struct rio_dev *rdev)
+{
+	if (rio_is_switch(rdev) && (rdev->em_efptr) &&
+	    (rdev->rswitch->em_init)) {
+		rdev->rswitch->em_init(rdev);
+	}
+}
+
+/**
+ * rio_pw_enable - Enables/disables port-write handling by a master port
+ * @port: Master port associated with port-write handling
+ * @enable:  1=enable,  0=disable
+ */
+static void rio_pw_enable(struct rio_mport *port, int enable)
+{
+	if (port->ops->pwenable)
+		port->ops->pwenable(port, enable);
+}
+
 /**
  * rio_enum_mport- Start enumeration through a master port
  * @mport: Master port to send transactions
@@ -1083,6 +1177,7 @@ int __devinit rio_enum_mport(struct rio_mport *mport)
 		}
 		rio_update_route_tables(mport);
 		rio_clear_locks(mport);
+		rio_pw_enable(mport, 1);
 	} else {
 		printk(KERN_INFO "RIO: master port %d link inactive\n",
 		       mport->id);

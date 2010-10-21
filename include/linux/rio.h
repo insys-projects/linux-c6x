@@ -91,10 +91,13 @@
 #define RIO_INB_MBOX_RESOURCE	1
 #define RIO_OUTB_MBOX_RESOURCE	2
 
+#define RIO_PW_MSG_SIZE		64
+
 extern struct bus_type rio_bus_type;
 extern struct list_head rio_devices;	/* list of all devices */
 
 struct rio_mport;
+union rio_pw_msg;
 
 /**
  * struct dio_dev - DirectI/O info for a RIO device
@@ -145,11 +148,15 @@ struct rio_dev {
 	u32 swpinfo;		/* Only used for switches */
 	u32 src_ops;
 	u32 dst_ops;
+	u32 comp_tag;
+	u32 phys_efptr;
+	u32 em_efptr;
 	u64 dma_mask;
 	struct rio_switch *rswitch;	/* RIO switch info */
 	struct rio_driver *driver;	/* RIO driver claiming this device */
 	struct device dev;	/* LDM device structure */
 	struct resource riores[RIO_MAX_DEV_RESOURCES];
+	int (*pwcback) (struct rio_dev *rdev, union rio_pw_msg *msg, int step);
 	u16 destid;
 	struct dio_dev dio;
 };
@@ -253,6 +260,7 @@ struct rio_net {
  * @hopcount: Hopcount to this switch
  * @destid: Associated destid in the path
  * @route_table: Copy of switch routing table
+ * @port_ok: Status of each port (one bit per port) - OK=1 or UNINIT=0
  * @add_entry: Callback for switch-specific route add function
  * @get_entry: Callback for switch-specific route get function
  * @clr_table: Callback for switch-specific clear route table function
@@ -263,12 +271,15 @@ struct rio_switch {
 	u16 hopcount;
 	u16 destid;
 	u8 *route_table;
+	u32 port_ok;
 	int (*add_entry) (struct rio_mport * mport, u16 destid, u8 hopcount,
 			  u16 table, u16 route_destid, u8 route_port);
 	int (*get_entry) (struct rio_mport * mport, u16 destid, u8 hopcount,
 			  u16 table, u16 route_destid, u8 * route_port);
 	int (*clr_table) (struct rio_mport *mport, u16 destid, u8 hopcount,
 			  u16 table);
+	int (*em_init)   (struct rio_dev *dev);
+	int (*em_handle) (struct rio_dev *dev, u8 swport);
 };
 
 /* Low-level architecture-dependent routines */
@@ -283,6 +294,7 @@ struct rio_switch {
  * @dwait: Callback to wait a doorbell message.
  * @transfer: Callback to perform a Direct I/O transfer
  * @fixup: Callback for architecture specific fixup fonction
+ * @pwenable: Callback to enable/disable port-write message handling.
  */
 struct rio_ops {
 	int (*lcread) (struct rio_mport *mport, int index, u32 offset, int len,
@@ -298,6 +310,7 @@ struct rio_ops {
 	int (*transfer) (struct rio_mport *mport, int index, u16 dest_id,
 			 u32 src_addr,u32 tgt_addr, int size_bytes, int write);
 	int (*fixup) (struct rio_mport *mport, struct rio_dev *rdev);
+	int (*pwenable) (struct rio_mport *mport, int enable);
 };
 
 #define RIO_RESOURCE_MEM	0x00000100
@@ -372,6 +385,33 @@ struct rio_route_ops {
 			 u16 table, u16 route_destid, u8 * route_port);
 	int (*clr_hook) (struct rio_mport *mport, u16 destid, u8 hopcount,
 			 u16 table);
+};
+
+/**
+ * struct rio_em_ops - Per-switch error management operations
+ * @vid: RIO vendor ID
+ * @did: RIO device ID
+ * @init_hook: Switch specific error management initialization (may be NULL)
+ * @handler_hook: Switch specific error management handler (may be NULL)
+ *
+ * Defines the operations that are necessary to initialize and handle
+ * error management events for a particular RIO switch device.
+ */
+struct rio_em_ops {
+	u16 vid, did;
+	int (*init_hook) (struct rio_dev *dev);
+	int (*handler_hook) (struct rio_dev *dev, u8 swport);
+};
+
+union rio_pw_msg {
+	struct {
+		u32 comptag;	/* Component Tag CSR */
+		u32 errdetect;	/* Port N Error Detect CSR */
+		u32 is_port;	/* Implementation specific + PortID */
+		u32 ltlerrdet;	/* LTL Error Detect CSR */
+		u32 padding[12];
+	} em;
+	u32 raw[RIO_PW_MSG_SIZE/sizeof(u32)];
 };
 
 /* Architecture and hardware-specific functions */
