@@ -115,13 +115,6 @@ unsigned int _bitr(unsigned int);
 #define __ffs(a)   (_lmbd(1, _bitr(a)))
 #define fls(a)     (!(a)?0:(32 - _lmbd(1, (a))))
 
-/*
- * ffs: find first bit set. This is defined the same way as
- * the libc and compiler builtin ffs routines, therefore
- * differs in spirit from the above ffz (man ffs).
- */
-#define ffs(x) ((__ffs(x) + 1) % 33)
-
 #else /* CONFIG_TI_C6X_COMPILER */
 
 /**
@@ -167,6 +160,8 @@ static inline unsigned long fls(unsigned long x)
 	return 32 - x;
 }
 
+#endif /* CONFIG_TI_C6X_COMPILER */
+
 /**
  * ffs - find first bit set
  * @x: the word to search
@@ -181,14 +176,8 @@ static inline int ffs(int x)
 	if (!x)
 		return 0;
 
-	asm (" bitr  .M1  %0,%0\n"
-	     " nop\n"
-	     " lmbd  .L1  1,%0,%0\n"
-	     : "+a"(x));
-
-	return 32 - x;
+	return __ffs(x) + 1;
 }
-#endif /* CONFIG_TI_C6X_COMPILER */
 
 #include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/fls64.h>
