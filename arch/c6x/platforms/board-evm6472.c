@@ -36,9 +36,9 @@
 #include <asm/timer.h>
 #include <asm/percpu.h>
 #include <asm/clock.h>
+#include <asm/gemac.h>
 
 #include <mach/i2c.h>
-#include <mach/gemac.h>
 #include <mach/board.h>
 
 #ifdef CONFIG_TMS320C64X_GEMAC
