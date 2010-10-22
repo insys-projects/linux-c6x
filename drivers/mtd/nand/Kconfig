@@ -488,4 +488,10 @@ config MTD_NAND_W90P910
 	  This enables the driver for the NAND Flash on evaluation board based
 	  on w90p910.
 
+config MTD_NAND_EVM6488
+        tristate "NAND Flash device on EVM6488 board"
+	depends on ARCH_BOARD_EVM6457 || ARCH_BOARD_EVM6472
+        help
+          Support for NAND flash on Texas Instruments EVM6488-like platforms.
+
 endif # MTD_NAND

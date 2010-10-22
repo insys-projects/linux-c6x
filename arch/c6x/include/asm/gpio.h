@@ -137,6 +137,12 @@ static inline void gpio_direction(unsigned short direction_mask) {
 	gpio_set_reg(GPIO_GPDIR, direction_mask);
 }
 
+static inline void gpio_direction_set(unsigned short direction_mask, unsigned short mask)
+{
+        unsigned int dir = gpio_get_reg(GPIO_GPDIR) & ~mask;
+	gpio_set_reg(GPIO_GPDIR, dir | (direction_mask & mask));
+}
+
 static inline void gpio_pin_set(unsigned int id) {
 	gpio_set_reg(GPIO_GPSETDATA, 1 << (id % 32));
 }
