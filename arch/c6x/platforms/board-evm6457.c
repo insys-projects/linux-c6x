@@ -90,6 +90,12 @@ static void setup_emac(void) {}
 #endif
 
 #ifdef CONFIG_I2C
+static struct at24_platform_data at24_eeprom_data = {
+	.byte_len	= 0x100000 / 8,
+	.page_size	= 256,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
 #ifdef CONFIG_SERIAL_SC16IS7XX
 static struct sc16is7xx_platform_data uart_data = {
 	.baud_base = 921600,
@@ -101,6 +107,11 @@ static struct i2c_board_info evm_i2c_info[] = {
 	{ I2C_BOARD_INFO("sc16is750", 0x4d),
 	  .irq = IRQ_UART_BRIDGE,
 	  .platform_data = &uart_data,
+	},
+#endif
+#ifdef CONFIG_EEPROM_AT24
+	{ I2C_BOARD_INFO("24c1024", 0x50),
+	  .platform_data = &at24_eeprom_data,
 	},
 #endif
 };
@@ -195,12 +206,10 @@ void c6x_board_setup_arch(void)
 #endif
 
 #if defined(CONFIG_SERIAL_SC16IS7XX)
-#if 0
 	/* setup GP15 for interrupt from i2c UART */
 	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
 	gpio_bank_int_enable();
 	irq_map(IRQ_GPIO15, IRQ_UART_BRIDGE);
-#endif
 #endif
 
 	mach_progress      = dummy_progress;
