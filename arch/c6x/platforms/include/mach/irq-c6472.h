@@ -76,7 +76,7 @@
 #define IRQ_EMURTDXTX     12
 #define IRQ_IDMAINT0      13  /* IDMA channel 0 interrupt */
 #define IRQ_IDMAINT1      14  /* IDMA channel 1 interrupt */
-#define IRQ_EDMMA3CCINT   15  /* EDMA3CC completion interrupt */
+#define IRQ_EDMA3CCINT    15  /* EDMA3CC completion interrupt */
 #define IRQ_TINT          16  /* timer interrupts */
 #define IRQ_TINTLO        16
 #define IRQ_TINTHI        17
@@ -172,65 +172,5 @@
 #define IRQ_L2CDMPA       125 /* L2 DMA memory protection fault */
 #define IRQ_EMCCMPA       126 /* external CPU memory protection fault */
 #define IRQ_EMCBUSERR     127 /* bus error interrupt */
-
-/*
- * C6x Chip Interrupt Controller (CIC) events
- */ 
-#define CIC_EVT0          0   /* combined events */ 
-#define CIC_EVT1          1
-#define CIC_IICINT        4   /* I2C event */
-#define CIC_FSERR1        5   /* error/alarm interrupts */ 
-#define CIC_RIOINT7       6   
-#define CIC_FSERR2        7
-#define CIC_VCPINT        8
-#define CIC_TCPINT        9
-#define CIC_RINT0         10  /* McBSP event */
-#define CIC_XINT0         11
-#define CIC_RINT1         12
-#define CIC_XINT1         13
-#define CIC_REVT0         14
-#define CIC_XEVT0         15
-#define CIC_REVT1         16
-#define CIC_XEVT1         17
-#define CIC_IREVT1        18  /* I2C EDMA events */
-#define CIC_IXEVT1        19
-#define CIC_FSEVT18       20  /* frame synchronization events */
-#define CIC_FSEVT19       21
-#define CIC_FSEVT20       22
-#define CIC_FSEVT21       23
-#define CIC_FSEVT22       24
-#define CIC_FSEVT23       25
-#define CIC_FSEVT24       26
-#define CIC_FSEVT25       27
-#define CIC_FSEVT26       28
-#define CIC_FSEVT27       29
-#define CIC_FSEVT28       30
-#define CIC_FSEVT29       31
-#define CIC_VCPREVT       32  /* VCP events */
-#define CIC_VCPXEVT       33
-#define CIC_TCPREVT       34  /* TCP events */
-#define CIC_TCPXEVT       35
-#define CIC_TPCCERRINT    36  /* TPCC error interrupt */
-#define CIC_TPCCMPINT     37  /* TPCSS memory protection interrupt */
-#define CIC_TPTCERRINT0   38  /* TPTC error interrupts */
-#define CIC_TPTCERRINT1   39  
-#define CIC_TPTCERRINT2   40
-#define CIC_TPTCERRINT3   41
-#define CIC_TPTCERRINT4   42
-#define CIC_TPTCERRINT5   43
-#define CIC_TPTCAETEVT    44  /* TPTC AET event */
-#define CIC_AIFEVT2       45  /* AIF CPU interrupts */
-#define CIC_AIFEVT3       46
-#define CIC_AIFPSEVT0     47  /* packet switched transfer events */
-#define CIC_AIFPSEVT1     48
-#define CIC_AIFPSEVT2     49
-#define CIC_AIFPSEVT3     50
-#define CIC_AIFPSEVT4     51
-#define CIC_AIFPSEVT5     52
-#define CIC_AIFPSEVT6     53
-#define CIC_AIFBUFEVT     54
-#define CIC_RACDEVENT0    56  /* debug events */
-#define CIC_RACDEVENT1    57
-#define CIC_SEMERR        58
 
 #endif /* __MACH_IRQ_C6472_H */
