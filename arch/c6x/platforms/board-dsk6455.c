@@ -23,10 +23,11 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c/at24.h>
-#include <linux/i2c/pca953x.h>
-#include <linux/i2c/sc16is7xx.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -55,7 +56,7 @@ static struct resource _cpld_async_res = {
 	.start = 0xa0000000,
 	.end   = 0xa0000008,
 	.flags = IORESOURCE_MEM,
-}; 
+};
 
 #define NR_RESOURCES 2
 static struct resource *dsk_resources[NR_RESOURCES] = 
@@ -250,3 +251,49 @@ static int __init evm_init(void)
 }
 
 arch_initcall(evm_init);
+
+/*
+ * NOR Flash support.
+ */
+#ifdef CONFIG_MTD
+static struct map_info nor_map = {
+	.name		= "NOR-flash",
+	.phys		= 0xB0000000,
+	.size		= 0x400000,
+	.bankwidth	= 1,
+};
+static struct mtd_info *mymtd;
+#ifdef CONFIG_MTD_PARTITIONS
+static int nr_parts;
+static struct mtd_partition *parts;
+static const char *part_probe_types[] = {
+	"cmdlinepart",
+	NULL
+};
+#endif
+
+static __init int nor_init(void)
+{
+	nor_map.virt = ioremap(nor_map.phys, nor_map.size);
+	simple_map_init(&nor_map);
+	mymtd = do_map_probe("cfi_probe", &nor_map);
+	if (mymtd) {
+		mymtd->owner = THIS_MODULE;
+
+#ifdef CONFIG_MTD_PARTITIONS
+		nr_parts = parse_mtd_partitions(mymtd,
+						part_probe_types,
+						&parts, 0);
+		if (nr_parts > 0)
+			add_mtd_partitions(mymtd, parts, nr_parts);
+		else
+			add_mtd_device(mymtd);
+#else
+		add_mtd_device(mymtd);
+#endif
+	}
+	return 0;
+}
+
+late_initcall(nor_init);
+#endif
