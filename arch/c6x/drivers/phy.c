@@ -23,8 +23,6 @@
 
 int phy_init(void)
 {
-	int i;
-
 	mdio_set_reg(MDIO_CONTROL, 0x4004001f); /* enable MII interface */
 
 	_c6x_delay(145844);
@@ -63,8 +61,11 @@ int phy_init(void)
 	mdio_phy_wait();
 
 	/* wait for link establishment (~5 sec) */
-	for (i = 0; i < 5000; i++)
-		udelay(1000); /* 1ms */
+	{
+		int i;
+		for (i = 0; i < 5000; i++)
+			udelay(1000); /* 1ms */
+	}
 #endif
 	return 0;
 }
@@ -83,7 +84,7 @@ int evm6488_phy_init(void)
 	sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode */
 	sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
 
-#ifdef ARCH_BOARD_EVM6474
+#ifdef CONFIG_ARCH_BOARD_EVM6474
 	/* EVMC6474 board is wired up with TX differential +/- swapped. */
 	sgmiic.txconfig  |= 0x80;
 #endif
