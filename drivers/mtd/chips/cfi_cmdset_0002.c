@@ -465,6 +465,14 @@ static struct mtd_info *cfi_amdstd_setup(struct mtd_info *mtd)
 		ersize = ((cfi->cfiq->EraseRegionInfo[i] >> 8) & ~0xff) * cfi->interleave;
 		ernum = (cfi->cfiq->EraseRegionInfo[i] & 0xffff) + 1;
 
+#ifdef CONFIG_TI_C6X_COMPILER
+		/*
+		 * The TI compiler (or maybe assembler) has a problem with this loop which
+		 * goes away when a printk is placed here. Just do this temporarily until
+		 * the true problem is isolated and resolved.
+		 */
+		printk(KERN_DEBUG "\n");
+#endif
 		if (mtd->erasesize < ersize) {
 			mtd->erasesize = ersize;
 		}
