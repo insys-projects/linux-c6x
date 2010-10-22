@@ -58,7 +58,7 @@ extern unsigned long zone_dma_start, zone_dma_size;
 static char c6x_command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
 static const char *cpu_name, *cpu_voltage, *mmu, *fpu;
-static char __cpu_rev[4], *cpu_rev;
+static char __cpu_rev[5], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
 #ifdef CONFIG_TMS320C64XPLUS
 static unsigned int cpu_num = 0;
@@ -172,7 +172,7 @@ void get_cpuinfo(void)
 		}
 	} else {
 		cpu_rev = __cpu_rev;
-		sprintf(cpu_rev, "0x%x", cpu_id);
+		snprintf(__cpu_rev, sizeof(__cpu_rev), "0x%x", cpu_id);
 	}
 
 #ifndef CONFIG_TMS320C64XPLUS
