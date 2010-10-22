@@ -185,29 +185,9 @@ static struct pll_data pll1_data = {
 	.phys_base = ARCH_PLL1_BASE,
 };
 
-static struct pll_data pll2_data = {
-	.num       = 2,
-	.phys_base = ARCH_PLL2_BASE,
-};
-
-static struct pll_data pll3_data = {
-	.num       = 3,
-	.phys_base = ARCH_PLL3_BASE,
-};
-
 static struct clk clkin1 = {
 	.name = "clkin1",
 	.rate = 25000000,
-};
-
-static struct clk clkin2 = {
-	.name = "clkin2",
-	.rate = 25000000,
-};
-
-static struct clk clkin3 = {
-	.name = "clkin3",
-	.rate = 26660000,
 };
 
 static struct clk pll1_clk = {
@@ -314,8 +294,6 @@ static void dummy_progress(unsigned int step, char *s) {}
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
-	int i, ret;
-
 	printk("Designed for the EVM6472 board, Texas Instruments.\n");
 
 	/* Configure the interupt selector MUX registers */
@@ -353,10 +331,11 @@ void c6x_board_setup_arch(void)
 	mach_progress(1, "End of EVM6486 specific initialization");
 }
 
-__init void evm_init(void)
+__init int evm_init(void)
 {
 	evm_setup_i2c();
         setup_emac();
+	return 0;
 }
 
 arch_initcall(evm_init);

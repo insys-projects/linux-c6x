@@ -203,6 +203,7 @@ config PGCACHE_LIMIT
 
 config IDLE_LED
        bool "Use LED activity indicator based on idle loop"
+       depends on !(MTD_NAND_EVM6488 && (ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6457))
        default n
 
 source "mm/Kconfig"
