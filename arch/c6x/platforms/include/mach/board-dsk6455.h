@@ -17,10 +17,15 @@
 #define TEXTLEN         0x07FFFC00
 #define RAMEND		0xE8000000
 
+/* davinci i2c bus specs */
+#define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
+#define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
+
 /*
  * Interrupt Assignments
  */
 #define IRQ_CLOCKEVENTS INT15
+#define IRQ_DAVINCI_I2C	INT14
 #define IRQ_EMAC        INT6
 
 

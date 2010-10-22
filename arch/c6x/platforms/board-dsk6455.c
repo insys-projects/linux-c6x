@@ -128,6 +128,90 @@ static int setup_emac(void)
 static inline int setup_emac(void) { return 0; }
 #endif
 
+#ifdef CONFIG_I2C
+static struct at24_platform_data at24_eeprom_data = {
+	.byte_len	= 0x100000 / 8,
+	.page_size	= 256,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
+static struct i2c_board_info dsk_i2c_info[] = {
+#ifdef CONFIG_EEPROM_AT24
+	{ I2C_BOARD_INFO("24c1024", 0x50),
+	  .platform_data = &at24_eeprom_data,
+	},
+#endif
+};
+
+static void __init dsk_setup_i2c(void)
+{
+	i2c_register_board_info(1, dsk_i2c_info,
+				ARRAY_SIZE(dsk_i2c_info));
+}
+#else
+#define dsk_setup_i2c()
+#endif /* CONFIG_I2C */
+
+static struct pll_data pll1_data = {
+	.num       = 1,
+	.phys_base = ARCH_PLL1_BASE,
+};
+
+static struct clk clkin1 = {
+	.name = "clkin1",
+	.rate = 50000000,
+};
+
+static struct clk pll1_clk = {
+	.name = "pll1",
+	.parent = &clkin1,
+	.pll_data = &pll1_data,
+	.flags = CLK_PLL | PLL_HAS_PREDIV,
+};
+
+static struct clk pll1_sysclk2 = {
+	.name = "pll1_sysclk2",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 3,
+};
+
+static struct clk pll1_sysclk3 = {
+	.name = "pll1_sysclk3",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 6,
+};
+
+static struct clk pll1_sysclk4 = {
+	.name = "pll1_sysclk4",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL,
+	.div = PLLDIV4,
+};
+
+static struct clk pll1_sysclk5 = {
+	.name = "pll1_sysclk5",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL,
+	.div = PLLDIV5,
+};
+
+static struct clk i2c_clk = {
+	.name = "i2c",
+	.parent = &pll1_sysclk3,
+};
+
+static struct clk_lookup evm_clks[] = {
+	CLK(NULL, "pll1", &pll1_clk),
+	CLK(NULL, "pll1_sysclk2", &pll1_sysclk2),
+	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
+	CLK(NULL, "pll1_sysclk4", &pll1_sysclk4),
+	CLK(NULL, "pll1_sysclk5", &pll1_sysclk5),
+	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK("", NULL, NULL)
+};
+
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
@@ -146,6 +230,7 @@ void c6x_board_setup_arch(void)
 	/* Map our IRQs */
 	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
 	irq_map(IRQ_EMACINT, IRQ_EMAC);
+	irq_map(IRQ_I2CINT, IRQ_DAVINCI_I2C);
 
 	/* Initialize led register */
 	cpld_set_reg(DSK6455_CPLD_USER, 0x0);
@@ -153,11 +238,14 @@ void c6x_board_setup_arch(void)
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
-	mach_progress(1, "End of EVM6486 specific initialization");
+	c6x_clk_init(evm_clks);
+
+	mach_progress(1, "End of DSK6455 specific initialization");
 }
 
 static int __init evm_init(void)
 {
+	dsk_setup_i2c();
         return setup_emac();
 }
 
