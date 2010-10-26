@@ -362,7 +362,7 @@ static void init_power(void)
 	*(volatile unsigned int *)  PSC_MDCTL6 |= 0x00000103; /* SRIO */
 #endif /* CONFIG_RAPIDIO_TCI648X */
 
-	*(int *)  PSC_PTCMD  |= 0x00000001;
+	*(volatile unsigned int *)  PSC_PTCMD  |= 0x00000001;
 
 #endif/* CONFIG_SOC_TMS320C6472 */
 }
