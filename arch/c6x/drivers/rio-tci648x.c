@@ -2670,6 +2670,7 @@ static int tci648x_rio_setup_controller(struct platform_device *pdev)
 	tci648x_rio_start();
 	
 	while(ports) {
+		int status;
 		u32 port = __ffs(ports);
 		ports &= ~(1 << port);
 		
@@ -2678,9 +2679,9 @@ static int tci648x_rio_setup_controller(struct platform_device *pdev)
 		if (res < 0)
 			goto out;
 		
-		res = tci648x_rio_port_status(port);
-		if (res == 0) {
-				/* Register this port  */
+		status = tci648x_rio_port_status(port);
+		if (status == 0) {
+			/* Register this port  */
 			res = tci648x_rio_register_mport(port, hostid, init);
 			if (res)
 				goto out;
