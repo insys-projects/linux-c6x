@@ -28,7 +28,7 @@ int sgmii_reset(void)
 	return 0;
 }
 
-int sgmii_config(struct sgmii_config *config)
+int sgmii_config(struct sgmii_config_s *config)
 {
 	unsigned int i, val1 = 0, val2 = 0;
 

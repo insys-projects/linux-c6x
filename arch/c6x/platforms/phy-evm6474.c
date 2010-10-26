@@ -1,5 +1,5 @@
 /*
- *  linux/arch/c6x/mach-evm6488/phy-evm6474.c
+ *  linux/arch/c6x/platforms/phy-evm6474.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
@@ -65,7 +65,7 @@ int phy_init(void) {
 	return 0;
 }
 
-int evm6488_phy_init(void) {
+int evm6474_phy_init(void) {
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
@@ -74,7 +74,7 @@ int evm6488_phy_init(void) {
 	sgmiic.master    = 1;
 	sgmiic.loopback  = 0;
 	sgmiic.autoneg   = 0;
-	sgmiic.txconfig  = 0x00000ea3;
+	sgmiic.txconfig  = 0x00000ea3; /* EVMC6474 board is wired up with TX differential +/- swapped. */
 	sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode TX swapped */
 	sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
 
@@ -85,4 +85,4 @@ int evm6488_phy_init(void) {
 	return 0;
 }
 
-module_init(evm6488_phy_init);
+module_init(evm6474_phy_init);

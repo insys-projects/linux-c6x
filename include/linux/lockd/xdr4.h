@@ -15,7 +15,7 @@
 #include <linux/lockd/xdr.h>
 
 /* error codes new to NLMv4 */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 #define	nlm4_deadlock		__constant_cpu_to_be32(NLM_DEADLCK)
 #define	nlm4_rofs		__constant_cpu_to_be32(NLM_ROFS)
 #define	nlm4_stale_fh		__constant_cpu_to_be32(NLM_STALE_FH)

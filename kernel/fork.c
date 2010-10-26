@@ -220,7 +220,7 @@ void __init fork_init(unsigned long mempages)
 		init_task.signal->rlim[RLIMIT_NPROC];
 }
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 int arch_dup_task_struct(struct task_struct *dst,
 			 struct task_struct *src)
 {
@@ -1333,7 +1333,7 @@ fork_out:
 	return ERR_PTR(retval);
 }
 
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 noinline struct pt_regs * __cpuinit idle_regs(struct pt_regs *regs)
 {
 	memset(regs, 0, sizeof(struct pt_regs));

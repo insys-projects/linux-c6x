@@ -35,32 +35,49 @@
  * These will be re-linked against their real values
  * during the second link stage.
  */
+#ifdef CONFIG_TI_C6X_COMPILER
 const unsigned long kallsyms_addresses[] __weak;
 const u8 kallsyms_names[] __weak;
+#else
+extern const unsigned long kallsyms_addresses[] __attribute__((weak));
+extern const u8 kallsyms_names[] __attribute__((weak));
+#endif
 
 /*
  * Tell the compiler that the count isn't in the small data section if the arch
  * has one (eg: FRV).
  */
+#ifdef CONFIG_TI_C6X_COMPILER
 const unsigned long kallsyms_num_syms
-#ifdef __TI_TOOL_WRAPPER__
 __attribute__((section(".rodata")));
 #else
+extern const unsigned long kallsyms_num_syms
 __attribute__((weak, section(".rodata")));
 #endif
 
+#ifdef CONFIG_TI_C6X_COMPILER
 const u8 kallsyms_token_table[] __weak;
 const u16 kallsyms_token_index[] __weak;
 
 const unsigned long kallsyms_markers[] __weak;
+#else
+extern const u8 kallsyms_token_table[] __attribute__((weak));
+extern const u16 kallsyms_token_index[] __attribute__((weak));
 
-#ifdef __TI_TOOL_WRAPPER__
+extern const unsigned long kallsyms_markers[] __attribute__((weak));
+#endif
+
+#ifdef CONFIG_TI_C6X_COMPILER
+const unsigned long kallsyms_markers[] __weak;
+
 asm("\t.weak kallsyms_addresses");
 asm("\t.weak kallsyms_names");
 asm("\t.weak kallsyms_num_syms");
 asm("\t.weak kallsyms_token_table");
 asm("\t.weak kallsyms_token_index");
 asm("\t.weak kallsyms_markers");
+#else
+extern const unsigned long kallsyms_markers[] __attribute__((weak));
 #endif
 
 static inline int is_kernel_inittext(unsigned long addr)

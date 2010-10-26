@@ -222,7 +222,7 @@ bool each_symbol(bool (*fn)(const struct symsearch *arr, struct module *owner,
 			    unsigned int symnum, void *data), void *data)
 {
 	struct module *mod;
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	struct symsearch arr[] = {
 #else
 	const struct symsearch arr[] = {
@@ -2058,7 +2058,7 @@ static noinline struct module *load_module(void __user *umod,
 		goto truncated;
 
 	/* Convenience variables */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	/* TI compiler doesn't align sechdrs in the file */
 	sechdrs = vmalloc(sizeof(Elf_Shdr) * hdr->e_shnum);
 	if (sechdrs == NULL) {
@@ -2458,7 +2458,7 @@ static noinline struct module *load_module(void __user *umod,
 	add_notes_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 
 	/* Get rid of temporary copy */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	vfree(sechdrs);
 #endif
 	vfree(hdr);
@@ -2493,7 +2493,7 @@ static noinline struct module *load_module(void __user *umod,
 	kfree(args);
 	kfree(strmap);
  free_hdr:
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	vfree(sechdrs);
 #endif
 	vfree(hdr);

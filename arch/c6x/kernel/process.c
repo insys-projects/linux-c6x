@@ -42,10 +42,6 @@
 
 #include <mach/board.h>  /* for c6x_arch_idle_led() */
 
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-#endif
-
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 /*
@@ -83,15 +79,11 @@ EXPORT_SYMBOL(pm_idle);
 
 static void default_idle(void)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_NK)
+#if defined(CONFIG_PM)
 	pwrd_set(PWRD_PD1A);
 #endif
-#ifdef CONFIG_NK
-	(void) nkctx->ops.idle(nkctx);
-#else
 #ifndef CONFIG_ARCH_SIM
 	do_idle(); /* do nothing until interrupt */
-#endif
 #endif
 }
 
@@ -300,7 +292,7 @@ asmlinkage int c6x_clone(struct pt_regs *regs)
 	else
 		newsp = regs->sp;
 
-	return do_fork(clone_flags, newsp, regs, 0, regs->a6, regs->b6);
+	return do_fork(clone_flags, newsp, regs, 0, (int __user *)regs->a6, (int __user *)regs->b6);
 }
 
 /*
@@ -360,25 +352,6 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 }
 
 /*
- * fill in the user structure for a core dump..
- */
-void dump_thread(struct pt_regs * regs, struct user * dump)
-{
-	/* changed the size calculations - should hopefully work better. lbt */
-	dump->magic = CMAGIC;
-	dump->start_code = 0;
-	dump->start_stack = regs->sp & ~(PAGE_SIZE - 1);
-	dump->u_tsize = ((unsigned long) current->mm->end_code) >> PAGE_SHIFT;
-	dump->u_dsize = ((unsigned long) (current->mm->brk +
-					  (PAGE_SIZE-1))) >> PAGE_SHIFT;
-	dump->u_dsize -= dump->u_tsize;
-	dump->u_ssize = 0;
-	dump->u_ar0 = (struct pt_regs *)(((int)(&dump->regs)) - ((int)(dump)));
-	dump->regs = *regs;
-	dump->regs2 = ((struct switch_stack *)regs)[-1];
-}
-
-/*
  * c6x_execve() executes a new program.
  */
 extern int do_execve(char *, char **, char **, struct pt_regs *);
@@ -400,22 +373,6 @@ out:
 }
 
 /*
- * c6x_exec_memobj() executes a new program already store in a memory space (special feature).
- */
-#ifdef CONFIG_BINFMT_MEM
-#include <asm/binfmt_mem.h>
-extern int do_exec_memobj(struct memobj_frm_struct *, char **, char **, struct pt_regs *);
-asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char **envp, struct pt_regs *regs)
-{
-	return (do_exec_memobj(exe, argv, envp, regs));
-}
-#else
-asmlinkage int c6x_exec_memobj(struct memobj_frm_struct *exe, char **argv, char **envp, struct pt_regs *regs)
-{
-	return -ENOSYS;
-}
-#endif
-/*
  * These bracket the sleeping functions..
  */
 extern void scheduling_functions_start_here(void);
@@ -430,6 +387,7 @@ unsigned long __kstk_eip(struct task_struct *p)
 
 unsigned long get_wchan(struct task_struct *p)
 {
+#if 0
 	unsigned long fp, pc;
 	unsigned long stack_page;
 	int count = 0;
@@ -438,6 +396,6 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
  
 	/* TO BE DONE */
-
+#endif
 	return 0;
 }

@@ -69,10 +69,30 @@
 #define IRQ_AEASYNCERR    18  /* EMIFA error event */
 #define IRQ_RIOINT0       20  /* RapidIO events */
 #define IRQ_RIOINT1       21
+#if defined(CONFIG_SOC_TMS320C6455)
 #define IRQ_RIOINT4       22
+#endif
+#if defined(CONFIG_SOC_TMS320C6457)
+#define IRQ_RIOINT2       23
+#define IRQ_RIOINT3       24
+#endif
 #define IRQ_EDMA3CCGINT   24  /* EDMA channel completion event */
+#if defined(CONFIG_SOC_TMS320C6457)
+#define IRQ_MACRXINT      25
+#define IRQ_MACTXINT      26
+#define IRQ_MACTHRESH     27
+#define IRQ_RIOINT4       28
+#define IRQ_RIOINT5       28
+#define IRQ_RIOINT6       28
+#endif
 #define IRQ_VCP2INT       32  /* VCP2 error event */
+#if defined(CONFIG_SOC_TMS320C6455)
 #define IRQ_TCP2INT       33  /* TCP2 error event */
+#endif
+#if defined(CONFIG_SOC_TMS320C6457)
+#define IRQ_TCP2AINT      33  /* TCP2 error event */
+#define IRQ_TCP2BINT      34  /* TCP2 error event */
+#endif
 #define IRQ_UINT          36  /* UTOPIA event */
 #define IRQ_RINT0         40  /* McBSP event */
 #define IRQ_XINT0         41
@@ -114,8 +134,23 @@
 #define IRQ_EDMA3C1ERRINT 82
 #define IRQ_EDMA3C2ERRINT 83
 #define IRQ_EDMA3C3ERRINT 84
+#if defined(CONFIG_SOC_TMS320C6457)
+#define IRQ_EDMA3CCAET    85
+#define IRQ_EDMA3C4ERRINT 86
+#define IRQ_EDMA3C5ERRINT 86
+#define IRQ_ETBOVFLINT    94
+#define IRQ_ETBUNFLINT    95
+#endif
 #define IRQ_INTERR        96  /* interrupt controller dropped CPU interrupt event */
 #define IRQ_EMCIDMAERR    97  /* EMC invalid IDMA parameters */
+#if defined(CONFIG_SOC_TMS320C6457)
+#define IRQ_EFIINTA       100
+#define IRQ_EFIINTB       101
+#define IRQ_L1PED1        113
+#define IRQ_L1ED1         116
+#define IRQ_L2ED1         117
+#define IRQ_PDCINT        118
+#endif
 #define IRQ_L1PCMPA       120 /* L1P CPU memory protection fault */
 #define IRQ_L1PDMPA       121 /* L1P DMA memory protection fault */
 #define IRQ_L1DCMPA       122 /* L1D CPU memory protection fault */

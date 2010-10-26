@@ -84,10 +84,12 @@ void *c6x_tag_find(struct tag_header *atag, unsigned int tag)
 
 int c6x_tags_are_valid(struct tag_header *atag)
 {
-	struct tag_header *next;
-
-	if (atag && atag->tag != TAG_SOL || atag->size)
+	if (!atag)
 		return 0;
+
+	if (atag->tag != TAG_SOL || atag->size)
+		return 0;
+
 	return 1;
 }
 

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -18,6 +18,8 @@
 #include <linux/mm.h>
 #include <asm/io.h>
 #include <asm/types.h>
+#include <asm/pgtable.h>
+#include <linux/scatterlist.h>
 #include <asm/scatterlist.h>
 
 /*
@@ -65,7 +67,7 @@ extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t
  * References to the memory and mappings associated with cpu_addr/dma_addr
  * past this call are illegal.
  */
-extern inline void
+static inline void
 pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
 		    dma_addr_t dma_handle)
 {
@@ -78,7 +80,7 @@ pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-extern inline dma_addr_t
+static inline dma_addr_t
 pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 {
 	consistent_sync(ptr, size, direction);
@@ -92,7 +94,7 @@ pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
  * After this call, reads by the cpu to the buffer are guarenteed to see
  * whatever the device wrote there.
  */
-extern inline void
+static inline void
 pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction)
 {
 	/* nothing to do */
@@ -113,7 +115,7 @@ pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int di
  * Device ownership issues as mentioned above for pci_map_single are
  * the same here.
  */
-extern inline int
+static inline int
 pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
 {
 	int i;
@@ -130,7 +132,7 @@ pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int directi
  * Again, cpu read rules concerning calls here are the same as for
  * pci_unmap_single() above.
  */
-extern inline void
+static inline void
 pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
 {
 	/* nothing to do */
@@ -145,7 +147,7 @@ pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direc
  * next point you give the PCI dma address back to the card, the
  * device again owns the buffer.
  */
-extern inline void
+static inline void
 pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
 {
 	consistent_sync(bus_to_virt(dma_handle), size, direction);
@@ -157,7 +159,7 @@ pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, i
  * The same as pci_dma_sync_single but for a scatter-gather list,
  * same rules and usage.
  */
-extern inline void
+static inline void
 pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	int i;

@@ -96,6 +96,18 @@ config CMDLINE
 config RAM_ATTACHED_ROMFS
 	bool "m68knommu-style attached romfs in RAM support"
 
+config TI_C6X_COMPILER
+       bool "Build using Texas Instruments compiler"
+       help
+	  Say Y if you are using the Texas Instruments compiler rather
+	  than GCC.
+
+config TI_C6X_LINKER
+       bool "Build using Texas Instruments linker"
+       depends on TI_C6X_COMPILER
+       help
+	  Say Y if you are using the Texas Instruments linker rather than GCC.
+
 config CPU_BIG_ENDIAN
 	bool "Build big-endian kernel"
 	help
@@ -137,8 +149,8 @@ config USE_RT_TIMER
 	default n
 
 config SGMII
-	bool "SGMII support"
-	default y if SOC_TMS320C6474
+	bool "Ethernet SGMII support"
+	default n
 
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
@@ -203,6 +215,7 @@ config TMS320C6X_SYSCALL_COMPAT
 config PAGE_OFFSET
 	hex "Virtual address of memory base"
 	default 0xe0000000 if SOC_TMS320C6455
+	default 0xe0000000 if SOC_TMS320C6457
 	default 0xe0000000 if SOC_TMS320C6472
 	default 0x80000000
 
@@ -216,6 +229,7 @@ config PGCACHE_LIMIT
 
 config IDLE_LED
        bool "Use LED activity indicator based on idle loop"
+       depends on !(MTD_NAND_EVM6488 && (ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6457))
        default n
 
 source "mm/Kconfig"
@@ -241,20 +255,6 @@ config PCI
 endmenu
 
 menu "Executable file formats"
-
-config BINFMT_COFF
-	bool "Kernel support for COFF binaries"
-
-config BINFMT_COFF_INFLATE
-	bool "Support for compressed COFF binaries"
-	depends on BINFMT_COFF
-	select ZLIB_INFLATE
-	default n
-
-config BINFMT_COFF_USE_SHLIBS
-    bool "Support for COFF shared and dynamic libraries"
-    depends on BINFMT_COFF
-    default n
 
 source "fs/Kconfig.binfmt"
 

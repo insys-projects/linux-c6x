@@ -25,8 +25,8 @@
 /*
  * Timer definitions
  */
-#define LINUX_TIMER_SRC (TIMER_5 - get_coreid())
-#define LINUX_TIMER_EVT (IRQ_TINT5 - (get_coreid() << 1))
+#define LINUX_TIMER_SRC TIMER_5
+#define LINUX_TIMER_EVT IRQ_TINT5
 
 /*
  * Interrupt Assignments

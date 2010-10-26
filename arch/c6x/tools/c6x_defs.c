@@ -15,10 +15,6 @@
 #include <asm/page.h>
 #include <asm/processor.h>
 
-#ifdef CONFIG_NK
-#include <asm/nk/f_nk.h>
-#endif
-
 #define DEFINE(sym, val) unsigned long sym = val
 
 int main(void)
@@ -35,9 +31,5 @@ int main(void)
 	/* offsets into the thread_info struct */
 	DEFINE(PREEMPT_COUNT, offsetof(struct thread_info, preempt_count));
 
-#ifdef CONFIG_NK
-	/* offsets into the pt_regs struct */
-	DEFINE(PT_REGS, offsetof(NkOsCtx, cpu));
-#endif
 	return 0;
 }

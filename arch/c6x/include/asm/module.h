@@ -26,7 +26,7 @@
  */
 struct mod_arch_specific
 {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
         /* original values of sh_addr (always zero with gcc) */
 	Elf_Addr *sh_addr;
 #endif

@@ -311,21 +311,6 @@ static inline map_word map_word_load(struct map_info *map, const void *ptr)
 {
 	map_word r;
 
-#ifdef __TI_TOOL_WRAPPER__
-        /* Workaround cilly bug with get_unaligned() macro */
-	if (map_bankwidth_is_1(map))
-		r.x[0] = *(unsigned char *)ptr;
-	else if (map_bankwidth_is_2(map))
-		r.x[0] = get_unaligned16((uint16_t *)ptr);
-	else if (map_bankwidth_is_4(map))
-		r.x[0] = get_unaligned32((uint32_t *)ptr);
-#if BITS_PER_LONG >= 64
-	else if (map_bankwidth_is_8(map))
-		r.x[0] = get_unaligned64((uint64_t *)ptr);
-#endif
-	else if (map_bankwidth_is_large(map))
-		memcpy(r.x, ptr, map->bankwidth);
-#else
 	if (map_bankwidth_is_1(map))
 		r.x[0] = *(unsigned char *)ptr;
 	else if (map_bankwidth_is_2(map))
@@ -339,7 +324,6 @@ static inline map_word map_word_load(struct map_info *map, const void *ptr)
 	else if (map_bankwidth_is_large(map))
 		memcpy(r.x, ptr, map->bankwidth);
 
-#endif
 	return r;
 }
 

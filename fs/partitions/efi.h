@@ -87,7 +87,7 @@ typedef struct _gpt_header {
 } __attribute__ ((packed)) gpt_header;
 
 typedef struct _gpt_entry_attributes {
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 	u64 required_to_function:1;
 	u64 reserved:47;
         u64 type_guid_specific:16;

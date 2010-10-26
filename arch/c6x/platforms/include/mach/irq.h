@@ -13,7 +13,7 @@
 #ifndef __MACH_C6X_IRQ_H
 #define __MACH_C6X_IRQ_H
 
-#if defined(CONFIG_SOC_TMS320C6455)
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 #include <mach/irq-c645x.h>
 #elif defined(CONFIG_SOC_TMS320C6472)
 #include <mach/irq-c6472.h>

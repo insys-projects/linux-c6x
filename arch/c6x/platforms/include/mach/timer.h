@@ -17,7 +17,7 @@
 /*
  * Timers register base
  */
-#if defined(CONFIG_SOC_TMS320C6455)
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 #define TIMER_BASE_ADDR   0x02940000
 #define TIMER_CHAN_MULT   0x40000
 #elif defined(CONFIG_SOC_TMS320C6472)
@@ -85,17 +85,7 @@
 #define TIMER_11                     11
 #endif /* defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
 
-#ifndef CONFIG_NK
 #define timer_period(f, d)            (((f) * 1000000) / ((d) * HZ))
 #define ticks2usecs(f, d, x)          (((x) * (d)) / (f))
-#else /* CONFIG_NK */
-#define timer_period(f, d)            (nkctx->boot_info->clocksrc ? \
-			              nkctx->boot_info->clocksrc / HZ : \
-			              ((f) * 1000000) / ((d) * HZ))
-#define ticks2usecs(f, d, x)          (nkctx->boot_info->clocksrc ? \
-			              (x) / (nkctx->boot_info->clocksrc / 1000000): \
-                                      (((x) * (d)) / (f)))
-#endif /* CONFIG_NK */
-
 
 #endif

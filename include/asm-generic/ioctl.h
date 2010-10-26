@@ -79,6 +79,12 @@ extern unsigned int __invalid_size_argument_for_IOC;
 #define _IOC_TYPECHECK(t) (sizeof(t))
 #endif
 
+#ifdef CONFIG_TI_C6X_COMPILER
+/* TI compiler has trouble with this */
+#undef _IOC_TYPECHECK
+#define _IOC_TYPECHECK(t) (sizeof(t))
+#endif
+
 /* used to create numbers */
 #define _IO(type,nr)		_IOC(_IOC_NONE,(type),(nr),0)
 #define _IOR(type,nr,size)	_IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))

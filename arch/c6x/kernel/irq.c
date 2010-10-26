@@ -35,17 +35,6 @@
 
 DECLARE_PER_CPU(struct kernel_stat, kstat);
 
-#ifdef CONFIG_NK
-extern void nk_process_xirq(int irq, void *dev_id, struct pt_regs * regs);
-#endif
-
-/*
- * Software content of IER register
- */
-unsigned int irq_IER;
-
-static spinlock_t irq_lock;
-
 /*
  * Mach dep functions
  */ 
@@ -70,12 +59,6 @@ static struct irq_chip c64x_irq_chip = {
 	.mask		= c64x_mask_irq,
 	.unmask		= c64x_unmask_irq,
 };
-
-
-static void default_irq_handler(int vec, void * id, struct pt_regs * fp)
-{
-	printk("IRQ #%d with default handler\n", vec);
-}
 
 /* The number of spurious interrupts */
 volatile unsigned int num_spurious;
@@ -144,7 +127,7 @@ void irq_set_polarity(unsigned int irq_src, unsigned int polarity)
  */
 void irq_map(unsigned int irq_src, unsigned int cpu_irq)
 {
-	unsigned int offset;
+	unsigned int offset = 0;
 	volatile unsigned int* reg;
 	
 	if (cpu_irq < INT4 || cpu_irq > INT15)
@@ -247,7 +230,7 @@ EXPORT_SYMBOL(cic_map);
 #endif /* CONFIG_TMS320C64XPLUS */
 
 static atomic_t irq_err_count;
-void ack_bad_irq(unsigned int irq)
+void ack_bad_irq(int irq)
 {
 	atomic_inc(&irq_err_count);
 	printk(KERN_ERR "IRQ: spurious interrupt %d\n", irq);
@@ -285,7 +268,7 @@ asmlinkage void c6x_do_IRQ(unsigned int irq, struct pt_regs *regs)
 
 void __init init_IRQ(void)
 {
-	int i, res;
+	int i;
 
 	for (i = 0; i < SYS_IRQS; i++) {
 		irq_mux[i] = -1;
@@ -293,13 +276,6 @@ void __init init_IRQ(void)
 		set_irq_handler(i, handle_level_irq);
 	}
 
-#ifdef CONFIG_NK
-	/* Register INT5 for XIRQ */
-	res = request_irq(INT5, nk_process_xirq, SA_INTERRUPT, "XIRQ", NULL);
-	if (res)
-		printk("XIRQ irq handler not registered\n");
-
-#endif
 	if (mach_init_IRQ != NULL)
 		mach_init_IRQ();
 }
@@ -314,7 +290,7 @@ void __init init_IRQ(void)
 int __init __weak arch_early_irq_init(void)
 {
 	/* clear interrupt flags */
-	ICR = 0xfff0;
+	set_creg(ICR, 0xfff0);
 	local_irq_disable();
 	return 0;
 }

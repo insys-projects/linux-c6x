@@ -17,7 +17,7 @@
 
 #include <asm/types.h>
 
-#ifndef __TI_C6X_COMPILER__
+#ifndef CONFIG_TI_C6X_COMPILER
 
 #ifdef _BIG_ENDIAN
 #include <linux/byteorder/big_endian.h>
@@ -379,6 +379,6 @@ static inline u16 ntohs(u16 x)
 #define htons_const(x) __constant_cpu_to_be16(x)
 #define ntohs_const(x) __constant_be16_to_cpu(x)
 
-#endif /* __TI_C6X_COMPILER__ */
+#endif /* CONFIG_TI_C6X_COMPILER */
 
 #endif /* __ASM_BYTEORDER_H */

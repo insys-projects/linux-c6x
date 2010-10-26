@@ -247,7 +247,11 @@ static inline struct kmem_cache_node *get_node(struct kmem_cache *s, int node)
 static inline int check_valid_pointer(struct kmem_cache *s,
 				struct page *page, const void *object)
 {
+#ifdef CONFIG_TI_C6X_COMPILER
 	char *base;
+#else
+	void *base;
+#endif
 
 	if (!object)
 		return 1;

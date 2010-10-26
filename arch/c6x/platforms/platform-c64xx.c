@@ -47,7 +47,7 @@ static struct resource c6x_soc_res = {
 	"C64X+ SOC peripherals",
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
 	0x01800000, 0x02f60000
-#elif defined (CONFIG_SOC_TMS320C6455)
+#elif defined (CONFIG_SOC_TMS320C6455) || defined (CONFIG_SOC_TMS320C6457)
 	0x01800000, 0x2cffffff
 #else
 #error "No SoC peripheral address space defined"
@@ -247,7 +247,6 @@ char* arch_compute_silicon_rev(u32 silicon_rev)
 }
 #endif
 
-#ifndef CONFIG_NK
 static void init_pll(void)
 {
 	int i;
@@ -312,7 +311,6 @@ static void init_pll(void)
 	pll2_setbit_reg(PLLCTL, PLLCTL_PLLEN);
 #endif
 }
-#endif
 
 static void init_power(void)
 {
@@ -369,20 +367,16 @@ static void init_power(void)
 
 void c6x_soc_setup_arch(void)
 {
-	unsigned long val;
-
  	/* Initialize C64x+ IRQs */          	
-#ifndef CONFIG_NK
 	clear_all_irq(); /* acknowledge all pending irqs */
 
 	init_pll();
-#else
-	irq_IER = 0;
-#endif
 
 	init_power();
 
 #if defined(CONFIG_SOC_TMS320C6474)
+	unsigned long val;
+
 	/* Enable timers and devices (in regs PERLOCK & PERCFG0) */
 	dscr_set_reg(DSCR_PERLOCK, DSCR_LOCKVAL);
 
@@ -410,6 +404,8 @@ void c6x_soc_setup_arch(void)
 #endif /*defined(CONFIG_SOC_TMS320C6472) */
 
 #if defined(CONFIG_SOC_TMS320C6455)
+	unsigned long val;
+
 	/* Enable timers (in regs PERLOCK & PERCFG0) */
 	val = dscr_get_reg(DSCR_PERCFG0);
 	dscr_set_device(val | DSCR_B_PERCFG0_TIMER0 | DSCR_B_PERCFG0_TIMER1, DSCR_PERCFG0);

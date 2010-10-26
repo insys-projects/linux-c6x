@@ -285,7 +285,7 @@ void __init parse_early_options(char *cmdline);
 #define security_initcall(fn)		module_init(fn)
 
 /* Each module must use one module_init(). */
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 #define module_init(initfn)					\
 	static inline initcall_t __inittest(void)		\
 	{ return initfn; }					\

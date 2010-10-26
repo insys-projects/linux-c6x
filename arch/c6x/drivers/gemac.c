@@ -41,6 +41,10 @@
 #define DPRINTK(fmt, args...) 
 #endif
 
+static int emac_open(struct net_device *dev);
+static int emac_close(struct net_device *dev);
+static int emac_reset(struct net_device *dev, int reset_mode);
+
 extern int mdio_init(unsigned int txid_version);
 
 #ifdef EMAC_TIMER_TICK
@@ -231,7 +235,7 @@ static int emac_tx(struct net_device *dev, struct emac_desc *desc_ack)
 			dev->name, desc_ack, desc, (desc_ack - desc));
 
 		if (ep->tx_skbuff[ep->skb_tx_dirty] == NULL) {
-			printk(KERN_ERR "%s: SKB NULL desc =0x%x desc_ack =0x%x, skb_tx_dirty=%d count=%d\n",
+			printk(KERN_ERR "%s: SKB NULL desc =%p desc_ack =%p, skb_tx_dirty=%ld count=%ld\n",
 			       dev->name, desc, desc_ack, ep->skb_tx_dirty, ep->count_tx);
 			break;
 		}
@@ -400,10 +404,10 @@ static void emac_handle_host_interrupt(struct net_device *dev)
 		printk(KERN_ERR "%s: EMAC rx ring full\n", dev->name);
 		ep->stats.rx_fifo_errors++;
 	} else
-		printk(KERN_ERR "%s: EMAC fatal host error 0x%x\n",
+		printk(KERN_ERR "%s: EMAC fatal host error 0x%lx\n",
 		       dev->name, status);
 	
-	DPRINTK("%s: Error head=0x%x desc=0x%x dirty=0x%x skb_tx_dirty=%d count=%d\n",
+	DPRINTK(KERN_ERR "%s: Error head=%p desc=%p dirty=%p skb_tx_dirty=%ld count=%ld\n",
 		dev->name, ep->head_tx, ep->cur_tx,
 		ep->dirty_tx, ep->skb_tx_dirty, ep->count_tx);
 	
@@ -723,7 +727,6 @@ static int emac_reset(struct net_device *dev, int reset_mode)
 {
 	struct emac_private *ep = netdev_priv(dev);
 	volatile u32        *preg;
-	int                  res = 0;
 	int                  i;
 
 	if (!ep->slave) {
@@ -941,7 +944,6 @@ static int emac_close(struct net_device *dev)
 int emac_setup_ring(struct emac_private *ep)
 {
 	struct emac_desc *desc;
-	u8               *buff;
 	int               i;
 	struct sk_buff   *skb;
 
@@ -1340,7 +1342,8 @@ static void emac_set_rx_mode(struct net_device *dev)
  */
 static void emac_timer_tick(struct net_device *dev)
 {
-	struct emac_private *ep = netdev_priv(dev);
+	struct net_device   *dev = (struct net_device *)data;
+	struct emac_private *ep  = netdev_priv(dev);
 	unsigned int link_status;
 	unsigned int link_event = mdio_timer_tick();
 	unsigned int intfmacsel = mdio_get_macsel();
@@ -1418,11 +1421,12 @@ static int __init emac_probe(struct platform_device *pdev)
 {
 	struct net_device      *netdev;
 	struct emac_private    *ep;
-	unsigned long           val;
 	int                     res = -EINVAL;
 	int                     i;
 	int                     err;
+#ifdef EMAC_ARCH_HAS_MAC_ADDR
 	char                    hw_emac_addr[6];
+#endif
 	struct resource        *cur_res;
 	static int              ndevs = 0;
 	int                     irq        = 0;

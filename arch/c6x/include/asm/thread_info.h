@@ -33,6 +33,8 @@
 
 #ifndef __ASSEMBLY__
 
+typedef unsigned long mm_segment_t;
+
 /*
  * low level task data.
  */

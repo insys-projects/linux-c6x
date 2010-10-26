@@ -294,7 +294,7 @@ static inline void log_buf_kexec_setup(void)
 extern int printk_needs_cpu(int cpu);
 extern void printk_tick(void);
 
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 extern void asmlinkage __attribute__((format(printf, 1, 2)))
 #else
 extern void asmlinkage
@@ -710,9 +710,15 @@ static inline void ftrace_dump(void) { }
  * @member:	the name of the member within the struct.
  *
  */
+#ifdef CONFIG_TI_C6X_COMPILER
+#define container_of(ptr, type, member) ({		\
+	typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+#else
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
+#endif
 
 struct sysinfo;
 extern int do_sysinfo(struct sysinfo *info);
@@ -743,6 +749,17 @@ struct sysinfo {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
+#ifdef CONFIG_TI_C6X_COMPILER
+/* TI toolchain has problems with these */
+#define BUILD_BUG_ON(condition)
+#define MAYBE_BUILD_BUG_ON(cond)
+
+/* Force a compilation error if a constant expression is not a power of 2 */
+#define BUILD_BUG_ON_NOT_POWER_OF_2(n)
+
+#define BUILD_BUG_ON_ZERO(e) (sizeof(struct { }))
+#define BUILD_BUG_ON_NULL(e) ((void *)sizeof(struct { }))
+#else
 /* Force a compilation error if condition is true */
 #define BUILD_BUG_ON(condition) ((void)BUILD_BUG_ON_ZERO(condition))
 
@@ -759,6 +776,7 @@ struct sysinfo {
    aren't permitted). */
 #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:-!!(e); }))
 #define BUILD_BUG_ON_NULL(e) ((void *)sizeof(struct { int:-!!(e); }))
+#endif
 
 /* Trap pasters of __FUNCTION__ at compile-time */
 #define __FUNCTION__ (__func__)

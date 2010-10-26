@@ -121,7 +121,7 @@ struct emac_config {
                 (w) = stat;			\
         } while(0)
 
-#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
 #define ectl_setbit_reg(reg, val)					\
         *((volatile u32 *) (ep->ectl_reg_base + (reg))) |= (u32) (val)
 	    
@@ -135,16 +135,10 @@ struct emac_config {
         *((volatile u32 *) (ep->ectl_reg_base + (reg)))
 
 /* Value for interrupt pacing: (CPUCLK/6) / 250000 (1/4us) = 0x29a on 1GHz DSP */
-#ifndef CONFIG_NK
 #define gemac_int_prescaler()					\
         (((CONFIG_TMS320C6X_MHZ * (1000000 / 6)) / 250000))
-#else /* CONFIG_NK */
-#define gemac_int_prescaler()				   \
-        (nkctx->boot_info->clocksrc ?			   \
-         ((nkctx->boot_info->clocksrc / 6) / 250000) :	   \
-	 ((CONFIG_TMS320C6X_MHZ * (1000000 / 6)) / 250000))
-#endif /* CONFIG_NK */
-#endif /* defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
+
+#endif /* defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
 
 #include <mach/gemac.h>
 

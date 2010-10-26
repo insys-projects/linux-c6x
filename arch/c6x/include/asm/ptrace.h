@@ -196,9 +196,9 @@
 #ifndef __ASSEMBLY__
 
 #ifdef _BIG_ENDIAN
-#define REG_PAIR(odd,even) int odd; int even
+#define REG_PAIR(odd,even) unsigned long odd; unsigned long even
 #else
-#define REG_PAIR(odd,even) int even; int odd
+#define REG_PAIR(odd,even) unsigned long even; unsigned long odd
 #endif
 
 /*
@@ -273,8 +273,8 @@ struct switch_stack {
 	REG_PAIR(b11,b10);
 	REG_PAIR(b13,b12);
 
-	int retpc;
-	int pad;
+	unsigned long retpc;
+	unsigned long pad;
 };
 
 /* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
@@ -289,7 +289,8 @@ struct switch_stack {
                                                 /* used in /include/asm/processor.h*/
 
 #ifndef CONFIG_TMS320C64XPLUS
-#define user_mode(regs)           (((((regs)->sp) ^ (get_sp())) >> PAGE_SHIFT) != 0)
+extern unsigned long current_ksp;
+#define user_mode(regs)           (((((regs)->sp) ^ current_ksp) >> PAGE_SHIFT) != 0)
 #else
 #define user_mode(regs)           ((((regs)->tsr) & 0x40) != 0)
 #endif

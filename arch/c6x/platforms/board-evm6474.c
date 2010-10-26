@@ -39,9 +39,6 @@
 
 #include <mach/board.h>
 
-static void dummy_print_dummy(char *s, unsigned long hex) {}
-static void dummy_progress(unsigned int step, char *s) {}
-
 #ifdef CONFIG_RAPIDIO_TCI648X
 #include <linux/rio.h>
 #include <asm/rio.h>
@@ -68,6 +65,85 @@ static void __init evm_init_rio(void)
 core_initcall(evm_init_rio);
 #endif
 
+static struct pll_data pll1_data = {
+	.num       = 1,
+	.phys_base = ARCH_PLL1_BASE,
+};
+
+static struct clk clkin1 = {
+	.name = "clkin1",
+	.rate = 61440000,
+};
+
+static struct clk pll1_clk = {
+	.name = "pll1",
+	.parent = &clkin1,
+	.pll_data = &pll1_data,
+	.flags = CLK_PLL,
+};
+
+static struct clk pll1_sysclk7 = {
+	.name = "pll1_sysclk7",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 1,
+};
+
+static struct clk pll1_sysclk9 = {
+	.name = "pll1_sysclk9",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 3,
+};
+
+static struct clk pll1_sysclk10 = {
+	.name = "pll1_sysclk10",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 6,
+};
+
+static struct clk pll1_sysclk11 = {
+	.name = "pll1_sysclk11",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL,
+	.div = PLLDIV11,
+};
+
+static struct clk pll1_sysclk12 = {
+	.name = "pll1_sysclk12",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 2,
+};
+
+static struct clk pll1_sysclk13 = {
+	.name = "pll1_sysclk13",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL,
+	.div = PLLDIV13,
+};
+
+static struct clk i2c_clk = {
+	.name = "i2c",
+	.parent = &pll1_sysclk10,
+};
+
+static struct clk_lookup evm_clks[] = {
+	CLK(NULL, "pll1", &pll1_clk),
+	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
+	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
+	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
+	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),
+	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
+	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
+	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK("", NULL, NULL)
+};
+
+static void dummy_print_dummy(char *s, unsigned long hex) {}
+static void dummy_progress(unsigned int step, char *s) {}
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -80,7 +156,7 @@ void c6x_board_setup_arch(void)
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
-//	c6x_clk_init(evm_clks);
+	c6x_clk_init(evm_clks);
 
 	mach_progress(1, "End of EVM6474 specific initialization");
 }

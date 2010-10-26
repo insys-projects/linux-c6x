@@ -234,6 +234,7 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
 	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK(NULL, NULL, NULL)
 };
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
@@ -267,9 +268,10 @@ void c6x_board_setup_arch(void)
 	mach_progress(1, "End of EVM6472 specific initialization");
 }
 
-__init void evm_init(void)
+__init int evm_init(void)
 {
 	evm_setup_i2c();
+	return 0;
 }
 
 arch_initcall(evm_init);

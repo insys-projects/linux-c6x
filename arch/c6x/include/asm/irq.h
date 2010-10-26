@@ -69,4 +69,6 @@
 #define CIC14		    14
 #define CIC15		    15
 
+extern void irq_map(unsigned int irq_src, unsigned int cpu_irq);
+
 #endif /* __ASM_C6X_IRQ_H_ */

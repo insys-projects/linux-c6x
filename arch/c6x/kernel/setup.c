@@ -46,11 +46,6 @@
 
 #include <mach/board.h>
 
-#ifdef CONFIG_NK
-#include <asm/nkern.h>
-extern void nk_ddi_init(void);
-#endif
-
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/initrd.h>
 #include <asm/pgtable.h>
@@ -58,14 +53,16 @@ extern void nk_ddi_init(void);
 
 #include "tags.h"
 
-extern unsigned int _stext, _etext, _edata, _bss_start, _bss_end;
+extern unsigned int  _stext, _etext, _edata, _bss_start, _bss_end;
+extern unsigned long zone_dma_start, zone_dma_size;
+
 unsigned int memory_start, memory_end; 
 unsigned int c6x_early_uart_cons = 0;
-extern unsigned long zone_dma_start, zone_dma_size;
+
 static char c6x_command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
-static const char *cpu_name, *cpu_rev, *cpu_voltage, *mmu, *fpu, *soc_rev;
-static char __cpu_rev[4];
+static const char *cpu_name, *cpu_voltage, *mmu, *fpu, *soc_rev;
+static char __cpu_rev[5], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
 #ifdef CONFIG_TMS320C64XPLUS
 static unsigned int cpu_num = 0;
@@ -105,13 +102,13 @@ static unsigned long dummy_gettimeoffset(void)
 
 unsigned long (*mach_gettimeoffset)(void) = dummy_gettimeoffset;;
 
-void get_cpuinfo()
+void get_cpuinfo(void)
 {
-	extern cregister volatile unsigned int CSR;
-	unsigned long cpu_id, rev_id;
+	unsigned cpu_id, rev_id, csr;
 
-	cpu_id = CSR >> 24;
-	rev_id = (CSR >> 16) & 0xff;
+	csr = get_creg(CSR);
+	cpu_id = csr >> 24;
+	rev_id = (csr >> 16) & 0xff;
 
 	mmu         = "none";
 	cpu_voltage = "unknown";
@@ -179,14 +176,14 @@ void get_cpuinfo()
 		}
 	} else {
 		cpu_rev = __cpu_rev;
-		sprintf(cpu_rev, "0x%x", cpu_id);
+		snprintf(__cpu_rev, sizeof(__cpu_rev), "0x%x", cpu_id);
 	}
 
 #ifndef CONFIG_TMS320C64XPLUS
 	printk("CPU: %s revision %s core voltage %s\n",
 	       cpu_name, cpu_rev, cpu_voltage);
 #else
-	cpu_num = (unsigned int) (DNUM & 0xff);
+	cpu_num = get_creg(DNUM) & 0xff;
 	printk("CPU: %s revision %s core voltage %s core number %d\n",
 	       cpu_name, cpu_rev, cpu_voltage, cpu_num);
 #endif
@@ -202,7 +199,7 @@ void get_cpuinfo()
 /*
  * L1 and L2 caches configuration
  */
-static void cache_init()
+static void cache_init(void)
 {
 	/* Set L2 caches on the the whole L2 SRAM memory */
 	L2_cache_set_mode(L2MODE_SIZE);
@@ -232,6 +229,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			goto next_char;
 
 		if (!memcmp(from, "mem=", 4)) {
+			unsigned long mem_size;
+
 			if (to != c6x_command_line)
 				to--;
 			
@@ -243,11 +242,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			unsigned long mem_size;
 			
 			mem_size = (unsigned long) memparse(from + 4, &from);
-#ifndef CONFIG_NK
 			memory_end = PAGE_ALIGN(REGION_START(memory_start) + mem_size);
-#else
-			memory_end = PAGE_ALIGN(REGION_START(nkctx->mem.memstart) + mem_size);
-#endif
+
 			userdef = 1;
 		}
 
@@ -357,7 +353,6 @@ void __init setup_arch(char **cmdline_p)
 	if (!c6x_tags_are_valid(c6x_tags_pointer))
 		c6x_tags_pointer = NULL;
 
-#ifndef CONFIG_NK
 	/* interrupts must be masked */
 	local_irq_disable();
 
@@ -377,9 +372,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_PM
 	pwr_pdctl_set(PWR_PDCTL_ALL);
 #endif
-#else  /* CONFIG_NK */
-	NkLinuxPrivate* private = (NkLinuxPrivate*) nkctx->private;
-#endif /* CONFIG_NK */
 
   	/* Call SOC configuration function */
 	c6x_soc_setup_arch();
@@ -406,13 +398,7 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = PAGE_ALIGN((unsigned int) &_bss_end);
 #endif  
 
-#ifndef CONFIG_NK
 	memory_end   = PAGE_ALIGN((unsigned int) memory_start + BOARD_RAM_SIZE);
-#else
-	memory_end   = PAGE_ALIGN((unsigned int) nkctx->mem.memstart +
-				  (unsigned int) nkctx->mem.memsize);
-#endif
-
 	memory_size  = (memory_end - memory_start);
 
 	mach_print_value("memory_start:", memory_start);
@@ -437,15 +423,7 @@ void __init setup_arch(char **cmdline_p)
 
 	strlcpy(tmp_command_line, default_command_line, COMMAND_LINE_SIZE);
 
-#ifdef CONFIG_NK
-	/* Get eventually the command line given by the primary OS */
-	if (private->cmdline[0])
-		*cmdline_p = (char *) &(private->cmdline);
-	else
-		*cmdline_p = tmp_command_line;
-#else
 	*cmdline_p = tmp_command_line;
-#endif /* CONFIG_NK */
 
 	/* Let cmdline passed through tag array override CONFIG_CMDLINE */
 	tcmd = c6x_tag_find(c6x_tags_pointer, TAG_CMDLINE);
@@ -456,7 +434,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set(&_stext, memory_end);
+	cache_set((unsigned long)&_stext, memory_end);
 
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the
@@ -481,7 +459,7 @@ void __init setup_arch(char **cmdline_p)
 		if (c6x_platram_start < (memory_start + bootmap_size) ||
 		    (c6x_platram_start + c6x_platram_size) > memory_end) {
 			printk(KERN_ERR "Invalid platram= argument. Out of range %p - %p!\n",
-			       memory_start, memory_end);
+			       (void *)memory_start, (void *)memory_end);
 			c6x_platram_size = 0;
 		} else
 			reserve_bootmem(c6x_platram_start, c6x_platram_size, BOOTMEM_DEFAULT);
@@ -496,10 +474,10 @@ void __init setup_arch(char **cmdline_p)
 		}
 		else {
 			printk(KERN_ERR "initrd is not contained in normal memory\n"
-			       "initrd=(0x%08lx:0x%08lx) normal_mem=(0x%08lx:0x%08lx)\n"
+			       "initrd=(0x%08lx:0x%08lx) normal_mem=(%p:%p)\n"
 			       "disabling initrd\n",
 			       initrd_start, initrd_start + initrd_size,
-			       memory_start, memory_end);
+			       (void *)memory_start, (void *)memory_end);
 			initrd_start = 0;
 		}
 	}
@@ -513,13 +491,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	mach_progress(7, "Initializing paging");
 	paging_init();
-
-#ifdef CONFIG_NK
-	/*
-	 * Initialize NK-DDI
-	 */
-	nk_ddi_init();
-#endif
 
 	mach_progress(8, "End of C6x arch dep initialization");
 

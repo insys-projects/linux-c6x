@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -20,23 +20,11 @@
  */
 #include <asm/setup.h>
 
-#ifndef __ASSEMBLY__
 /*
  * Change virtual addresses to physical addresses and vv.
  */
-extern unsigned long mm_vtop(unsigned long addr);
-extern unsigned long mm_ptov(unsigned long addr);
-
-static inline unsigned long virt_to_phys(volatile void * address)
-{
-	return (unsigned long) mm_vtop((unsigned long)address);
-}
-
-static inline void * phys_to_virt(unsigned long address)
-{
-	return (void *) mm_ptov(address);
-}
-#endif /*__ASSEMBLER__*/
+#define virt_to_phys(virt) ((unsigned long) (virt))
+#define phys_to_virt(phys) ((void *)(phys))
 
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt

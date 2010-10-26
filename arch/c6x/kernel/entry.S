@@ -6,61 +6,68 @@
 ;  Copyright (C) 2004, 2005, 2006, 2009, 2010 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
 ;  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
-;  
+;
 ;  This program is free software; you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License version 2 as
 ;  published by the Free Software Foundation.
 ;
 
+#ifdef CONFIG_TI_C6X_COMPILER
+#define _DEFINE_MACRO(name,args...) name .macro args
+
+#define THREAD_SHIFT	  KTHREAD_SHIFT
+#define THREAD_START_SP	  KTHREAD_START_SP
+
 		.include	"c6x_defs.inc"
 		.include	"c6x_config.inc"
-		.include	"cnames.inc"
+#else
+	.altmacro
+#define _DEFINE_MACRO(name,args...) .macro name args
 
-	;; Registers naming
-DP			.set	B14
-FP			.set	A15
-SP			.set	B15
-	
-	;; Constants
-INT_SYSCALL		.set	6	; interrupt used for system call
+#include <linux/sys.h>
+#include <linux/linkage.h>
+#include <asm/thread_info.h>
+#include <asm/asm-offsets.h>
+#endif
 
-	.if (CONFIG_TMS320C64X == 1)
-HAVE_32_REGS .set 1
-	.elseif (CONFIG_TMS320C64XPLUS == 1)
-HAVE_32_REGS .set 1
-	.else
-HAVE_32_REGS .set 0
-	.endif
+; Registers naming
+#define DP	B14
+#define FP	A15
+#define SP	B15
 
-	.if (CONFIG_PREEMPT == 0)
-	.asg restore_all,resume_kernel
-	.endif
+#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)
+#define HAVE_32_REGS 1
+#endif
+
+#ifndef CONFIG_PREEMPT
+#define resume_kernel restore_all
+#endif
 
 	;; Entry management functions
-		.def 	resume
-		.def 	ret_from_exception
-		.def 	ret_from_interrupt
+		.global	resume
+		.global	ret_from_exception
+		.global	ret_from_interrupt
 
 	;; Interrupt handlers
-		.def 	_int4_handler
-		.def 	_int5_handler
-		.def 	_int7_handler
-		.def 	_int8_handler
-		.def 	_int9_handler
-		.def 	_int10_handler
-		.def 	_int11_handler
-		.def 	_int12_handler
-		.def 	_int13_handler
-		.def 	_int14_handler
-		.def 	_int15_handler
-		.def	_bad_interrupt
-		.def	_nmi_handler
+		.global	_int4_handler
+		.global	_int5_handler
+		.global	_int7_handler
+		.global	_int8_handler
+		.global	_int9_handler
+		.global	_int10_handler
+		.global	_int11_handler
+		.global	_int12_handler
+		.global	_int13_handler
+		.global	_int14_handler
+		.global	_int15_handler
+		.global	_bad_interrupt
+		.global	_nmi_handler
 
+#ifdef CONFIG_TI_C6X_COMPILER
 	;; Syscalls
 		.def 	sys_fork
 		.def	sys_clone
 		.def 	sys_execve
-		.def	sys_exec_memobj
 
 	;; External functions
 		.ref	schedule
@@ -74,7 +81,6 @@ HAVE_32_REGS .set 0
 		.ref	c6x_clone
 		.ref	c6x_vfork
 		.ref	c6x_execve
-		.ref	c6x_exec_memobj
 		.ref 	do_sigsuspend
 		.ref	do_sigreturn
 		.ref	do_rt_sigreturn
@@ -87,9 +93,11 @@ HAVE_32_REGS .set 0
 		.ref	sys_truncate64
 		.ref	sys_ftruncate64
 		.ref	sys_fallocate
-		.if (CONFIG_PREEMPT == 1)
+		.ref	process_exception
+		.ref   sys_ni_syscall
+#ifdef CONFIG_PREEMPT
 		.ref	preempt_schedule_irq
-		.endif
+#endif
 
 	;; External variables
 		.ref	irq_stat
@@ -98,345 +106,328 @@ HAVE_32_REGS .set 0
 	;; Internal variables
 		.def	_sys_call_table
 
+#endif  /* CONFIG_TI_C6X_COMPILER */
+
 	;;
 	;;  This defines the normal kernel pt_regs layout.
 	;;
-SAVE_ALL	.macro	__rp,__tsr
-	STW	B0,*SP--[2]		; save original B0
-	MVKL	current_ksp,B0
-	MVKH	current_ksp,B0
-	LDW	*B0,B1			; KSP
+_DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
+	STW	.D2T2	B0,*SP--[2]		; save original B0
+	MVKL	.S2	current_ksp,B0
+	MVKH	.S2	current_ksp,B0
+	LDW	.D2T2	*B0,B1			; KSP
 
 	NOP	3
-	STW	B1,*+SP[1]		; save original B1
-	XOR	SP,B1,B0		; (SP ^ KSP)
-	LDW	*+SP[1],B1		; restore B0/B1
-	LDW	*++SP[2],B0
-	SHR	B0,KTHREAD_SHIFT,B0	; 0 if already using kernel stack
+	STW	.D2T2	B1,*+SP[1]		; save original B1
+	XOR	.D2	SP,B1,B0		; (SP ^ KSP)
+	LDW	.D2T2	*+SP[1],B1		; restore B0/B1
+	LDW	.D2T2	*++SP[2],B0
+	SHR	.S2	B0,THREAD_SHIFT,B0	; 0 if already using kernel stack
 
-  [B0]	STDW.D2	SP:DP,*--B1[1]		; user: save user sp/dp on kernel stack
-  [B0]	MV	B1,SP			;    and switch to kernel stack
-||[!B0] STDW.D2	SP:DP,*--SP[1]		; kernel: save on current stack
+  [B0]	STDW	.D2T2	SP:DP,*--B1[1]		; user: save user sp/dp on kernel stack
+  [B0]	MV	.S2	B1,SP			;    and switch to kernel stack
+||[!B0] STDW	.D2T2	SP:DP,*--SP[1]		; kernel: save on current stack
 
-	SUBAW	SP,2,SP
+	SUBAW	.D2	SP,2,SP
 
-	.if	(HAVE_32_REGS == 1)
-	SUB	SP,8,A15
- ||	STDW.D2	A15:A14,*SP--[16]	; save A15:A14
- 	.else
-	SUB	SP,8,A15
- ||	STDW.D2	A15:A14,*SP--[8]	; save A15:A14
-	.endif
+#ifdef HAVE_32_REGS
+	ADD	.D1X	SP,-8,A15
+ ||	STDW	.D2T1	A15:A14,*SP--[16]	; save A15:A14
+#else
+	ADD	.D1X	SP,-8,A15
+ ||	STDW	.D2T1	A15:A14,*SP--[8]	; save A15:A14
+#endif
 
-	STDW.D2	B13:B12,*SP--[1]
- ||	STDW.D1	A13:A12,*A15--[1]
- ||	MVC.S2	__rp,B13
+	STDW	.D2T2	B13:B12,*SP--[1]
+ ||	STDW	.D1T1	A13:A12,*A15--[1]
+ ||	MVC	.S2	__rp,B13
 
-	STDW.D2	B11:B10,*SP--[1]
- ||	STDW.D1	A11:A10,*A15--[1]
- ||	MVC.S2	CSR,B12
+	STDW	.D2T2	B11:B10,*SP--[1]
+ ||	STDW	.D1T1	A11:A10,*A15--[1]
+ ||	MVC	.S2	CSR,B12
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	STDW.D2	B9:B8,*SP--[1]
- ||	STDW.D1	A9:A8,*A15--[1]
- ||	MVC.S2	RILC,B11
-	STDW.D2	B7:B6,*SP--[1]
- ||	STDW.D1	A7:A6,*A15--[1]
- ||	MVC.S2	ILC,B10
-	.else
-	STDW.D2	B9:B8,*SP--[1]
- ||	STDW.D1	A9:A8,*A15--[1]
-	STDW.D2	B7:B6,*SP--[1]
- ||	STDW.D1	A7:A6,*A15--[1]
-	.endif
+#ifdef CONFIG_TMS320C64XPLUS
+	STDW	.D2T2	B9:B8,*SP--[1]
+ ||	STDW	.D1T1	A9:A8,*A15--[1]
+ ||	MVC	.S2	RILC,B11
+	STDW	.D2T2	B7:B6,*SP--[1]
+ ||	STDW	.D1T1	A7:A6,*A15--[1]
+ ||	MVC	.S2	ILC,B10
+#else
+	STDW	.D2T2	B9:B8,*SP--[1]
+ ||	STDW	.D1T1	A9:A8,*A15--[1]
+	STDW	.D2T2	B7:B6,*SP--[1]
+ ||	STDW	.D1T1	A7:A6,*A15--[1]
+#endif
 
-	STDW.D2	B5:B4,*SP--[1]
- ||	STDW.D1	A5:A4,*A15--[1]
+	STDW	.D2T2	B5:B4,*SP--[1]
+ ||	STDW	.D1T1	A5:A4,*A15--[1]
 
-	STDW.D2	B3:B2,*SP--[1]
- ||	STDW.D1	A3:A2,*A15--[1]
- ||	MVC.S2	__tsr,B5
+	STDW	.D2T2	B3:B2,*SP--[1]
+ ||	STDW	.D1T1	A3:A2,*A15--[1]
+ ||	MVC	.S2	__tsr,B5
 
-	STDW.D2	B1:B0,*SP--[1]
- ||	STDW.D1	A1:A0,*A15--[1]
- ||	MV	B5,A5
+	STDW	.D2T2	B1:B0,*SP--[1]
+ ||	STDW	.D1T1	A1:A0,*A15--[1]
+ ||	MV	.S1X	B5,A5
 
-	.if	(HAVE_32_REGS == 1)
-	STDW.D2	B31:B30,*SP--[1]
- ||	STDW.D1	A31:A30,*A15--[1]
-	STDW.D2	B29:B28,*SP--[1]
- ||	STDW.D1	A29:A28,*A15--[1]
-	STDW.D2	B27:B26,*SP--[1]
- ||	STDW.D1	A27:A26,*A15--[1]
-	STDW.D2	B25:B24,*SP--[1]
- ||	STDW.D1	A25:A24,*A15--[1]
-	STDW.D2	B23:B22,*SP--[1]
- ||	STDW.D1	A23:A22,*A15--[1]
-	STDW.D2	B21:B20,*SP--[1]
- ||	STDW.D1	A21:A20,*A15--[1]
-	STDW.D2	B19:B18,*SP--[1]
- ||	STDW.D1	A19:A18,*A15--[1]
-	STDW.D2	B17:B16,*SP--[1]
- ||	STDW.D1	A17:A16,*A15--[1]
-	.endif
+#ifdef HAVE_32_REGS
+	STDW	.D2T2	B31:B30,*SP--[1]
+ ||	STDW	.D1T1	A31:A30,*A15--[1]
+	STDW	.D2T2	B29:B28,*SP--[1]
+ ||	STDW	.D1T1	A29:A28,*A15--[1]
+	STDW	.D2T2	B27:B26,*SP--[1]
+ ||	STDW	.D1T1	A27:A26,*A15--[1]
+	STDW	.D2T2	B25:B24,*SP--[1]
+ ||	STDW	.D1T1	A25:A24,*A15--[1]
+	STDW	.D2T2	B23:B22,*SP--[1]
+ ||	STDW	.D1T1	A23:A22,*A15--[1]
+	STDW	.D2T2	B21:B20,*SP--[1]
+ ||	STDW	.D1T1	A21:A20,*A15--[1]
+	STDW	.D2T2	B19:B18,*SP--[1]
+ ||	STDW	.D1T1	A19:A18,*A15--[1]
+	STDW	.D2T2	B17:B16,*SP--[1]
+ ||	STDW	.D1T1	A17:A16,*A15--[1]
+#endif
 
-	STDW.D2	B13:B12,*SP--[1]	; save PC and CSR
+	STDW	.D2T2	B13:B12,*SP--[1]	; save PC and CSR
 
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	STW.D2	A4,*SP--[2]		; orig A4
-	.else
-	STDW.D2	B11:B10,*SP--[1]	; save RILC and ILC
-	STDW.D2	A5:A4,*SP--[1]		; save TSR and orig A4
-	.endif
+#ifndef CONFIG_TMS320C64XPLUS
+	STW	.D2T2	A4,*SP--[2]		; orig A4
+#else
+	STDW	.D2T2	B11:B10,*SP--[1]	; save RILC and ILC
+	STDW	.D2T1	A5:A4,*SP--[1]		; save TSR and orig A4
+#endif
 
 	;; We left an unused word on the stack just above pt_regs.
 	;; It is used to save whether or not this frame is due to
 	;; a syscall. It is cleared here, but the syscall handler
 	;; sets it to a non-zero value.
-	MVK	0,B1
-	STW	B1,*+SP(REGS__END+8)	; clear syscall flag
+	MVK	.L2	0,B1
+	STW	.D2T2	B1,*+SP(REGS__END+8)	; clear syscall flag
 	.endm
 
-SAVE_ALL_EXCEPT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(SAVE_ALL_EXCEPT)
+#ifndef CONFIG_TMS320C64XPLUS
 	SAVE_ALL IRP
-	.else
+#else
 	SAVE_ALL NRP,NTSR
-	.endif
+#endif
 	.endm
 
-SAVE_ALL_INT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(SAVE_ALL_INT)
+#ifndef CONFIG_TMS320C64XPLUS
 	SAVE_ALL IRP
-	.else
+#else
 	SAVE_ALL IRP,ITSR
-	.endif
+#endif
 	.endm
 
-RESTORE_ALL	.macro	__rp,__tsr
+_DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	LDDW	*++SP[1],B9:B8			; get TSR (B9)
-	LDDW	*++SP[1],B11:B10		; get RILC (B11) and ILC (B10)
-	LDDW	*++SP[1],B13:B12		; get PC (B13) and CSR (B12)
-	.else
-	LDDW	*++SP[2],B13:B12		; get PC (B13) and CSR (B12)
-	.endif
+#ifdef CONFIG_TMS320C64XPLUS
+	LDDW	.D2T2	*++SP[1],B9:B8		; get TSR (B9)
+	LDDW	.D2T2	*++SP[1],B11:B10	; get RILC (B11) and ILC (B10)
+	LDDW	.D2T2	*++SP[1],B13:B12	; get PC (B13) and CSR (B12)
+#else
+	LDDW	.D2T2	*++SP[2],B13:B12	; get PC (B13) and CSR (B12)
+#endif
 
-	.if	(HAVE_32_REGS == 1)
-	ADDAW	SP,30,A15
-	.else
-	ADDAW	SP,14,A15
-	.endif
+#ifdef HAVE_32_REGS
+	ADDAW	.D1X	SP,30,A15
+#else
+	ADDAW	.D1X	SP,14,A15
+#endif
 
-	.if	(HAVE_32_REGS == 1)
-	LDDW.D1	*++A15[1],A17:A16
- ||	LDDW.D2	*++SP[1],B17:B16
-	LDDW.D1	*++A15[1],A19:A18
- ||	LDDW.D2	*++SP[1],B19:B18
-	LDDW.D1	*++A15[1],A21:A20
- ||	LDDW.D2	*++SP[1],B21:B20
-	LDDW.D1	*++A15[1],A23:A22
- ||	LDDW.D2	*++SP[1],B23:B22
-	LDDW.D1	*++A15[1],A25:A24
- ||	LDDW.D2	*++SP[1],B25:B24
-	LDDW.D1	*++A15[1],A27:A26
- ||	LDDW.D2	*++SP[1],B27:B26
-	LDDW.D1	*++A15[1],A29:A28
- ||	LDDW.D2	*++SP[1],B29:B28
-	LDDW.D1	*++A15[1],A31:A30
- ||	LDDW.D2	*++SP[1],B31:B30
-	.endif
+#ifdef HAVE_32_REGS
+	LDDW	.D1T1	*++A15[1],A17:A16
+ ||	LDDW	.D2T2	*++SP[1],B17:B16
+	LDDW	.D1T1	*++A15[1],A19:A18
+ ||	LDDW	.D2T2	*++SP[1],B19:B18
+	LDDW	.D1T1	*++A15[1],A21:A20
+ ||	LDDW	.D2T2	*++SP[1],B21:B20
+	LDDW	.D1T1	*++A15[1],A23:A22
+ ||	LDDW	.D2T2	*++SP[1],B23:B22
+	LDDW	.D1T1	*++A15[1],A25:A24
+ ||	LDDW	.D2T2	*++SP[1],B25:B24
+	LDDW	.D1T1	*++A15[1],A27:A26
+ ||	LDDW	.D2T2	*++SP[1],B27:B26
+	LDDW	.D1T1	*++A15[1],A29:A28
+ ||	LDDW	.D2T2	*++SP[1],B29:B28
+	LDDW	.D1T1	*++A15[1],A31:A30
+ ||	LDDW	.D2T2	*++SP[1],B31:B30
+#endif
 
-	LDDW.D1	*++A15[1],A1:A0
- ||	LDDW.D2	*++SP[1],B1:B0
+	LDDW	.D1T1	*++A15[1],A1:A0
+ ||	LDDW	.D2T2	*++SP[1],B1:B0
 
-	.if	(HAVE_32_REGS == 1)
-	LDDW.D1	*++A15[1],A3:A2
- ||	LDDW.D2	*++SP[1],B3:B2
- ||	MVC	B9,__tsr
-	LDDW.D1	*++A15[1],A5:A4
- ||	LDDW.D2	*++SP[1],B5:B4
- ||     MVC	B11,RILC
-	LDDW.D1	*++A15[1],A7:A6
- ||	LDDW.D2	*++SP[1],B7:B6
- ||	MVC	B10,ILC
-	.else
-	LDDW.D1	*++A15[1],A3:A2
- ||	LDDW.D2	*++SP[1],B3:B2
-	LDDW.D1	*++A15[1],A5:A4
- ||	LDDW.D2	*++SP[1],B5:B4
-	LDDW.D1	*++A15[1],A7:A6
- ||	LDDW.D2	*++SP[1],B7:B6
-	.endif
+#ifdef HAVE_32_REGS
+	LDDW	.D1T1	*++A15[1],A3:A2
+ ||	LDDW	.D2T2	*++SP[1],B3:B2
+ ||	MVC	.S2	B9,__tsr
+	LDDW	.D1T1	*++A15[1],A5:A4
+ ||	LDDW	.D2T2	*++SP[1],B5:B4
+ ||	MVC	.S2	B11,RILC
+	LDDW	.D1T1	*++A15[1],A7:A6
+ ||	LDDW	.D2T2	*++SP[1],B7:B6
+ ||	MVC	.S2	B10,ILC
+#else
+	LDDW	.D1T1	*++A15[1],A3:A2
+ ||	LDDW	.D2T2	*++SP[1],B3:B2
+	LDDW	.D1T1	*++A15[1],A5:A4
+ ||	LDDW	.D2T2	*++SP[1],B5:B4
+	LDDW	.D1T1	*++A15[1],A7:A6
+ ||	LDDW	.D2T2	*++SP[1],B7:B6
+#endif
 
-	LDDW.D1	*++A15[1],A9:A8
- ||	LDDW.D2	*++SP[1],B9:B8
- ||	MVC	B13,__rp
+	LDDW	.D1T1	*++A15[1],A9:A8
+ ||	LDDW	.D2T2	*++SP[1],B9:B8
+ ||	MVC	.S2	B13,__rp
 
-	LDDW.D1	*++A15[1],A11:A10
- ||	LDDW.D2	*++SP[1],B11:B10
- ||	MVC	B12,CSR
+	LDDW	.D1T1	*++A15[1],A11:A10
+ ||	LDDW	.D2T2	*++SP[1],B11:B10
+ ||	MVC	.S2	B12,CSR
 
-	LDDW.D1	*++A15[1],A13:A12
- ||	LDDW.D2	*++SP[1],B13:B12
+	LDDW	.D1T1	*++A15[1],A13:A12
+ ||	LDDW	.D2T2	*++SP[1],B13:B12
 
-	MV	A15,SP
- ||	MVKL	current_ksp,A15
-	MVKH	current_ksp,A15
- ||	ADDAW	SP,6,A14
-	STW	A14,*A15		; save kernel stack pointer
+	MV	.D2X	A15,SP
+ ||	MVKL	.S1	current_ksp,A15
+	MVKH	.S1	current_ksp,A15
+ ||	ADDAW	.D1X	SP,6,A14
+	STW	.D1T1	A14,*A15	; save kernel stack pointer
 
-	LDDW.D2	*++SP[1],A15:A14
+	LDDW	.D2T1	*++SP[1],A15:A14
 
-	B	__rp			; return from interruption
-	LDDW.D2	*+SP[1],SP:DP
+	B	.S2	__rp		; return from interruption
+	LDDW	.D2T2	*+SP[1],SP:DP
 	NOP	4
 	.endm
 
-RESTORE_ALL_EXCEPT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(RESTORE_ALL_EXCEPT)
+#ifndef CONFIG_TMS320C64XPLUS
 	RESTORE_ALL IRP
-	.else
+#else
 	RESTORE_ALL NRP,NTSR
-	.endif
+#endif
 	.endm
 
-RESTORE_ALL_INT	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+_DEFINE_MACRO(RESTORE_ALL_INT)
+#ifndef CONFIG_TMS320C64XPLUS
 	RESTORE_ALL IRP
-	.else
+#else
 	RESTORE_ALL IRP,ITSR
-	.endif
-	.endm	
-
-MASK_SYSCALL  .macro tmp
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	MVC.S2	IER,B1
-	CLR.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
-	MVC.S2	B1,IER
-	.endif
+#endif
 	.endm
 
-UNMASK_SYSCALL  .macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	MVC.S2	IER,B1
-	SET.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
-	MVC.S2	B1,IER
-	.endif
+_DEFINE_MACRO(MASK_SYSCALL)
+#ifndef CONFIG_TMS320C64XPLUS
+	MVC	.S2	IER,B1
+	CLR	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
+	MVC	.S2	B1,IER
+#endif
 	.endm
 
-MASK_INT  .macro reg
-	MVC.S2	CSR,reg
-	CLR	reg,0,0,reg
-	MVC.S2	reg,CSR
+_DEFINE_MACRO(UNMASK_SYSCALL)
+#ifndef CONFIG_TMS320C64XPLUS
+	MVC	.S2	IER,B1
+	SET	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
+	MVC	.S2	B1,IER
+#endif
+	.endm
+
+_DEFINE_MACRO(MASK_INT,reg)
+	MVC	.S2	CSR,reg
+	CLR	.S2	reg,0,0,reg
+	MVC	.S2	reg,CSR
 	.endm
 
 	;; Enable interrupts
-UNMASK_INT	.macro	reg
-	MVC	CSR,reg
-	SET	reg,0,0,reg
-	MVC	reg,CSR
+_DEFINE_MACRO(UNMASK_INT,reg)
+	MVC	.S2	CSR,reg
+	SET	.S2	reg,0,0,reg
+	MVC	.S2	reg,CSR
 	.endm
 
-
-RESTORE_NK_INT	.macro
-
-	MVC.S2	CSR,B2
-	CLR	B2,0,0,B2
-	MVC.S2	B2,CSR			; cut global IRQ
-
-	.if	(CONFIG_NK == 1)
-	.ref    irq_IER
-	MVC.S2	IER,B4
-	MVKL.S2	irq_IER,B2
-	MVKH.S2	irq_IER,B2
-	LDW.D2	*B2,B2
-	NOP	4
-	OR.L2	B2,B4,B4		; enable IT set in irq_IER
-	MVC.S2	B4,IER
-	.endif
-	.endm
-
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-SWITCH_STACK_SIZE 	.set	(12*4+8)
-	.else
-SWITCH_STACK_SIZE 	.set	(14*4+8)
-	.endif
+#ifndef CONFIG_TMS320C64XPLUS
+#define SWITCH_STACK_SIZE (12*4+8)
+#else
+#define SWITCH_STACK_SIZE (14*4+8)
+#endif
 
 	;;
 	;; Save remaining registers preserved by C
 	;; B3 must contain the return addresse
 	;;
-SAVE_SWITCH_STACK	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	STW.D2	B3,*SP--[12]		; push return address
-	STDW.D2	B13:B12,*+SP[5]
-	STDW.D2	B11:B10,*+SP[4]
-	STDW.D2	A15:A14,*+SP[3]
-	STDW.D2	A13:A12,*+SP[2]
-	STDW.D2	A11:A10,*+SP[1]
-	.else
-	STW.D2	B3,*SP--[14]		; push return address
-	STDW.D2	B13:B12,*+SP[6]
-	STDW.D2	B11:B10,*+SP[5]
-	STDW.D2	A15:A14,*+SP[4]
-	STDW.D2	A13:A12,*+SP[3]
- ||	MVC.S2  RILC,B11
-	STDW.D2	A11:A10,*+SP[2]
- ||	MVC.S2  ILC,B10
-	STDW.D2	B11:B10,*+SP[1]
-	.endif
+_DEFINE_MACRO(SAVE_SWITCH_STACK)
+#ifndef CONFIG_TMS320C64XPLUS
+	STW	.D2T2	B3,*SP--[12]		; push return address
+	STDW	.D2T2	B13:B12,*+SP[5]
+	STDW	.D2T2	B11:B10,*+SP[4]
+	STDW	.D2T1	A15:A14,*+SP[3]
+	STDW	.D2T1	A13:A12,*+SP[2]
+	STDW	.D2T1	A11:A10,*+SP[1]
+#else
+	STW	.D2T2	B3,*SP--[14]		; push return address
+	STDW	.D2T2	B13:B12,*+SP[6]
+	STDW	.D2T2	B11:B10,*+SP[5]
+	STDW	.D2T1	A15:A14,*+SP[4]
+	STDW	.D2T1	A13:A12,*+SP[3]
+ ||	MVC	.S2	RILC,B11
+	STDW	.D2T1	A11:A10,*+SP[2]
+ ||	MVC	.S2	ILC,B10
+	STDW	.D2T2	B11:B10,*+SP[1]
+#endif
 	.endm
 
-RESTORE_SWITCH_STACK	.macro
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	LDDW.D2	*+SP[1],A11:A10
-	LDDW.D2	*+SP[2],A13:A12
-	LDDW.D2	*+SP[3],A15:A14
-	LDDW.D2	*+SP[4],B11:B10
-	LDDW.D2	*+SP[5],B13:B12
-	LDW.D2	*++SP[12],B3		; pop return address
-	.else
-	LDDW.D2	*+SP[1],B11:B10		; load B11 (RILC ) and B10 (ILC)
+_DEFINE_MACRO(RESTORE_SWITCH_STACK)
+#ifndef CONFIG_TMS320C64XPLUS
+	LDDW	.D2T1	*+SP[1],A11:A10
+	LDDW	.D2T1	*+SP[2],A13:A12
+	LDDW	.D2T1	*+SP[3],A15:A14
+	LDDW	.D2T2	*+SP[4],B11:B10
+	LDDW	.D2T2	*+SP[5],B13:B12
+	LDW	.D2T2	*++SP[12],B3		; pop return address
+#else
+	LDDW	.D2T2	*+SP[1],B11:B10		; load B11 (RILC ) and B10 (ILC)
 
-	LDDW.D2	*+SP[2],A11:A10
-	LDDW.D2	*+SP[3],A13:A12
-	LDDW.D2	*+SP[4],A15:A14
-	LDDW.D2	*+SP[5],B11:B10
+	LDDW	.D2T1	*+SP[2],A11:A10
+	LDDW	.D2T1	*+SP[3],A13:A12
+	LDDW	.D2T1	*+SP[4],A15:A14
+	LDDW	.D2T2	*+SP[5],B11:B10
 
-	LDDW.D2	*+SP[6],B13:B12
- ||	MVC.S2	B10,ILC
+	LDDW	.D2T2	*+SP[6],B13:B12
+ ||	MVC	.S2	B10,ILC
 
- 	LDW.D2	*++SP[14],B3		; pop return address
- ||	MVC.S2	B11,RILC
-	.endif
-	NOP		4
+	LDW	.D2T2	*++SP[14],B3		; pop return address
+ ||	MVC	.S2	B11,RILC
+#endif
+	NOP	4
 	.endm
 
 	;;
 	;; Call c6x_do_IRQ with the corresponding int number and regs
 	;;
-CALL_INT	.macro int
-	MVK.S1	int,A4
- ||	ADD	8,SP,B4
-	MVKL	c6x_do_IRQ,A0
-	MVKH	c6x_do_IRQ,A0
-	BNOP	A0,3
-	MVKL	ret_from_interrupt,B3
-	MVKH	ret_from_interrupt,B3
+_DEFINE_MACRO(CALL_INT,int)
+	MVK	.S1	int,A4
+ ||	ADDAW	.D2	SP,2,B4
+	MVKL	.S1	c6x_do_IRQ,A0
+	MVKH	.S1	c6x_do_IRQ,A0
+	BNOP	.S2X	A0,3
+	MVKL	.S2	ret_from_interrupt,B3
+	MVKH	.S2	ret_from_interrupt,B3
 	.endm
 
-GET_THREAD_INFO	.macro reg
-	SHR	SP,KTHREAD_SHIFT,reg
-	SHL	reg,KTHREAD_SHIFT,reg
+_DEFINE_MACRO(GET_THREAD_INFO,reg)
+	SHR	.S1X	SP,THREAD_SHIFT,reg
+	SHL	.S1	reg,THREAD_SHIFT,reg
 	.endm
 
 	.sect 	".data"
 
 	.global	current_ksp
 current_ksp:
-	.word	init_thread_union + KTHREAD_START_SP
+	.word	init_thread_union + THREAD_START_SP
 
 	.sect 	".text"
 
@@ -444,224 +435,205 @@ current_ksp:
 	;; Jump to schedule() then return to ret_from_exception
 	;;
 _reschedule:
-	MVKL	schedule,A0
-	MVKH	schedule,A0
-	BNOP	A0,3
-	MVKL	ret_from_exception,B3
-	MVKH	ret_from_exception,B3
+	MVKL	.S1	schedule,A0
+	MVKH	.S1	schedule,A0
+	BNOP	.S2X	A0,3
+	MVKL	.S2	ret_from_exception,B3
+	MVKH	.S2	ret_from_exception,B3
 
 	;;
 	;; Called before syscall handler when process is being debugged
 	;;
 tracesys_on:
 
-	MVKL	syscall_trace_entry,A0
-	MVKH	syscall_trace_entry,A0
-	B	A0
-	ADDKPC	ret_from_syscall_trace,B3,3
-	ADD	SP,8,A4
+	MVKL	.S1	syscall_trace_entry,A0
+	MVKH	.S1	syscall_trace_entry,A0
+	B	.S2X	A0
+	ADDKPC	.S2	ret_from_syscall_trace,B3,3
+	ADD	.S1X	8,SP,A4
 
 ret_from_syscall_trace:
 	;; tracing returns (possibly new) syscall number
-	MV	A4,B0
+	MV	.D2X	A4,B0
 
- || 	MVKL	sys_ni_syscall,A0
- || 	MVK	NR_SYSCALLS_,B1
-	CMPLTU	B0,B1,B1
- ||	MVKH	sys_ni_syscall,A0
+ ||	MVKL	.S1	sys_ni_syscall,A0
+ ||	MVK	.S2	NR_SYSCALLS_,B1
+	CMPLTU	.L2	B0,B1,B1
+ ||	MVKH	.S1	sys_ni_syscall,A0
 
- [!B1]	B	A0
- [!B1]	ADDKPC	ret_from_syscall_trace,B3,4
+ [!B1]	B	.S2X	A0
+ [!B1]	ADDKPC	.S2	ret_from_syscall_trace,B3,4
 
 	;; reload syscall args from (possibly modified) stack frame
-	LDW	*+SP(REGS_B4+8),B4
-	LDW	*+SP(REGS_A6+8),A6
-	LDW	*+SP(REGS_B6+8),B6
-	LDW	*+SP(REGS_A8+8),A8
-	LDW	*+SP(REGS_B8+8),B8
+	LDW	.D2T2	*+SP(REGS_B4+8),B4
+	LDW	.D2T1	*+SP(REGS_A6+8),A6
+	LDW	.D2T2	*+SP(REGS_B6+8),B6
+	LDW	.D2T1	*+SP(REGS_A8+8),A8
+	LDW	.D2T2	*+SP(REGS_B8+8),B8
 
 	;; Get syscall handler addr from _sys_call_table:
-	MVKL	_sys_call_table,B1
-	MVKH	_sys_call_table,B1
-	LDW	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
-	MVKL	ret_from_syscall_function,B3
-	MVKH	ret_from_syscall_function,B3
+	MVKL	.S2	_sys_call_table,B1
+	MVKH	.S2	_sys_call_table,B1
+	LDW	.D2T2	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
+	MVKL	.S2	ret_from_syscall_function,B3
+	MVKH	.S2	ret_from_syscall_function,B3
 	NOP	2
-	B	B0			; branch to syscall handler
-	LDW	*+SP(REGS_ORIG_A4+8),A4
-	NOP	4
-
+	BNOP	.S2	B0,5			; branch to syscall handler
+ ||	LDW	.D2T1	*+SP(REGS_ORIG_A4+8),A4
 
 syscall_exit_work:
-	AND	_TIF_SYSCALL_TRACE,A2,A0
- [!A0]	BNOP	work_pending,5
- [A0]	B	syscall_trace_exit
-	ADDKPC	resume_userspace,B3,1
-	MVC	CSR,B1
-	SET	B1,0,0,B1
-	MVC	B1,CSR		; enable ints
+	AND	.D1	_TIF_SYSCALL_TRACE,A2,A0
+ [!A0]	BNOP	.S1	work_pending,5
+ [A0]	B	.S2	syscall_trace_exit
+	ADDKPC	.S2	resume_userspace,B3,1
+	MVC	.S2	CSR,B1
+	SET	.S2	B1,0,0,B1
+	MVC	.S2	B1,CSR		; enable ints
 
 work_pending:
-	AND	_TIF_NEED_RESCHED,A2,A0
- [!A0]	BNOP	work_notifysig,5
+	AND	.D1	_TIF_NEED_RESCHED,A2,A0
+ [!A0]	BNOP	.S1	work_notifysig,5
 
 work_resched:
-	MVKL	schedule,A1
-	MVKH	schedule,A1
-	B	A1
-	ADDKPC	work_rescheduled,B3,4
+	MVKL	.S1	schedule,A1
+	MVKH	.S1	schedule,A1
+	B	.S2X	A1
+	ADDKPC	.S2	work_rescheduled,B3,4
 work_rescheduled:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
 	GET_THREAD_INFO A12
-	LDW	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	_TIF_WORK_MASK,A1
-	MVK	_TIF_NEED_RESCHED,A3
+	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	MVK	.S1	_TIF_WORK_MASK,A1
+	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
-	AND	A1,A2,A0
- ||	AND	A3,A2,A1
- [!A0]	BNOP	restore_all,5
- [A1]	BNOP	work_resched,5
+	AND	.D1	A1,A2,A0
+ ||	AND	.S1	A3,A2,A1
+ [!A0]	BNOP	.S1	restore_all,5
+ [A1]	BNOP	.S1	work_resched,5
 
 work_notifysig:
-	B	do_notify_resume
-	LDW	*+SP(REGS__END+8),A6 ; syscall flag
-	ADDKPC	resume_userspace,B3,1
-	ADD	SP,8,A4		; pt_regs pointer is first arg
-	MV	A2,B4		; thread_info flags is second arg
+	B	.S2	do_notify_resume
+	LDW	.D2T1	*+SP(REGS__END+8),A6 ; syscall flag
+	ADDKPC	.S2	resume_userspace,B3,1
+	ADD	.S1X	8,SP,A4		; pt_regs pointer is first arg
+	MV	.D2X	A2,B4		; thread_info flags is second arg
 
 ret_from_exception:
-	.if (CONFIG_PREEMPT == 1)
+#ifdef CONFIG_PREEMPT
 	MASK_INT B2
-	.endif
+#endif
 	;;
 	;; On C64x+, the return way from exception and interrupt
 	;; is a little bit different
 	;;
 ret_from_interrupt:
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-
+#ifndef CONFIG_TMS320C64XPLUS
 	;;
 	;; Check if we are comming from user mode.
 	;; C6x doesn't have a user/supervisor mode
 	;; so we need to compare context stack and
 	;; current one (ksp).
 	;;
-	LDW	*+SP(REGS_SP+8),B0
-	MVKL	resume_kernel,A0
-	MVKH	resume_kernel,A0
+	LDW	.D2T2	*+SP(REGS_SP+8),B0
+	MVKL	.S1	resume_kernel,A0
+	MVKH	.S1	resume_kernel,A0
 	NOP	2
-	XOR	B0,SP,B0
-	SHR	B0,KTHREAD_SHIFT,B0	; (SP ^ KSP) >> KTHREAD_SHIFT => User or Sup
+	XOR	.D2	B0,SP,B0
+	SHR	.S2	B0,THREAD_SHIFT,B0	; (SP ^ KSP) >> THREAD_SHIFT => User or Sup
 
-	.else
+#else
 
 	;;
 	;; Check if we are comming from user mode.
 	;;
-	LDW	*+SP(REGS_TSR+8),B0
-	MVK	0x40,B1
-	MVKL	resume_kernel,A0
-	MVKH	resume_kernel,A0
+	LDW	.D2T2	*+SP(REGS_TSR+8),B0
+	MVK	.S2	0x40,B1
+	MVKL	.S1	resume_kernel,A0
+	MVKH	.S1	resume_kernel,A0
 	NOP	1
-	AND	B0,B1,B0
+	AND	.D2	B0,B1,B0
 
-	.endif
+#endif
 
- [!B0]	BNOP	A0,5
+ [!B0]	BNOP	.S2X	A0,5
 
 resume_userspace:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
 	GET_THREAD_INFO A12
-	LDW	*+A12(THREAD_INFO_FLAGS),A2
-	MVK	_TIF_WORK_MASK,A1
-	MVK	_TIF_NEED_RESCHED,A3
+	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	MVK	.S1	_TIF_WORK_MASK,A1
+	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
-	AND	A1,A2,A0
- [A0]	BNOP	work_pending,5
-	BNOP	restore_all,5
+	AND	.D1	A1,A2,A0
+ [A0]	BNOP	.S1	work_pending,5
+	BNOP	.S1	restore_all,5
 
 	;;
 	;; System call function (called by syscall int)
 	;; B0 = syscall number (in _sys_call_table)
 	;; A4,B4,A6,B6,A8,B8 = arguments of the syscall function
 	;; A4 is the return value register
-	;; 
-	.if	(CONFIG_TMS320C64XPLUS == 0)
-	.def 	_system_call
+	;;
+#ifndef CONFIG_TMS320C64XPLUS
+	.global _system_call
 _system_call:
 	SAVE_ALL_EXCEPT			; save A0-A9/B0-B9 registers in stack
 	MASK_SYSCALL
-	.endif
+#endif
 
 system_call_saved:
-	MVK	1,B2
-	STW	B2,*+SP(REGS__END+8)	; set syscall flag
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	MVC.S2	B2,ECR		        ; acknowledge the software exception
-	.endif
+	MVK	.L2	1,B2
+	STW	.D2T2	B2,*+SP(REGS__END+8)	; set syscall flag
+#ifdef CONFIG_TMS320C64XPLUS
+	MVC	.S2	B2,ECR			; acknowledge the software exception
+#endif
 
 	UNMASK_INT B2			; re-enable global IT
 
 system_call_saved_noack:
 	;; Check system call number
-	MVK	NR_SYSCALLS_,B1
- || 	MVKL	sys_ni_syscall,A0
-	CMPLTU	B0,B1,B1
- || 	MVKH	sys_ni_syscall,A0
+	MVK	.S2	NR_SYSCALLS_,B1
+ ||	MVKL	.S1	sys_ni_syscall,A0
+	CMPLTU	.L2	B0,B1,B1
+ ||	MVKH	.S1	sys_ni_syscall,A0
 
- [!B1]	B	A0
- [!B1]	ADDKPC	ret_from_syscall_function,B3,4
+ [!B1]	B	.S2X	A0
+ [!B1]	ADDKPC	.S2	ret_from_syscall_function,B3,4
 
-	;; Get syscall handler addr from _sys_call_table:	
-	MVKL	_sys_call_table,B1
-	MVKH	_sys_call_table,B1
-	LDW	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
+	;; Get syscall handler addr from _sys_call_table:
+	MVKL	.S2	_sys_call_table,B1
+	MVKH	.S2	_sys_call_table,B1
+	LDW	.D2T2	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
 
 	;; Check for ptrace
 	GET_THREAD_INFO A12
-	LDW	*+A12(THREAD_INFO_FLAGS),A2
+	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
 	NOP	4
-	AND	_TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
- [A2]	BNOP	tracesys_on,5		; call syscall_trace_entry before syscall function
+	AND	.D1	_TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
+ [A2]	BNOP	.S1	tracesys_on,5		 ; call syscall_trace_entry before syscall function
 
 	;; Branch to the corresponding syscall
-	B	B0
-	ADDKPC	ret_from_syscall_function,B3,4
+	B	.S2	B0
+	ADDKPC	.S2	ret_from_syscall_function,B3,4
 
 ret_from_syscall_function:
-	STW	A4,*+SP(REGS_A4+8)	; save return value in A4
-					; original A4 is in orig_A4
+	STW	.D2T1	A4,*+SP(REGS_A4+8)	; save return value in A4
+						; original A4 is in orig_A4
 syscall_exit:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
-
-	;; Disable IT
-	.if	(CONFIG_NK == 1)
-	.ref    irq_IER
-
-	MVC.S2	IER,B4
-	MVKL.S2	irq_IER,B2
-	MVKH.S2	irq_IER,B2
-	LDW.D2	*B2,B2
-	NOP	4
-	ANDN.L2	B4,B2,B4
-	MVC.S2	B4,IER			; change IER
-
-	UNMASK_INT B2
-	.endif
-
-	LDW	*+A12(THREAD_INFO_FLAGS),A2
-	MVKL	syscall_exit_work,A0
-	MVKH	syscall_exit_work,A0
-	MVK	_TIF_ALLWORK_MASK,A1
+	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	MVKL	.S1	syscall_exit_work,A0
+	MVKH	.S1	syscall_exit_work,A0
+	MVK	.S1	_TIF_ALLWORK_MASK,A1
 	NOP
-	AND	A1,A2,A2 ; check for work to do
- [A2]	BNOP	syscall_exit_work,5
+	AND	.D1	A1,A2,A2 ; check for work to do
+ [A2]	BNOP	.S1	syscall_exit_work,5
 
 restore_all:
 	RESTORE_ALL_EXCEPT
@@ -670,19 +642,19 @@ restore_all:
 	;; After a fork we jump here directly from resume,
 	;; so that A4 contains the previous task structure.
 	;;
-	.def 	ret_from_fork
+	.global	ret_from_fork
 ret_from_fork:
-	MVKL	schedule_tail,A0
-	MVKH	schedule_tail,A0
-	B	A0
-	ADDKPC	ret_from_fork_2,B3,4
+	MVKL	.S1	schedule_tail,A0
+	MVKH	.S1	schedule_tail,A0
+	B	.S2X	A0
+	ADDKPC	.S2	ret_from_fork_2,B3,4
 ret_from_fork_2:
 	;; return 0 for child process
-	MVK	0,B0
- ||	MVKL	syscall_exit,B1
-	STW	B0,*+SP(REGS_A4+8)
- ||	MVKH	syscall_exit,B1
-	BNOP	B1,5
+	MVK	.L2	0,B0
+ ||	MVKL	.S2	syscall_exit,B1
+	STW	.D2T2	B0,*+SP(REGS_A4+8)
+ ||	MVKH	.S2	syscall_exit,B1
+	BNOP	.S2	B1,5
 
 	;;
 	;; These are the interrupt handlers, responsible for calling __do_IRQ()
@@ -698,13 +670,13 @@ _int5_handler:
 	MASK_SYSCALL
 	CALL_INT 5
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	.def	_int6_handler 
+#ifdef CONFIG_TMS320C64XPLUS
+	.global	_int6_handler
 _int6_handler:
 	SAVE_ALL_INT
 	MASK_SYSCALL
 	CALL_INT 6
-	.endif
+#endif
 
 _int7_handler:
 	SAVE_ALL_INT
@@ -751,204 +723,195 @@ _int15_handler:
 	MASK_SYSCALL
 	CALL_INT 15
 
-	.if	(CONFIG_NK == 1)
-	.def 	_xirq_handler
-_xirq_handler:
-	SAVE_ALL_INT
-	MASK_SYSCALL
-	CALL_INT 5
-	.endif
-
 	;;
 	;; Handler for uninitialized and spurious interrupts
 	;;
+	.global _bad_interrupt
 _bad_interrupt:
-	B	IRP
+	B	.S2	IRP
 	NOP	5
 
 	;;
 	;; Handler for NMI (C6x) and exceptions (C64x+)
 	;;
+	.global _nmi_handler
 _nmi_handler:
-	.if	(CONFIG_TMS320C64XPLUS == 0)
+#ifndef CONFIG_TMS320C64XPLUS
 
-	B	NRP
+	B	.S2	NRP
 	NOP	5
 
-	.else
-
-	.ref	process_exception
-
+#else
 	SAVE_ALL_EXCEPT
 
-	MVC.S2	EFR,B2
- 	CMPEQ   B2,1,B2
- ||	MVC.S2	TSR,B1
- 	MV	B2,A2
- ||	CLR	B1,10,10,B1
-	MVC.S2	B1,TSR
- [!A2]	MVKL	process_exception,A0
- ||[B2]	MVKL	system_call_saved,B1
- [!A2]	MVKH	process_exception,A0
- ||[B2]	MVKH	system_call_saved,B1
- [!B2]	B	A0
- [B2]   B	B1
- [!B2]  ADDAW	SP,2,B1
- [!B2]	MV	B1,A4
- 	ADDKPC	ret_from_trap,B3,2
+	MVC	.S2	EFR,B2
+	CMPEQ	.L2	1,B2,B2
+ ||	MVC	.S2	TSR,B1
+	MV	.D1X	B2,A2
+ ||	CLR	.S2	B1,10,10,B1
+	MVC	.S2	B1,TSR
+ [!A2]	MVKL	.S1	process_exception,A0
+ ||[B2]	MVKL	.S2	system_call_saved,B1
+ [!A2]	MVKH	.S1	process_exception,A0
+ ||[B2]	MVKH	.S2	system_call_saved,B1
+ [!B2]	B	.S2X	A0
+ [B2]	B	.S2	B1
+ [!B2]	ADDAW	.D2	SP,2,B1
+ [!B2]	MV	.D1X	B1,A4
+	ADDKPC	.S2	ret_from_trap,B3,2
 
 ret_from_trap:
-	MV	A4,B0
- [!B0] 	MVKL	ret_from_exception,B3
- [!B0] 	MVKH	ret_from_exception,B3
- [!B0]	BNOP	B3,5
+	MV	.D2X	A4,B0
+ [!B0]	MVKL	.S2	ret_from_exception,B3
+ [!B0]	MVKH	.S2	ret_from_exception,B3
+ [!B0]	BNOP	.S2	B3,5
 
-	MVKL	system_call_saved_noack,B3
-	MVKH	system_call_saved_noack,B3
+	MVKL	.S2	system_call_saved_noack,B3
+	MVKH	.S2	system_call_saved_noack,B3
 
-	LDW	*+SP(REGS_B0+8),B0
-	LDW	*+SP(REGS_A4+8),A4
-	LDW	*+SP(REGS_B4+8),B4
-	LDW	*+SP(REGS_A6+8),A6
-	LDW	*+SP(REGS_B6+8),B6
-	LDW	*+SP(REGS_A8+8),A8
- ||	B	B3
-	LDW	*+SP(REGS_B8+8),B8
+	LDW	.D2T2	*+SP(REGS_B0+8),B0
+	LDW	.D2T1	*+SP(REGS_A4+8),A4
+	LDW	.D2T2	*+SP(REGS_B4+8),B4
+	LDW	.D2T1	*+SP(REGS_A6+8),A6
+	LDW	.D2T2	*+SP(REGS_B6+8),B6
+	LDW	.D2T1	*+SP(REGS_A8+8),A8
+ ||	B	.S2	B3
+	LDW	.D2T2	*+SP(REGS_B8+8),B8
 	NOP	4
-	.endif
+#endif
 
 	;;
 	;; Jump to schedule() then return to ret_from_isr
 	;;
+#ifdef	CONFIG_PREEMPT
 irq_reschedule:
-	MVKL	schedule,A0
-	MVKH	schedule,A0
-	BNOP	A0,3
-	MVKL	ret_from_interrupt,B3
-	MVKH	ret_from_interrupt,B3
+	MVKL	.S1	schedule,A0
+	MVKH	.S1	schedule,A0
+	BNOP	.S2X	A0,3
+	MVKL	.S2	ret_from_interrupt,B3
+	MVKH	.S2	ret_from_interrupt,B3
 	NOP	3
 
-	.if (CONFIG_PREEMPT == 1)
 resume_kernel:
 	GET_THREAD_INFO A12
-	LDW	*+A12(THREAD_INFO_PREEMPT_COUNT),A1
-	MVKL	restore_all,A0
-	MVKH	restore_all,A0
+	LDW	.D1T1	*+A12(THREAD_INFO_PREEMPT_COUNT),A1
+	MVKL	.S1	restore_all,A0
+	MVKH	.S1	restore_all,A0
 	NOP	2
- [A1]	BNOP	A0,5
+ [A1]	BNOP	.S2X	A0,5
 
 preempt_schedule:
 	GET_THREAD_INFO A2
-	LDW	*+A2(THREAD_INFO_FLAGS),A1
-	MVKL	restore_all,A0
-	MVKH	restore_all,A0
-	MVKL	preempt_schedule_irq,B0
-	MVKH	preempt_schedule_irq,B0
-	AND	_TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
- [!A1]	BNOP	A0,5
+	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A1
+	MVKL	.S1	restore_all,A0
+	MVKH	.S1	restore_all,A0
+	MVKL	.S2	preempt_schedule_irq,B0
+	MVKH	.S2	preempt_schedule_irq,B0
+	AND	.D1	_TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
+ [!A1]	BNOP	.S2X	A0,5
 	B	B0
-	ADDKPC	preempt_schedule,B3,4
-	.endif
+	ADDKPC	.S2	preempt_schedule,B3,4
+#endif
 
-	.if	(CONFIG_TMS320C64XPLUS == 1)
-	.def    enable_exception
+#ifdef CONFIG_TMS320C64XPLUS
+	.global enable_exception
 enable_exception:
 	DINT
-	MVC	TSR,B0
-	MVC	B3,NRP
-	MVK	0xc,B1
-	OR	B0,B1,B0
-	MVC	B0,TSR			;  Set GEE and XEN in TSR
-	B	NRP
+	MVC	.S2	TSR,B0
+	MVC	.S2	B3,NRP
+	MVK	.L2	0xc,B1
+	OR	.D2	B0,B1,B0
+	MVC	.S2	B0,TSR			;  Set GEE and XEN in TSR
+	B	.S2	NRP
 	NOP	5
-	.endif
+#endif
 
 	;;
 	;; Special system calls
 	;; return address is in B3
 	;;
 sys_fork:
-	ADD	8,SP,A4
- ||	MVKL	c6x_fork,A0		; branch to _c6x_fork(struct pt_regs *regs)
-	MVKH	c6x_fork,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	c6x_fork,A0		; branch to _c6x_fork(struct pt_regs *regs)
+	MVKH	.S1	c6x_fork,A0
+	BNOP	.S2X	A0,5
 
 sys_clone:
-	ADD	SP,8,A4
- ||	MVKL	c6x_clone,A0
-	MVKH	c6x_clone,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	c6x_clone,A0
+	MVKH	.S1	c6x_clone,A0
+	BNOP	.S2X	A0,5
 
 sys_vfork:
-	ADD	8,SP,A4
- ||	MVKL	c6x_vfork,A0		; branch to _c6x_vfork(struct pt_regs *regs)
-	MVKH	c6x_vfork,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	c6x_vfork,A0		; branch to _c6x_vfork(struct pt_regs *regs)
+	MVKH	.S1	c6x_vfork,A0
+	BNOP	.S2X	A0,5
 
 sys_sigsuspend:
-	ADD	8,SP,A4
- ||	MVKL	do_sigsuspend,A0	; branch to _do_sigsuspend
-	MVKH	do_sigsuspend,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	do_sigsuspend,A0	; branch to _do_sigsuspend
+	MVKH	.S1	do_sigsuspend,A0
+	BNOP	.S2X	A0,5
 
 sys_rt_sigsuspend_wrapper:
-	ADD	8,SP,A4
- ||	MVKL	sys_rt_sigsuspend,A0	; branch to sys_rt_sigsuspend
-	MVKH	sys_rt_sigsuspend,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	sys_rt_sigsuspend,A0	; branch to sys_rt_sigsuspend
+	MVKH	.S1	sys_rt_sigsuspend,A0
+	BNOP	.S2X	A0,5
 
 sys_sigreturn:
-	ADD	8,SP,A4		; move to A4 the starting value of pt_regs
- ||	MVKL	do_sigreturn,A0	; branch to _do_sigreturn
-	MVKH	do_sigreturn,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	do_sigreturn,A0	; branch to _do_sigreturn
+	MVKH	.S1	do_sigreturn,A0
+	BNOP	.S2X	A0,5
 
 sys_rt_sigreturn:
-	ADD	8,SP,A4			; move to A4 the starting value of pt_regs
- ||	MVKL	do_rt_sigreturn,A0	; branch to _do_rt_sigreturn
-	MVKH	do_rt_sigreturn,A0
-	BNOP	A0,5
+	ADD	.D1X	SP,8,A4
+ ||	MVKL	.S1	do_rt_sigreturn,A0	; branch to _do_rt_sigreturn
+	MVKH	.S1	do_rt_sigreturn,A0
+	BNOP	.S2X	A0,5
 
 sys_execve:
-	ADDAW	SP,2,B6			; put regs addr in 4th parameter
-					; & adjust regs stack addr
-	LDW 	*+SP(REGS_B4+8),B4
+	ADDAW	.D2	SP,2,B6			; put regs addr in 4th parameter
+						; & adjust regs stack addr
+	LDW	.D2T2	*+SP(REGS_B4+8),B4
 
 	;; c6x_execve(char *name, char **argv, char **envp, struct pt_regs *regs)
- ||	MVKL	c6x_execve,A0
-	MVKH	c6x_execve,A0
-	B	A0
-	STW	B3,*SP--[2]
-	ADDKPC	ret_from_c6x_execve,B3,3
+ ||	MVKL	.S1	c6x_execve,A0
+	MVKH	.S1	c6x_execve,A0
+	B	.S2X	A0
+	STW	.D2T2	B3,*SP--[2]
+	ADDKPC	.S2	ret_from_c6x_execve,B3,3
 
 ret_from_c6x_execve:
-	LDW	*++SP[2],B3
+	LDW	.D2T2	*++SP[2],B3
 	NOP	4
-	BNOP	B3,5
+	BNOP	.S2	B3,5
 
 sys_pread_c6x:
-	MVKL	sys_pread64,A0
-	MVKH	sys_pread64,A0
-	BNOP	A0,4
-	MV	A8,B7
+	MVKL	.S1	sys_pread64,A0
+	MVKH	.S1	sys_pread64,A0
+	BNOP	.S2X	A0,4
+	MV	.D2X	A8,B7
 
 sys_pwrite_c6x:
-	MVKL	sys_pwrite64,A0
-	MVKH	sys_pwrite64,A0
-	BNOP	A0,4
-	MV	A8,B7
+	MVKL	.S1	sys_pwrite64,A0
+	MVKH	.S1	sys_pwrite64,A0
+	BNOP	.S2X	A0,4
+	MV	.D2X	A8,B7
 
 sys_truncate64_c6x:
-	MVKL	sys_truncate64,A0
-	MVKH	sys_truncate64,A0
-	BNOP	A0,4
-	MV	A6,B5
+	MVKL	.S1	sys_truncate64,A0
+	MVKH	.S1	sys_truncate64,A0
+	BNOP	.S2X	A0,4
+	MV	.D2X	A6,B5
 
 sys_ftruncate64_c6x:
-	MVKL	sys_ftruncate64,A0
-	MVKH	sys_ftruncate64,A0
-	BNOP	A0,4
-	MV	A6,B5
+	MVKL	.S1	sys_ftruncate64,A0
+	MVKH	.S1	sys_ftruncate64,A0
+	BNOP	.S2X	A0,4
+	MV	.D2X	A6,B5
 
 ;; On Entry
 ;;   A4 - fd
@@ -958,32 +921,13 @@ sys_ftruncate64_c6x:
 ;;   A8 - len_hi
 ;;   B8 - len_lo
 sys_fallocate_c6x:
-	MVKL	sys_fallocate,A0
-	MVKH	sys_fallocate,A0
-	BNOP	A0,1
- 	MV	A6,A7
- 	MV	B6,A6
-	MV	A8,B7
-	MV	B8,B6
-
-sys_exec_memobj:
-	ADDAW	SP,1,B6			; put regs addr in 4th parameter
-					; & adjust regs stack addr
-
-	;; c6x_exec_memobj(struct memobj_frm_struct *memobj_frm, char **argv,
-	;;                 char **envp, struct pt_regs *regs) 
-
-	MVKL	c6x_exec_memobj,A0
-	MVKH	c6x_exec_memobj,A0
-	B	A0
-	STW	B3,*SP--[2]
-	ADDKPC	ret_from_c6x_exec_memobj,B3,3
-
-ret_from_c6x_exec_memobj:
-	LDW	*++SP[2],B3
-	NOP	4
-	BNOP	B3,5
-	MV	A4,SP
+	MVKL	.S1	sys_fallocate,A0
+	MVKH	.S1	sys_fallocate,A0
+	BNOP	.S2X	A0,1
+	MV	.D1	A6,A7
+	MV	.D1X	B6,A6
+	MV	.D2X	A8,B7
+	MV	.D2	B8,B6
 
 	;;
 	;; resume() switchs to a new task
@@ -992,46 +936,48 @@ ret_from_c6x_exec_memobj:
 	;; A6 = thread offset
 	;; B6 = shared flags (mm structure is shared between tasks)
 	;;
+	.global resume
 resume:
-	ADD	A6,A4,A0		; ptr to thread struct
- ||	MVC	CSR,B2
-	STW	B2,*+A0(THREAD_CSR)	; save CSR
+	ADD	.D1	A6,A4,A0		; ptr to thread struct
+ ||	MVC	.S2	CSR,B2
+	STW	.D1T2	B2,*+A0(THREAD_CSR)	; save CSR
 
 	;; Save non-scratch registers on stack
 	SAVE_SWITCH_STACK
 
 	;; Save current kernel stack pointer
-	MV	SP,A2
-	STW	A2,*+A0(THREAD_KSP)
-
+	MV	.D1X	SP,A2
+	STW	.D1T1	A2,*+A0(THREAD_KSP)
 	;; Get pointer to thread struct (B4 contains the new task)
- ||	ADD	A6,B4,B4
+ ||	ADD	.D2X	B4,A6,B4
 
 	;; Restore the kernel stack pointer
-	LDW	*+B4(THREAD_KSP),B2
- 	MVKL	current_ksp,B1
-	MVKH	current_ksp,B1
+	LDW	.D2T2	*+B4(THREAD_KSP),B2
+	MVKL	.S2	current_ksp,B1
+	MVKH	.S2	current_ksp,B1
 	NOP	2
-	MV	B2,SP
- ||	STW	B2,*B1
+	MV	.S2	B2,SP
+ ||	STW	.D2T2	B2,*B1
 
 	;; Restore non-scratch registers
 	RESTORE_SWITCH_STACK
 
 	;; Restore status register
-	LDW	*+B4(THREAD_CSR),B2
-	BNOP	B3,4			; return in next E1
-	MVC	B2,CSR
+	LDW	.D2T2	*+B4(THREAD_CSR),B2
+	BNOP	.S2	B3,4		; return in next E1
+	MVC	.S2	B2,CSR
 
+#ifdef CONFIG_TI_C6X_COMPILER
 	;;
 	;; void * current_text_addr(void)
 	;; Return current PC
 	;;
 	.global current_text_addr
 current_text_addr:
-	BNOP	B3,3
-	MVC	PC,B4
-	MV	B4,A4
+	BNOP	.S2	B3,4
+	MV	.D1X	B3,A4
+	MVC	.S2	PC,B4
+#endif
 
 	;;
 	;; unsigned int get_current(void):
@@ -1039,57 +985,34 @@ current_text_addr:
 	;;
 	.global	__current_thread_info
 __current_thread_info:
-	BNOP	B3,3
-	CLR	SP,0,KTHREAD_SHIFT-1,B4
-	MV	B4,A4
-
-	;;
-	;; unsigned int get_sp(void):
-	;; Return current SP
-	;;
-	.global	get_sp
-get_sp:
-	BNOP	B3,4
-	MV	SP,A4
-
-	;;
-	;; void set_sp(unsigned int sp):
-	;; Set current SP
-	;;
-	.global	set_sp
-set_sp:
-	BNOP	B3,4
-	MV	A4,SP
+	BNOP	.S2	B3,3
+	CLR	.S2	SP,0,THREAD_SHIFT-1,B4
+	MV	.D1X	B4,A4
 
 	;;
 	;; System calls table
 	;;
-SYSCALL_ENTRY .macro handler
-	.if __TI_EABI__
+_DEFINE_MACRO(SYSCALL_ENTRY,handler)
+#ifdef CONFIG_TI_C6X_COMPILER
 	.ref   handler
+#endif
 	.word  handler
-	.else
-	.ref   _:handler:
-	.word  _:handler:
-	.endif
 	.endm
 
-SYSCALL_NI .macro
-	.if __TI_EABI__
-	.ref   sys_ni_syscall
+_DEFINE_MACRO(SYSCALL_NI)
 	.word  sys_ni_syscall
-	.else
-	.ref   _sys_ni_syscall
-	.word  _sys_ni_syscall
-	.endif
 	.endm
-	
-SYSCALL_LOCAL .macro handler
+
+_DEFINE_MACRO(SYSCALL_LOCAL,handler)
 	.word  handler
 	.endm
 
 	.sect 	".data"
+#ifdef CONFIG_TI_C6X_COMPILER
 	.align 32
+#else
+	.align 5
+#endif
 _sys_call_table:
 	SYSCALL_NI				; 0
 	SYSCALL_ENTRY	sys_exit
@@ -1373,11 +1296,8 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_add_key
 	SYSCALL_ENTRY	sys_request_key		; 280
 	SYSCALL_ENTRY	sys_keyctl
-
-	; C6x special syscalls
-	SYSCALL_LOCAL   sys_exec_memobj
-	SYSCALL_ENTRY	sys_dp_alloc
-
+	SYSCALL_NI
+	SYSCALL_NI
 	SYSCALL_ENTRY	sys_sched_setaffinity
 	SYSCALL_ENTRY	sys_sched_getaffinity
 	SYSCALL_NI

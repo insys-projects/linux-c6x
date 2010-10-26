@@ -79,6 +79,9 @@ struct sc16_chip {
 	int nports;
 };
 
+static int serialsc16_register_port(struct uart_port *port);
+static void serialsc16_unregister_port(int line);
+
 static inline int i2c_write_reg(struct i2c_client *client, u8 reg, u8 data)
 {
 	int ret;
@@ -190,7 +193,6 @@ static int __devinit sc16_probe(struct i2c_client *client,
 
 	return 0;
 
-out_failed:
 	kfree(chip);
 	return ret;
 }
@@ -444,7 +446,6 @@ static inline int poll_timeout(int timeout)
 static void serialsc16_backup_timeout(unsigned long data)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)data;
-	unsigned long flags;
 	
 	queue_work(wq, &up->backup_work);
 
@@ -456,7 +457,6 @@ static void serialsc16_backup_timeout(unsigned long data)
 static unsigned int serialsc16_tx_empty(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned long flags;
 	unsigned int lsr;
 
 	mutex_lock(&up->xfer_lock);
@@ -511,7 +511,6 @@ static void serialsc16_set_mctrl(struct uart_port *port, unsigned int mctrl)
 static void serialsc16_break_ctl(struct uart_port *port, int break_state)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned long flags;
 
 	mutex_lock(&up->xfer_lock);
 	if (break_state == -1)
@@ -544,8 +543,6 @@ static void wait_for_xmitr(struct uart_sc16_port *up, int bits)
 static int serialsc16_startup(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned long flags;
-	unsigned char lsr, iir;
 	int retval;
 
 	up->mcr = 0;
@@ -612,7 +609,6 @@ static int serialsc16_startup(struct uart_port *port)
 static void serialsc16_shutdown(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned long flags;
 
 	/*
 	 * Disable interrupts from this port
@@ -645,7 +641,6 @@ serialsc16_set_termios(struct uart_port *port, struct ktermios *termios,
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 	unsigned char cval, fcr = 0, efr = 0;;
-	unsigned long flags;
 	unsigned int baud, quot;
 
 	switch (termios->c_cflag & CSIZE) {
@@ -779,11 +774,6 @@ serialsc16_pm(struct uart_port *port, unsigned int state,
 	struct uart_sc16_port *p = (struct uart_sc16_port *)port;
 
 	serialsc16_set_sleep(p, state != 0);
-}
-
-static unsigned int serialsc16_port_size(struct uart_sc16_port *pt)
-{
-	return 8 << pt->port.regshift;
 }
 
 static void serialsc16_release_port(struct uart_port *port)
@@ -996,7 +986,7 @@ static DEFINE_MUTEX(serial_mutex);
  *
  *	On success the port is ready to use and the line number is returned.
  */
-int serialsc16_register_port(struct uart_port *port)
+static int serialsc16_register_port(struct uart_port *port)
 {
 	struct uart_sc16_port *uart = NULL;
 	int i, ret = -ENOSPC;
@@ -1056,7 +1046,7 @@ int serialsc16_register_port(struct uart_port *port)
  *	Remove one serial port.  This may not be called from interrupt
  *	context.  We hand the port back to the our control.
  */
-void serialsc16_unregister_port(int line)
+static void serialsc16_unregister_port(int line)
 {
 	struct uart_sc16_port *uart = &serialsc16_ports[line];
 

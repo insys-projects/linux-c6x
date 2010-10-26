@@ -1,5 +1,5 @@
 /*
- *  linux/arch/c6x/mach-evm6488/phy.c
+ *  linux/arch/c6x/platforms/phy-evm6474l.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
@@ -36,17 +36,8 @@ int phy_init(void) {
 	mdio_phy_write(26, 0xe, 0x47); /* set PHY port 6 SERDES to 0.7V swing */
 	mdio_phy_wait();
 
-//	mdio_phy_write(26, 0xd, 0x47); /* set PHY port 5 SERDES to 0.7V swing */
-//	mdio_phy_wait();
-
 	mdio_phy_write(0, 0xe, 0x8140); /* configure PHY port 6 SERDES --> Faraday 1 at 1000mpbs, full duplex */
 	mdio_phy_wait();
-	
-//	mdio_phy_write(0, 0xd, 0x8140); /* configure PHY port 5 SERDES --> Faraday 2 at 1000mbps, full duplex */
-//	mdio_phy_wait();
-
-//	mdio_phy_write(1, 0x15, 0x43e); /* force internal switch --> port 5 SERDES to 1000MPBS, full Duplex */
-//	mdio_phy_wait();
 
 	mdio_phy_write(1, 0x16, 0x43e); /* force internal switch --> port 6 SERDES to 1000MBPS, full Duplex */
 	mdio_phy_wait();
@@ -72,7 +63,7 @@ int phy_init(void) {
 	return 0;
 }
 
-int evm6488_phy_init(void) {
+int evm6474l_phy_init(void) {
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
@@ -92,4 +83,4 @@ int evm6488_phy_init(void) {
 	return 0;
 }
 
-module_init(evm6488_phy_init);
+module_init(evm6474l_phy_init);

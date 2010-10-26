@@ -18,7 +18,16 @@
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
-void *current_text_addr(void);
+#ifdef CONFIG_TI_C6X_COMPILER
+extern void *current_text_addr(void);
+#else
+#define current_text_addr()			\
+({						\
+	void *__pc;				\
+	asm("mvc .S2 pce1,%0\n" : "=b"(__pc));	\
+	__pc;					\
+})
+#endif
 
 #include <asm/segment.h>
 #include <asm/ptrace.h>
@@ -51,8 +60,6 @@ void *current_text_addr(void);
  */
 #define wp_works_ok__is_a_macro	1
 #define wp_works_ok 1
-
-typedef unsigned long mm_segment_t; /* Domain register */
 
 struct thread_struct {
 	unsigned long  ksp;		/* kernel stack pointer */
@@ -102,11 +109,8 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 /*
  * Return saved PC of a blocked thread.
  */
-static inline unsigned int thread_saved_pc(struct thread_struct *t)
-{
-	unsigned long frame = ((struct switch_stack *)t->ksp)->retpc;
-	return frame;
-}
+#define thread_saved_pc(tsk) \
+	((tsk)->thread.ksp? ((struct switch_stack *)(tsk)->thread.ksp)->retpc: 0)
 
 extern unsigned long get_wchan(struct task_struct *p);
 extern unsigned long __kstk_eip(struct task_struct *p);
@@ -116,6 +120,7 @@ extern unsigned long __kstk_eip(struct task_struct *p);
 
 #define cpu_relax()             do { } while (0)
 
+#ifdef CONFIG_TI_C6X_COMPILER
 #define ARCH_HAS_PREFETCH
 #define prefetch(x) (0)
 
@@ -124,6 +129,6 @@ extern unsigned long __kstk_eip(struct task_struct *p);
 
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define spin_lock_prefetch(x) (0)
-
+#endif
 
 #endif /* ASM_C6X_PROCESSOR_H */

@@ -13,11 +13,7 @@
  *  This file handles the architecture-dependent parts of process handling.
  */
 #include <linux/moduleloader.h>
-#ifdef __TI_EABI__
 #include <linux/elf.h>
-#else
-#include <linux/coff.h>
-#endif
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
@@ -55,7 +51,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	kfree(me->arch.sh_addr);
 	me->arch.sh_addr = NULL;
 #endif
@@ -71,14 +67,13 @@ void module_arch_cleanup(struct module *mod)
 }
 
 
-#ifdef __TI_EABI__
 /* We don't need anything special. */
 int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      Elf_Shdr *sechdrs,
 			      char *secstrings,
 			      struct module *mod)
 {
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	int i, max_alloc = 0;
 	Elf_Shdr shdr, *shdrs = (void *)hdr + hdr->e_shoff;
 
@@ -122,7 +117,7 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 	unsigned int i;
 	Elf32_Addr v;
 	int res;
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
 	Elf_Addr offset = 0;
@@ -145,7 +140,11 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 			+ ELF32_R_SYM(rel[i].r_info);
 
 		/* this is the adjustment to be made */
+#ifdef CONFIG_TI_C6X_COMPILER
 		v = sym->st_value - me->arch.sh_addr[sym->st_shndx];
+#else
+		v = sym->st_value;
+#endif
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_C6000_ABS32:
@@ -206,7 +205,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	unsigned int i;
 	Elf32_Addr v;
 	int res;
-#ifdef __TI_TOOL_WRAPPER__
+#ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
 	Elf_Addr offset = 0;
@@ -225,7 +224,11 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			+ ELF32_R_SYM(rel[i].r_info);
 
 		/* this is the adjustment to be made */
+#ifdef CONFIG_TI_C6X_COMPILER
 		v = sym->st_value + rel[i].r_addend - me->arch.sh_addr[sym->st_shndx];
+#else
+		v = sym->st_value + rel[i].r_addend;
+#endif
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_C6000_ABS_L16:
@@ -252,200 +255,3 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	return 0;
 }
 
-#else /* __TI_EABI__ */
-/* We don't need anything special. */
-int module_frob_arch_sections(COFF_FILHDR *hdr,
-			      COFF_SCNHDR *sechdrs,
-			      char *secstrings,
-			      struct module *mod)
-{
-	return 0;
-}
-
-int apply_relocate(COFF_SCNHDR *sechdrs,
-		   const char *strtab,
-		   COFF_FILHDR *hdr,
-		   unsigned int relsec,
-		   struct loaded_sections *lsecs,
-		   struct module *me)
-{
-	unsigned int n_reloc;
-	unsigned int inst_addr;
-	unsigned int instruction;
-	unsigned int label;
-	unsigned int reloc_amount;
-	COFF_RELOC *creloc;
-	COFF_SYMENT *sym;
-	int status;
-        /*****************************************************************************/
-        /* Complex Relocation Expression Stack                                       */
-        /*****************************************************************************/
-	relocation_stack relstk;
-	relstk.stack = NULL;
-	relstk.index = -1;
-	relstk.size  = 2;
-
-	relstk.stack = (unsigned int *) kmalloc (relstk.size * sizeof(unsigned int), GFP_KERNEL);
-	if (relstk.stack == NULL)
-		return -ENOMEM;
-
-	DEBUGP("Applying relocate section %s\n",
-	       COFF_LONG(sechdrs[relsec].s_name) ? sechdrs[relsec].s_name : strtab + COFF_LONG((sechdrs[relsec].s_name + 4)));
-
-	for(n_reloc = 0; n_reloc < COFF_LONG(sechdrs[relsec].s_nreloc); n_reloc++) {
-		creloc = ((void *)hdr) + COFF_LONG(sechdrs[relsec].s_relptr) + (n_reloc * COFF_RELSZ);
-
-		if (COFF_SHORT(creloc->r_type) == R_ABS) break;
-
-		/*
-		 * Extract the relocatable field from the object data.
-		 */
-		inst_addr = COFF_LONG(sechdrs[relsec].s_paddr) + COFF_LONG(creloc->r_vaddr) - COFF_LONG(sechdrs[relsec].s_vaddr);
-
-		sym = NULL;
-		if ( COFF_LONG(creloc->r_symndx) != -1 &&
-			(COFF_SHORT(creloc->r_type) == RE_PUSH
-				|| COFF_SHORT(creloc->r_type) == R_RELLONG
-				|| COFF_SHORT(creloc->r_type) == R_C6XLO16
-				|| COFF_SHORT(creloc->r_type) == R_C6XHI16))
-			sym = ((void *)hdr) + COFF_LONG(hdr->f_symptr) + COFF_LONG(creloc->r_symndx) * COFF_SYMESZ;
-
-		/*------------------------------------------------------------------*/
-		/* If this is a relocation expression arithmetic or push            */
-		/* instruction, then we can handle it now and move on to the next   */
-		/* relocation entry.                                                */
-		/*------------------------------------------------------------------*/
-		if (ismathrel(COFF_SHORT(creloc->r_type))) { 
-			if ((status = coff_rel_math(creloc, &relstk)) < 0)
-				return status;
-			continue;
-		}
-
-		if (ispushrel(COFF_SHORT(creloc->r_type))) {
-			if ((status = coff_rel_push(sym, creloc, 0, &relstk)) < 0)
-				return status;
-			continue;
-		}
-
-		/*-----------------------------------------------------------------*/
-		/* Handle relocation expression field instructions.                */
-		/*-----------------------------------------------------------------*/
-		if (isstfldrel(COFF_SHORT(creloc->r_type))) {
-			if ((status = coff_rel_stfld((unsigned int *)inst_addr, creloc, &relstk)) < 0)
-				return status;
-			continue;
-		}
-
-		if ( sym ) {
-			if ( !COFF_SHORT(sym->e_scnum) )
-				reloc_amount = COFF_LONG(sym->e_value);
-			else
-				reloc_amount = COFF_LONG(sechdrs[COFF_SHORT(sym->e_scnum)-1].s_paddr) - 
-					COFF_LONG(sechdrs[COFF_SHORT(sym->e_scnum)-1].s_vaddr);
-		}
-		else
-			reloc_amount = me->module_core + lsecs[relsec].new_vaddr - COFF_LONG(sechdrs[relsec].s_vaddr);
-
-		/*
-		 * Modify the field based on the relocation type.
-		 */
-		switch (COFF_SHORT(creloc->r_type)) {
-
-		case R_RELLONG:
-			/*
-			 * Normal relocations :
-			 * add in the relocation amount.
-			 */
-			label = (unsigned int) *((unsigned int *) inst_addr);
-			label += reloc_amount;
-			*((unsigned int *) inst_addr) = label;
-			break;
-
-		case R_C6XLO16:
-			/*
-			 * MVK 16-bit Constant.
-			 * Calculate address by masking
-			 * off the opcode and OR in the lower 16-bit
-			 * constant + the amount
-			 */
-			
-			instruction = (unsigned int) *((unsigned int *) inst_addr);
-			label = (instruction & 0x007FFF80) >> 7;
-			label += reloc_amount;
-			instruction &= 0xFF80007F ;
-			instruction |= (label & 0x0000FFFF) << 7;
-			*((unsigned int *) inst_addr) = instruction;
-			break;
-
-		case R_C6XHI16:
-			/*
-			 * MVK 16-bit Constant.  Calculate address by masking
-			 * off the opcode and OR in the lower 16-bit constant 
-			 * + the amount
-			 */
-			instruction = (unsigned int) *((unsigned int *) inst_addr);
-			label = ((instruction & 0x007FFF80) << 9) | 
-				(COFF_SHORT(creloc->r_disp) & 0x0000FFFF);
-			label += reloc_amount;
-			instruction &= 0xFF80007F;
-			instruction |= (label & 0xFFFF0000) >> 9;
-			*((unsigned int *)inst_addr) = instruction;
-      			break;
-
-		case R_C6XBASE:
-		case R_C6XPCR21:
-			break;
-
-			/*
-			 * All other cases are treated as default for which future 
-			 * extension are requested.
-			 */
-		default:
-			printk(KERN_ERR "module %s: Unknown relocation: %u\n",
-			       me->name, COFF_SHORT(creloc->r_type));
-			return -ENOEXEC;
-		}		
-	}
-
-	if (relstk.index != -1) {
-		printk(KERN_ALERT "Complex relocation stack should be empty!\n");
-		return -ENOEXEC;		
-	}
-
-	kfree(relstk.stack);
-	return 0;
-}
-
-#define ALIGN_COFF_MASK 0x7
-#define ALIGN_COFF_PTR(ptr) \
-   ((unsigned *)(((unsigned)ptr + ALIGN_COFF_MASK) & ~ALIGN_COFF_MASK))
-#define ALIGN_COFF_VAL(val) \
-   ((((unsigned)val + ALIGN_COFF_MASK) & ~ALIGN_COFF_MASK))
-
-void handle_cinit(COFF_SCNHDR *sechdrs,
-		  unsigned int cinitsec)
-{
-	const unsigned int *recptr = COFF_LONG(sechdrs[cinitsec].s_paddr);
-	int length, cinit_size = COFF_LONG(sechdrs[cinitsec].s_size);
-
-	while( cinit_size > 0 ) {
-		length = *recptr++;
-		cinit_size -= 4;
-
-		if (length < 0){
-			printk(KERN_WARNING "negative length in .cinit section\n");
-			cinit_size -= ALIGN_COFF_VAL(recptr) - (unsigned)recptr;
-			recptr = ALIGN_COFF_PTR(recptr);
-		} else {
-			char *to    = *recptr++;
-			char *from  = (char *)recptr;
-
-			memcpy( to, from, length);
-					
-			from += length;
-			cinit_size -= ALIGN_COFF_VAL(from) - (unsigned)from + length + 4;
-			recptr = ALIGN_COFF_PTR(from);
-		}
-	}	  
-}
-#endif /* __TI_EABI__ */

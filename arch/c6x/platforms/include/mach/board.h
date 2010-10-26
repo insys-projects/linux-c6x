@@ -16,6 +16,9 @@
 #ifdef CONFIG_ARCH_BOARD_DSK6455
 #include <mach/board-dsk6455.h>
 #endif
+#ifdef CONFIG_ARCH_BOARD_EVM6457
+#include <mach/board-evm6457.h>
+#endif
 #ifdef CONFIG_ARCH_BOARD_EVM6472
 #include <mach/board-evm6472.h>
 #endif

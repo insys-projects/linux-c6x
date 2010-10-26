@@ -15,7 +15,7 @@
  * happens, handle that and return -EFAULT.
  */
 
-#ifndef CONFIG_TMS320C6X
+#ifndef CONFIG_TI_C6X_COMPILER
 long __weak probe_kernel_read(void *dst, void *src, size_t size)
     __attribute__((alias("__probe_kernel_read")));
 #else
@@ -49,7 +49,7 @@ EXPORT_SYMBOL_GPL(probe_kernel_read);
  * Safely write to address @dst from the buffer at @src.  If a kernel fault
  * happens, handle that and return -EFAULT.
  */
-#ifndef CONFIG_TMS320C6X
+#ifndef CONFIG_TI_C6X_COMPILER
 long __weak probe_kernel_write(void *dst, void *src, size_t size)
     __attribute__((alias("__probe_kernel_write")));
 #else

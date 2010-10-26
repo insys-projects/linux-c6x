@@ -24,14 +24,8 @@
 #define HAVE_OP(x, op_end, op) ((size_t)(op_end - op) < (x))
 #define HAVE_LB(m_pos, out, op) (m_pos < out || m_pos >= op)
 
-#ifdef __TI_TOOL_WRAPPER__
-/* cilly bug with get_unaligned macro */
-#define COPY4(dst, src)	\
-		put_unaligned(get_unaligned32((const u32 *)(src)), (u32 *)(dst))
-#else
 #define COPY4(dst, src)	\
 		put_unaligned(get_unaligned((const u32 *)(src)), (u32 *)(dst))
-#endif
 
 int lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
 			unsigned char *out, size_t *out_len)

@@ -1595,7 +1595,7 @@ static long vmsplice_to_pipe(struct file *file, const struct iovec __user *iov,
 	struct pipe_inode_info *pipe;
 	struct page *pages[PIPE_BUFFERS];
 	struct partial_page partial[PIPE_BUFFERS];
-#ifndef __TI_TOOL_WRAPPER__
+#ifndef CONFIG_TI_C6X_COMPILER
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
