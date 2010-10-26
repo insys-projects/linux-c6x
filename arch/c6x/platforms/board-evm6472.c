@@ -213,7 +213,7 @@ static struct clk pll1_sysclk10 = {
 	.name = "pll1_sysclk10",
 	.parent = &pll1_clk,
 	.flags = CLK_PLL,
-	.div = 3,
+	.div = PLLDIV10,
 };
 
 static struct clk i2c_clk = {
