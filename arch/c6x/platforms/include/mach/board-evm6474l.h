@@ -32,6 +32,8 @@
 /*
  * Interrupt Assignments
  */
+#define IRQ_EDMA3       INT4
+
 #define IRQ_IPC         INT5
 
 /* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */

@@ -159,11 +159,19 @@ config DAVINCI_MCBSP
 	depends on TMS320DM644X || TMS320DM643X
 	default y
 	help
-	  DaVinci McBSP driver.  Auto-enabled by sound driver.
+	  DaVinci McBSP driver.
+
+config EDMA3
+	bool "EDMA3 support"
+	depends on SOC_TMS320C6474 || SOC_TMS320C6472
+	default y if (DAVINCI_MCBSP || RAPIDIO_TCI648X)
+	help 
+          If you say Y here, the kernel will include drivers and
+          infrastructure code to support TI EDMA3 devices.
 
 config RAPIDIO_TCI648X
         bool "RapidIO support"
-	depends on SOC_TMS320C6474 || SOC_TMS320C6472 || SOC_TMS320C6455
+	depends on SOC_TMS320C6474 || SOC_TMS320C6472
 	default y
         help
           If you say Y here, the kernel will include drivers and
