@@ -84,7 +84,8 @@ void foo(void)
 	OFFSET(TASK_STATE,	task_struct, state);
 	BLANK();
 
-	OFFSET(THREAD_INFO_FLAGS,	thread_info, flags);
+	OFFSET(THREAD_INFO_FLAGS,	  thread_info, flags);
+	OFFSET(THREAD_INFO_PREEMPT_COUNT, thread_info, preempt_count);
 	BLANK();
 
 	/* These would be unneccessary if we ran asm files
