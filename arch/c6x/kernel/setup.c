@@ -244,7 +244,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			
 			mem_size = (unsigned long) memparse(from + 4, &from);
 #ifndef CONFIG_NK
-			memory_end = PAGE_ALIGN(REGION_START(memory_start) + mem_size);
+			memory_end = PAGE_ALIGN(REGION_START(&_stext) + mem_size);
 #else
 			memory_end = PAGE_ALIGN(REGION_START(nkctx->mem.memstart) + mem_size);
 #endif
@@ -407,7 +407,7 @@ void __init setup_arch(char **cmdline_p)
 #endif  
 
 #ifndef CONFIG_NK
-	memory_end   = PAGE_ALIGN((unsigned int) memory_start + BOARD_RAM_SIZE);
+	memory_end   = PAGE_ALIGN((unsigned int) REGION_START(&_stext) + BOARD_RAM_SIZE);
 #else
 	memory_end   = PAGE_ALIGN((unsigned int) nkctx->mem.memstart +
 				  (unsigned int) nkctx->mem.memsize);
@@ -456,7 +456,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set(&_stext, memory_end);
+	cache_set(REGION_START(&_stext), memory_end);
 
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the
