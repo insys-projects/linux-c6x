@@ -174,7 +174,7 @@ void c6x_board_setup_arch(void)
 static int __init evm_init(void)
 {
 	dsk_setup_i2c();
-        return setup_emac();
+        return 0;
 }
 
 arch_initcall(evm_init);

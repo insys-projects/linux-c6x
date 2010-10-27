@@ -6,7 +6,7 @@
 
 include $(srctree)/arch/c6x/Makefile.lib
 
-obj-$(CONFIG_TMS320C64X) += platform-c64xx.o
+obj-$(CONFIG_TMS320C6X) += platform-c64xx.o
 
 # SoC objects
 obj-$(CONFIG_SOC_TMS320C6472)	+= mcore.o ipc.o

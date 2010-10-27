@@ -31,8 +31,8 @@
 /*
  * Timer definitions
  */
-#define LINUX_TIMER_SRC TIMER_5
-#define LINUX_TIMER_EVT IRQ_TINT5
+#define LINUX_TIMER_SRC TIMER_1
+#define LINUX_TIMER_EVT IRQ_TINT1
 
 /*
  * Interrupt Assignments

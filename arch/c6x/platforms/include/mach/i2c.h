@@ -31,7 +31,7 @@ struct davinci_i2c_platform_data {
 /* 
  * Configuration of the interupt selector MUX registers
  */
-#if defined(CONFIG_SOC_TMS320C6472) || defined(SOC_TMS320C6455)
+#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 
 #define i2c_arch_interrupt_setup()      irq_map(IRQ_I2CINT, IRQ_I2C)
 

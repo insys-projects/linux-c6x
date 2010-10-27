@@ -78,12 +78,15 @@
 #endif
 #define IRQ_EDMA3CCGINT   24  /* EDMA channel completion event */
 #if defined(CONFIG_SOC_TMS320C6457)
-#define IRQ_MACRXINT      25
-#define IRQ_MACTXINT      26
-#define IRQ_MACTHRESH     27
+#define IRQ_EMACRXINT     25
+#define IRQ_EMACTXINT     26
+#define IRQ_EMACTHRES     27
 #define IRQ_RIOINT4       28
 #define IRQ_RIOINT5       28
 #define IRQ_RIOINT6       28
+#else
+#define IRQ_EMACRXINT     IRQ_EMACINT
+#define IRQ_EMACTXINT     IRQ_EMACINT
 #endif
 #define IRQ_VCP2INT       32  /* VCP2 error event */
 #if defined(CONFIG_SOC_TMS320C6455)

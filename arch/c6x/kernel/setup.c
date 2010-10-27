@@ -242,7 +242,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			unsigned long mem_size;
 			
 			mem_size = (unsigned long) memparse(from + 4, &from);
-			memory_end = PAGE_ALIGN(REGION_START(memory_start) + mem_size);
+			memory_end = PAGE_ALIGN(REGION_START(&_stext) + mem_size);
 
 			userdef = 1;
 		}
@@ -398,7 +398,7 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = PAGE_ALIGN((unsigned int) &_bss_end);
 #endif  
 
-	memory_end   = PAGE_ALIGN((unsigned int) memory_start + BOARD_RAM_SIZE);
+	memory_end   = PAGE_ALIGN((unsigned int) REGION_START(&_stext) + BOARD_RAM_SIZE);
 	memory_size  = (memory_end - memory_start);
 
 	mach_print_value("memory_start:", memory_start);
@@ -434,7 +434,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set((unsigned long)&_stext, memory_end);
+	cache_set((unsigned long) REGION_START(&_stext), memory_end);
 
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the

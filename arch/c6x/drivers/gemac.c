@@ -47,7 +47,7 @@ static int emac_reset(struct net_device *dev, int reset_mode);
 
 extern int mdio_init(unsigned int txid_version);
 
-#ifdef EMAC_TIMER_TICK
+#ifdef EMAC_TIMER_TICK_MDIO
 static struct timer_list  emac_timer;
 #endif
 
@@ -1340,7 +1340,7 @@ static void emac_set_rx_mode(struct net_device *dev)
  * periodic basis of 100mS (10 times a second). It is used to check the
  * status of the EMAC and MDIO device.
  */
-static void emac_timer_tick(struct net_device *dev)
+static void emac_timer_tick(unsigned long data)
 {
 	struct net_device   *dev = (struct net_device *)data;
 	struct emac_private *ep  = netdev_priv(dev);
@@ -1497,8 +1497,6 @@ static int __init emac_probe(struct platform_device *pdev)
 
 	if (emac_check_shared_capability())
 		ep->slave = emac_shared;
-	else
-		return -ENOSYS;
 
 	netdev->base_addr = ep->emac_reg_base;
 	netdev->dev_id    = pdev->id;
@@ -1544,7 +1542,7 @@ static int __init emac_probe(struct platform_device *pdev)
 		goto error;
 	}
 	
-#ifdef EMAC_TIMER_TICK
+#ifdef EMAC_TIMER_TICK_MDIO
 	/* Set EMAC timer */
 	init_timer(&emac_timer);
 	emac_timer.function = emac_timer_tick;

@@ -409,11 +409,14 @@
 
 static inline int emac_check_shared_capability(void) 
 {
+#ifdef C6X_SOC_HAS_CORE_REV
 	if (arch_get_silicon_rev() < 0x3)
 		printk(KERN_WARNING "Warning sharing of GEMAC has issues with silicon rev %s!\n",
 		       arch_compute_silicon_rev(arch_get_silicon_rev()));
+#endif
 	return 1;
 }
+
 #ifdef CONFIG_SOC_TMS320C6457
 #include <asm/dscr.h>
 #define EFUSE_REG_MAC_ADDR     DSCR_MACID1
@@ -608,11 +611,11 @@ static inline int emac_check_shared_capability(void)
 #define emac_arch_get_mac_addr_low(a)   emac_get_reg(EMAC_MACADDRLO)
 
 /* Take RMII out of reset (the following 2 settings apply only to PG 2.0) */
-#define rmii_arch_fix() do {					\
-		if (intfmacsel == DEVSTAT_MACSEL_RMII) {		\
-			dscr_set_reg(dscr_get_reg(DSCR_EMACCFG) |	\
-				     DSCR_B_EMACCFG_RMIIRST, DSCR_EMACCFG); \
-		} while(0)
+#define rmii_arch_fix() do {						\
+	if (intfmacsel == DEVSTAT_MACSEL_RMII)				\
+	    dscr_set_reg(dscr_get_reg(DSCR_EMACCFG) |			\
+			 DSCR_B_EMACCFG_RMIIRST, DSCR_EMACCFG);		\
+    } while(0)
 
 #define emac_check_shared_capability()  0
 

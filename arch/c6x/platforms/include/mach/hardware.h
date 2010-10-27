@@ -162,9 +162,10 @@
 #if defined(CONFIG_SOC_TMS320C6474)
 #define CORE_NUM                     3
 #define C6X_SOC_HAS_CORE_REV
-#endif
-#if defined(CONFIG_SOC_TMS320C6472)
+#elif defined(CONFIG_SOC_TMS320C6472)
 #define CORE_NUM                     6
+#else
+#define CORE_NUM                     1
 #endif
 
 /*

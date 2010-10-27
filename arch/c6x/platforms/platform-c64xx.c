@@ -213,7 +213,7 @@ static void setup_emac(void)
 }
 #else /* CONFIG_TMS320C64X_GEMAC */
 static void setup_emac(void) {}
-#endif
+#endif /* CONFIG_TMS320C64X_GEMAC */
 
 #if defined(CONFIG_SOC_TMS320C6474)
 unsigned int arch_get_silicon_rev(void)
