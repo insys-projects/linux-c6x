@@ -256,6 +256,7 @@ arch_initcall(evm_init);
  * NOR Flash support.
  */
 #ifdef CONFIG_MTD
+#ifndef CONFIG_TI_C6X_COMPILER /* toolchain bug compiling cfi_amdstd_setup() */
 static struct map_info nor_map = {
 	.name		= "NOR-flash",
 	.phys		= 0xB0000000,
@@ -296,4 +297,5 @@ static __init int nor_init(void)
 }
 
 late_initcall(nor_init);
+#endif /* CONFIG_TI_C6X_COMPILER */
 #endif
