@@ -208,6 +208,13 @@
 #define TCI648X_RIO_TIMEOUT              1000
 #define TCI648X_RIO_RETRY_SHIFT_FACTOR   2
 
+/* 
+ * Default configuration for SP_IP_MODE CSR
+ * Apparently the F8_TGT_ID_DIS field is not correctly read, so it needs
+ * to set it explicitely for each write to the SP_IP_MODE CSR
+ */
+#define TCI648X_RIO_SP_IP_MODE_DEFAULT   0x4d000000 /* SP_MODE = 1, PW_DIS, SCR_TGT_ID_DIS, F8_TGT_ID_DIS */
+
 /*
  * RIO error, reset and special event interrupt defines
  */

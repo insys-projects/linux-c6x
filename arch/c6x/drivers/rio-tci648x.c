@@ -179,6 +179,9 @@ static struct resource              _tci648x_rio_rxu_map_res;
 #define get_prev_desc(desc, p_ring) ((desc) == (p_ring)->desc_base ? \
 				     ((p_ring)->desc_base + (p_ring)->entries - 1) : (desc) - 1)
 
+/* Priority for LSU transfer */
+#define LSU_PRIO                    2 
+
 #ifdef CONFIG_EDMA3
 /*
  * Threshold size to start using EDMA instead of CPU for DIO
@@ -265,7 +268,7 @@ static void tci648x_rio_hw_init(u32 mode, u16 hostid, u32 size)
 	/* Port IP mode, SRC_TGT_ID_DIS is set */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_DISCOV_TIMER,
 		       0x90800000);
-	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,   0x4D00003F); /* 0x4D000000 */
+	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,   0x4D00003F);
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_IP_PRESCAL,   0x00000008);
 
 	/* Set error detection mode */
@@ -607,7 +610,7 @@ static void special_interrupt_handler(int ics)
 		/* Multi-cast event control symbol interrupt received on any port */
 		reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
 		DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
-			       reg | (1 << 4));
+			       reg | TCI648X_RIO_SP_IP_MODE_DEFAULT | (1 << 4));
 		break;
 
 	case TCI648X_RIO_PORT_WRITEIN_INT:
@@ -644,7 +647,7 @@ static void special_interrupt_handler(int ics)
 		/* Device reset interrupt on any port */
 		reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
 		DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
-			       reg | (1 << 2));
+			       reg | TCI648X_RIO_SP_IP_MODE_DEFAULT | (1 << 2));
 		break;
 
 	}
@@ -824,12 +827,13 @@ static u32 tci648x_rio_dio_packet_type(int dio_mode)
 /*
  * DIO transfer using LSU directly 
  */
-static int tci648x_rio_dio_raw_transfer(int index,
-					u16 dest_id,
-					u32 src_addr,
-					u32 tgt_addr,
-					int size_bytes,
-					int dio_mode)
+static inline int tci648x_rio_dio_raw_transfer(struct rio_mport *mport,
+					       int index,
+					       u16 dest_id,
+					       u32 src_addr,
+					       u32 tgt_addr,
+					       int size_bytes,
+					       int dio_mode)
 {
 	unsigned int count;
 	unsigned int status      = 0;
@@ -855,14 +859,18 @@ retry_transfer:
 	
 	/* LSU 1 Reg 4 - 
 	 * out port ID = rio.port
-	 * Priority = 2
+         * priority = LSU_PRIO
 	 * XAM = 0
-	 * ID size = 1 (16 bit)
+	 * ID size = 8 or 16 bit
 	 * Dest ID specified as arg
 	 * interrupt request = 1 */
-	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG4, 
-		       (0x21000001 | (dest_id << 8) | (index << 30)));
-
+	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG4,
+		       ((index_to_port(index) << 30)
+			| (LSU_PRIO << 28)
+			| ((mport->sys_size) ? (1 << 24) : 0)
+			| ((u32) dest_id << 8)
+			| 1));
+	
 	/* LSU 1 Reg 5 -
 	 * doorbell info = 0 for this packet type
 	 * hop count = 0 for this packet type
@@ -923,12 +931,13 @@ retry_transfer:
 /*
  * DIO transfer using EDMA
  */
-static int tci648x_rio_dio_edma_transfer(int index,
-					 u16 dest_id,
-					 u32 src_addr,
-					 u32 tgt_addr,
-					 int size_bytes,
-					 int dio_mode)
+static inline int tci648x_rio_dio_edma_transfer(struct rio_mport *mport,
+						int index,
+						u16 dest_id,
+						u32 src_addr,
+						u32 tgt_addr,
+						int size_bytes,
+						int dio_mode)
 {
         struct tci648x_rio_lsu_reg *lsu_reg_queue;
         struct tci648x_rio_lsu_reg *current_lsu_reg_queue;
@@ -973,14 +982,18 @@ static int tci648x_rio_dio_edma_transfer(int index,
 
 		/* LSU 1 Reg 4 - 
 		 * out port ID = rio.port
-		 * Priority = 2
+		 * priority = LSU_PRIO
 		 * XAM = 0
-		 * ID size = 1 (16 bit)
+		 * ID size = 8 or 16 bit
 		 * Dest ID specified as arg
 		 * interrupt request = 1 */
-		lsu_reg_queue[lsu].reg[4] = 
-			(0x21000001 | (dest_id << 8) | (index << 30));
-	
+		lsu_reg_queue[lsu].reg[4] =		
+			((index_to_port(index) << 30)
+			 | (LSU_PRIO << 28)
+			 | ((mport->sys_size) ? (1 << 24) : 0)
+			 | ((u32) dest_id << 8)
+			 | 1);
+
 		/* LSU 1 Reg 5 -
 		 * doorbell info = 0 for this packet type
 		 * hop count = 0 for this packet type
@@ -1136,6 +1149,7 @@ end_transfer:
  * tci648x_rio_dio_transfer - Transfer bytes data from/to DSP address
  * to device ID's global address.
  * @mport: RapidIO master port info
+ * @index: ID of the RapidIO interface
  * @dest_id: destination device id 
  * @src_addr: source (host) address
  * @tgt_addr: target global address
@@ -1166,7 +1180,8 @@ static int tci648x_rio_dio_transfer(struct rio_mport *mport,
 #ifdef CONFIG_EDMA3
 	/* Check if the transfer uses EDMA */ 
 	if ((tci648x_edma_threshold >= 0) && (size_bytes >= tci648x_edma_threshold)) {
-		res = tci648x_rio_dio_edma_transfer(index, 
+		res = tci648x_rio_dio_edma_transfer(mport,
+						    index, 
 						    dest_id,
 						    src_addr,
 						    tgt_addr,
@@ -1186,7 +1201,8 @@ static int tci648x_rio_dio_transfer(struct rio_mport *mport,
 			length = (count <= TCI648X_RIO_MAX_DIO_PKT_SIZE) ? 
 				count : TCI648X_RIO_MAX_DIO_PKT_SIZE;
 			
-			res = tci648x_rio_dio_raw_transfer(index,
+			res = tci648x_rio_dio_raw_transfer(mport,
+							   index,
 							   dest_id,
 							   s_addr,
 							   t_addr,
@@ -1338,8 +1354,12 @@ static int tci648x_rio_dbell_send(struct rio_mport *mport,
 
 	/* LSU 1 Reg 4 - */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG4,
-		       (0x21000001 | (dest_id << 8) | (index << 30)));
-	
+		       ((index_to_port(index) << 30)
+			| (LSU_PRIO << 28)
+			| ((mport->sys_size) ? (1 << 24) : 0)
+			| ((u32) dest_id << 8)
+			| 1));
+
 	/* LSU 1 Reg 5 
 	 * doorbell info = info
 	 * hop count = 0
@@ -1394,7 +1414,8 @@ static int tci648x_rio_dbell_send(struct rio_mport *mport,
 
 /**
  * maint_request - Perform a maintenance request
- * @port: port to send through
+ * @mport: Master port implementing the inbound message unit
+ * @index: ID of the RapidIO interface
  * @destid: destination ID of target device
  * @hopcount: hopcount for this request
  * @offset: offset in the RapidIO configuration space
@@ -1404,8 +1425,14 @@ static int tci648x_rio_dbell_send(struct rio_mport *mport,
  *
  * Returns %0 on success or %-EINVAL, %-EIO, %-EAGAIN or %-EBUSY on failure.
  */
-static int maint_request(int port, u16 destid, u8 hopcount, u32 offset, 
-			 int len, u32 paddr, u16 type)
+static inline int maint_request(struct rio_mport *mport,
+				int index,
+				u32 dest_id, 
+				u8 hopcount,
+				u32 offset,
+				int len,
+				u32 paddr,
+				u16 type)
 {
 	unsigned int count;
 	unsigned int status = 0;
@@ -1427,7 +1454,10 @@ static int maint_request(int port, u16 destid, u8 hopcount, u32 offset,
 	
 	/* LSU 1 Reg 4 - */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG4,
-		       (0x21000000 | (destid << 8) | (port << 30))); 
+		       ((index_to_port(index) << 30)
+			| (LSU_PRIO << 28)
+			| ((mport->sys_size) ? (1 << 24) : 0)
+			| ((u32) dest_id << 8)));
 
 	/* LSU 1 Reg 5 */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG5,
@@ -1535,7 +1565,7 @@ tci648x_rio_config_read(struct rio_mport *mport, int index, u16 destid,
 	if (!tbuf)
 		return -ENOMEM;
 
-	res = maint_request(index_to_port(index), destid, hopcount, offset, len,
+	res = maint_request(mport, index, destid, hopcount, offset, len,
 			    virt_to_phys(tbuf),
 			    TCI648X_RIO_PACKET_TYPE_MAINT_R);
 
@@ -1610,7 +1640,7 @@ tci648x_rio_config_write(struct rio_mport *mport, int index, u16 destid, u8 hopc
 				 (u32) tbuf + L1_CACHE_ALIGN(len));
 #endif
 
-	res = maint_request(index_to_port(index), destid, hopcount, offset, len,
+	res = maint_request(mport, index, destid, hopcount, offset, len,
 			    virt_to_phys(tbuf),
 			    TCI648X_RIO_PACKET_TYPE_MAINT_W);
 
@@ -1623,7 +1653,7 @@ tci648x_rio_config_write(struct rio_mport *mport, int index, u16 destid, u8 hopc
 /**
  * tci648x_rio_pw_enable - enable/disable port-write interface init
  * @mport: Master port implementing the port write unit
- * @enable:    1=enable; 0=disable port-write message handling
+ * @enable: 1=enable; 0=disable port-write message handling
  */
 static int tci648x_rio_pwenable(struct rio_mport *mport, int enable)
 {
@@ -1632,7 +1662,8 @@ static int tci648x_rio_pwenable(struct rio_mport *mport, int enable)
 	/* Enable/Disable port-write-in interrupt */
 	reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
-		       (reg & ~(1 << 1)) | ((enable & 1) << 1));
+		       (reg & ~(1 << 1)) | TCI648X_RIO_SP_IP_MODE_DEFAULT | ((enable & 1) << 1));
+
 	return 0;
 }
 
@@ -1725,7 +1756,7 @@ static void tci648x_rio_port_write_handler(struct tci648x_rio_data *p_rio)
 	/* Acknowledge port-write-in */
 	reg = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE);
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_SP_IP_MODE,
-		       reg | (1 << 0));
+		       reg | TCI648X_RIO_SP_IP_MODE_DEFAULT | (1 << 0));
 
 	return;
 }
@@ -2139,8 +2170,8 @@ int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 	desc->next  = NULL;
 	desc->opt1  = (mbox & (TCI648X_MAX_MBOX - 1))  /* mbox */
 		| (TCI648X_RIO_MSG_SSIZE << 6)         /* ssize (32 dword) */
-		| (mport->index << 10)                 /* port_id */
-		| (rdev->destid << 16);                /* dest_id*/
+		| (mport->id << 10)                    /* port_id */
+		| ((u32) rdev->destid << 16);          /* dest_id*/
 	
 	if (rdev->net->hport->sys_size)
 		desc->opt1 |= TCI648X_RIO_DESC_FLAG_TT_16;     /* tt */
