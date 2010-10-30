@@ -16,3 +16,4 @@ obj-$(CONFIG_I2C_DAVINCI)      += i2c-davinci.o
 
 obj-$(CONFIG_ARCH_BOARD_EVM6474) += phy.o
 obj-$(CONFIG_ARCH_BOARD_EVM6457) += phy.o
+obj-$(CONFIG_ARCH_BOARD_EVM6474L) += phy-evm6474l.o
