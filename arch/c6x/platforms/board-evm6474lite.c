@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Texas Instruments Incorporated
+ * Author: Sandeep Paulraj <s-paulraj@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -37,11 +38,7 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 
-#include <mach/gemac.h>
 #include <mach/board.h>
-
-static void dummy_print_dummy(char *s, unsigned long hex) {}
-static void dummy_progress(unsigned int step, char *s) {}
 
 #ifdef CONFIG_RAPIDIO_TCI648X
 #include <linux/rio.h>
@@ -65,6 +62,9 @@ static void __init evm_init_rio(void)
 {
 	platform_device_register(&evm6474l_rio_device);
 }
+
+core_initcall(evm_init_rio);
+#endif
 
 static struct pll_data pll1_data = {
 	.num       = 1,
@@ -144,8 +144,6 @@ static struct clk_lookup evm_clks[] = {
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
-core_initcall(evm_init_rio);
-#endif
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -153,17 +151,7 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6474 Lite EVM\n");
 
-<<<<<<< HEAD:arch/c6x/platforms/board-evm6474lite.c
-	/* Configure the interupt selector MUX registers */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-
-	irq_map(IRQ_EMACRXINT, IRQ_EMAC_RX_0);
-	irq_map(IRQ_EMACTXINT, IRQ_EMAC_TX_0);
-
-=======
->>>>>>> origin/srio-gemac:arch/c6x/platforms/board-evm6474lite.c
 	gpio_direction(0xFFFF);  /* all input */
-
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
@@ -171,9 +159,3 @@ void c6x_board_setup_arch(void)
 
 	mach_progress(1, "End of EVM6474 Lite specific initialization");
 }
-
-__init void evm_init(void)
-{
-}
-
-arch_initcall(evm_init);
