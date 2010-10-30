@@ -16,6 +16,3 @@ obj-$(CONFIG_RAPIDIO_TCI648X)  += rio-tci648x.o
 obj-$(CONFIG_I2C_DAVINCI)      += i2c.o
 obj-$(CONFIG_EDMA3)            += edma.o
 
-obj-$(CONFIG_ARCH_BOARD_EVM6474) += phy.o
-obj-$(CONFIG_ARCH_BOARD_EVM6457) += phy.o
-obj-$(CONFIG_ARCH_BOARD_EVM6474L) += phy-evm6474l.o
