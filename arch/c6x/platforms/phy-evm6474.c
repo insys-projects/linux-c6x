@@ -1,9 +1,9 @@
 /*
- *  linux/arch/c6x/platforms/phy-evm6474l.c
+ *  linux/arch/c6x/platforms/phy-evm6474.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -36,18 +36,20 @@ int phy_init(void) {
 	mdio_phy_write(26, 0xe, 0x47); /* set PHY port 6 SERDES to 0.7V swing */
 	mdio_phy_wait();
 
+	mdio_phy_write(26, 0xd, 0x47); /* set PHY port 5 SERDES to 0.7V swing */
+	mdio_phy_wait();
+
 	mdio_phy_write(0, 0xe, 0x8140); /* configure PHY port 6 SERDES --> Faraday 1 at 1000mpbs, full duplex */
+	mdio_phy_wait();
+	
+	mdio_phy_write(0, 0xd, 0x8140); /* configure PHY port 5 SERDES --> Faraday 2 at 1000mbps, full duplex */
+	mdio_phy_wait();
+
+	mdio_phy_write(1, 0x15, 0x43e); /* force internal switch --> port 5 SERDES to 1000MPBS, full Duplex */
 	mdio_phy_wait();
 
 	mdio_phy_write(1, 0x16, 0x43e); /* force internal switch --> port 6 SERDES to 1000MBPS, full Duplex */
 	mdio_phy_wait();
-
-	mdio_phy_write(0, 1, 0x9140);
-	mdio_phy_wait();
-
-	mdio_phy_write(0, 0x0c, 0x0800);
-	mdio_phy_wait();
-
 
 #if 0   /* Use autoneg at PHY level */
 
@@ -63,7 +65,7 @@ int phy_init(void) {
 	return 0;
 }
 
-int evm6474l_phy_init(void) {
+int evm6474_phy_init(void) {
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
@@ -72,7 +74,7 @@ int evm6474l_phy_init(void) {
 	sgmiic.master    = 1;
 	sgmiic.loopback  = 0;
 	sgmiic.autoneg   = 0;
-	sgmiic.txconfig  = 0x00000e23;
+	sgmiic.txconfig  = 0x00000ea3; /* EVMC6474 board is wired up with TX differential +/- swapped. */
 	sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode TX swapped */
 	sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
 
@@ -83,4 +85,4 @@ int evm6474l_phy_init(void) {
 	return 0;
 }
 
-module_init(evm6474l_phy_init);
+module_init(evm6474_phy_init);

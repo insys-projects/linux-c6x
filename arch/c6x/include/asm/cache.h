@@ -21,13 +21,18 @@
  * For practical reasons the L1_CACHE_BYTES defines should not be smaller than
  * the L2 line size
  */
-#define L1_CACHE_BYTES    L2_CACHE_BYTES 
+#define L1_CACHE_BYTES        L2_CACHE_BYTES 
 
 #define L2_CACHE_ALIGN_LOW(x) (((x) & ~(L2_CACHE_BYTES - 1)))
 #define L2_CACHE_ALIGN_UP(x)  (((x) + (L2_CACHE_BYTES - 1)) & ~(L2_CACHE_BYTES - 1))
 #define L2_CACHE_ALIGN_CNT(x) (((x) + (sizeof(int) - 1)) & ~(sizeof(int) - 1))
 
-#define NET_SKB_PAD L2_CACHE_BYTES
+#define NET_SKB_PAD           L2_CACHE_BYTES
+
+/*
+ * Align an address on the beginning of a MAR region
+ */
+#define REGION_START(v)       (((u32) (v)) & ~(IMCR_MAR_SIZE - 1))
 
 /*
  * CCFG register values and bits

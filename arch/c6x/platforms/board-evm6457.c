@@ -38,56 +38,7 @@
 #include <asm/clock.h>
 
 #include <mach/i2c.h>
-#include <mach/gemac.h>
 #include <mach/board.h>
-
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0[] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-	.name		= "EMAC",
-	.id		= 0,
-	.resource	= emac_resources0,
-	.num_resources	= ARRAY_SIZE(emac_resources0),
-};
-
-static void setup_emac(void)
-{
-	int status;
-
-	status	= platform_device_register(&emac_dev0);
-	if (status != 0)
-		pr_debug("setup_emac0 --> %d\n", status);
-
-	/* Power domain need to be activated here */
-}
-#else
-static void setup_emac(void) {}
-#endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -193,18 +144,6 @@ void c6x_board_setup_arch(void)
 {
 	printk("Designed for the EVM6457 board, Texas Instruments.\n");
 
-	/* Configure the interupt selector MUX registers */
-	/* Map our IRQs */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-#ifdef CONFIG_TMS320C64X_GEMAC
-	irq_map(IRQ_MACRXINT, IRQ_EMAC_RX);
-	irq_map(IRQ_MACTXINT, IRQ_EMAC_TX);
-#endif
-
-#ifdef CONFIG_I2C
-	irq_map(IRQ_I2CINT, IRQ_DAVINCI_I2C);
-#endif
-
 #if defined(CONFIG_SERIAL_SC16IS7XX)
 	/* setup GP15 for interrupt from i2c UART */
 	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
@@ -217,13 +156,12 @@ void c6x_board_setup_arch(void)
 
 	c6x_clk_init(evm_clks);
 
-	mach_progress(1, "End of EVM6486 specific initialization");
+	mach_progress(1, "End of EVM6457 specific initialization");
 }
 
 static __init int evm_init(void)
 {
 	evm_setup_i2c();
-	setup_emac();
 	return 0;
 }
 

@@ -72,6 +72,7 @@
 
 #if defined(CONFIG_SOC_TMS320C6474)
 #define DSCR_DEVSTAT                 0x02880804
+#define DSCR_JTAGID                  0x02880814
 #define DSCR_PERLOCK                 0x02ac0004
 #define DSCR_PERCFG0                 0x02ac0008
 #define DSCR_PERSTAT0                0x02ac0014

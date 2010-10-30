@@ -12,19 +12,38 @@
  */
 #include <asm/gpio.h>
 
-/* board memory map */
-#define VECTADDR        0x80000000
-#define TEXTADDR	0x80000400
-#define TEXTLEN         0x07FFFC00
-#define RAMEND		0x88000000
+/*
+ * Board memory
+ */
+#define BOARD_RAM_SIZE	0x08000000
+
+/* 
+ * I2C bus specs 
+ */
+#define ARCH_I2C_FREQ   400   /* KHz  */
+#define ARCH_I2C_DELAY    0   /* usec */
+
+/*
+ * Timer definitions
+ */
+#define LINUX_TIMER_SRC (TIMER_5 - get_coreid())
+#define LINUX_TIMER_EVT (IRQ_TINT5 - (get_coreid() << 1))
 
 /*
  * Interrupt Assignments
  */
-#define IRQ_CLOCKEVENTS INT15
+#define IRQ_EDMA3       INT4
+
+#define IRQ_IPC         INT5
 
 /* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
-#define IRQ_EMAC_TX_0   INT7
 #define IRQ_EMAC_RX_0   INT6
+#define IRQ_EMAC_TX_0   INT7
 
+#define IRQ_RIO_RXTX    INT8
+#define IRQ_RIO_LSU     INT9
+
+#define IRQ_I2C	        INT13
+
+#define IRQ_CLOCKEVENTS INT15
 

@@ -44,6 +44,8 @@
 #include <asm/pm.h>
 #include <asm/hardware.h>
 
+#include <mach/board.h>
+
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/initrd.h>
 #include <asm/pgtable.h>
@@ -51,13 +53,15 @@
 
 #include "tags.h"
 
-extern unsigned int _stext, _etext, _edata, _bss_start, _bss_end, _ramend;
+extern unsigned int  _stext, _etext, _edata, _bss_start, _bss_end;
+extern unsigned long zone_dma_start, zone_dma_size;
+
 unsigned int memory_start, memory_end; 
 unsigned int c6x_early_uart_cons = 0;
-extern unsigned long zone_dma_start, zone_dma_size;
+
 static char c6x_command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
-static const char *cpu_name, *cpu_voltage, *mmu, *fpu;
+static const char *cpu_name, *cpu_voltage, *mmu, *fpu, *soc_rev;
 static char __cpu_rev[5], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
 #ifdef CONFIG_TMS320C64XPLUS
@@ -183,6 +187,12 @@ void get_cpuinfo(void)
 	printk("CPU: %s revision %s core voltage %s core number %d\n",
 	       cpu_name, cpu_rev, cpu_voltage, cpu_num);
 #endif
+
+#ifdef C6X_SOC_HAS_CORE_REV
+	soc_rev = arch_compute_silicon_rev(arch_get_silicon_rev());
+#else
+	soc_rev = "unknown";
+#endif
 }
 
 #ifdef CONFIG_TMS320C6X_CACHES_ON
@@ -229,8 +239,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			 * that size. mem=number can be used to
 			 * trim the existing memory map.
 			 */
-			mem_size = (unsigned long) memparse(from+4, &from);
-			memory_end = PAGE_ALIGN(memory_start + mem_size);
+			unsigned long mem_size;
+			
+			mem_size = (unsigned long) memparse(from + 4, &from);
+			memory_end = PAGE_ALIGN(REGION_START(&_stext) + mem_size);
+
 			userdef = 1;
 		}
 
@@ -238,9 +251,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (to != c6x_command_line)
 				to--;
 			
-			zone_dma_size = (unsigned long) memparse(from+7, &from);
+			zone_dma_size = (unsigned long) memparse(from + 7, &from);
 			if (*from == '@') {
-				zone_dma_start = memparse(from+1, &from);
+				zone_dma_start = memparse(from + 1, &from);
 				userdef = 1;
 			}
 		} else if (!memcmp(from, "console=ttyS0", 13)) {
@@ -253,9 +266,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (to != c6x_command_line)
 				to--;
             
-			initrd_start = memparse(from+7, &from);
+			initrd_start = memparse(from + 7, &from);
 			if (*from == ',') {
-				initrd_size = memparse(from+1, &from);
+				initrd_size = memparse(from + 1, &from);
 			}
 		}
 #endif /* CONFIG_BLK_DEV_INITRD */
@@ -265,9 +278,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (to != c6x_command_line)
 				to--;
 
-			c6x_platram_start = memparse(from+8, &from);
+			c6x_platram_start = memparse(from + 8, &from);
 			if (*from == ',')
-				c6x_platram_size = memparse(from+1, &from);
+				c6x_platram_size = memparse(from + 1, &from);
 		}
 #endif
 
@@ -345,7 +358,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Set the Interrupt Service Table (IST) at the beginning of the 
 	   external memory */
-	set_IST(RAM_MEMORY_START);
+	set_ist(REGION_START(&_stext));
 
 #ifdef CONFIG_TMS320C6X_CACHES_ON
 	/* Perform caches initialization */
@@ -385,7 +398,7 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = PAGE_ALIGN((unsigned int) &_bss_end);
 #endif  
 
-	memory_end   = PAGE_ALIGN((unsigned int) &_ramend);
+	memory_end   = PAGE_ALIGN((unsigned int) REGION_START(&_stext) + BOARD_RAM_SIZE);
 	memory_size  = (memory_end - memory_start);
 
 	mach_print_value("memory_start:", memory_start);
@@ -421,7 +434,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set((unsigned long)&_stext, memory_end);
+	cache_set((unsigned long) REGION_START(&_stext), memory_end);
 
 	/*
 	 * give all the memory to the bootmap allocator,  tell it to put the
@@ -481,10 +494,8 @@ void __init setup_arch(char **cmdline_p)
 
 	mach_progress(8, "End of C6x arch dep initialization");
 
-#ifdef CONFIG_VT
-#ifdef CONFIG_DUMMY_CONSOLE
+#if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
-#endif
 #endif
 }
 
@@ -495,7 +506,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifndef CONFIG_TMS320C64XPLUS
 	seq_printf(m, 
 		   "CPU:\t\t%s\n"
-		   "Revision:\t%s\n"
+		   "Core revision:\t%s\n"
 		   "Core voltage:\t%s\n"
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
@@ -509,16 +520,17 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #else
 	seq_printf(m, 
 		   "CPU:\t\t%s\n"
-		   "Revision:\t%s\n"
+		   "Core revision:\t%s\n"
 		   "Core voltage:\t%s\n"
 		   "Core num:\t%d\n"
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
+		   "Silicon rev:\t%s\n"
 		   "Clocking:\t%luMHz\n"
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
 		   cpu_name, cpu_rev, cpu_voltage, cpu_num, mmu, fpu,
-		   clock_freq,
+		   soc_rev, clock_freq,
 		   (loops_per_jiffy/(500000/HZ)),(loops_per_jiffy/(5000/HZ))%100,
 		   loops_per_jiffy);
 #endif

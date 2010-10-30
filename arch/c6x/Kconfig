@@ -152,10 +152,6 @@ config SGMII
 	bool "Ethernet SGMII support"
 	default n
 
-config TMS320C6X_EMAC
-	bool "Ethernet (EMAC/MDIO interface)"
-	default n
-
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
 	default n
@@ -175,7 +171,37 @@ config DAVINCI_MCBSP
 	depends on TMS320DM644X || TMS320DM643X
 	default y
 	help
-	  DaVinci McBSP driver.  Auto-enabled by sound driver.
+	  DaVinci McBSP driver.
+
+config EDMA3
+	bool "EDMA3 support"
+	depends on SOC_TMS320C6474 || SOC_TMS320C6472
+	default y if (DAVINCI_MCBSP || RAPIDIO_TCI648X)
+	help 
+          If you say Y here, the kernel will include drivers and
+          infrastructure code to support TI EDMA3 devices.
+
+config RAPIDIO_TCI648X
+        bool "RapidIO support"
+	depends on SOC_TMS320C6474 || SOC_TMS320C6472
+	default y
+        help
+          If you say Y here, the kernel will include drivers and
+          infrastructure code to support RapidIO interconnect devices.
+
+config RAPIDIO_DEV
+	bool "sRIO user-level interface through /dev"
+	default y
+	depends on RAPIDIO_TCI648X
+
+config RAPIDIO
+        bool
+	depends on RAPIDIO_TCI648X
+	default y
+
+if RAPIDIO_TCI648X
+source "drivers/rapidio/Kconfig"
+endif
 
 config TMS320C6X_CACHES_ON
 	bool "L2 cache support"
@@ -186,16 +212,16 @@ config TMS320C6X_SYSCALL_COMPAT
 	depends on TMS320C64XPLUS_CORE
 	default n
 
-config LARGE_ALLOCS
-	bool "Allow allocating large blocks (> 1MB) of memory"
-	help
-	  Allow the slab memory allocator to keep chains for very large
-	  memory sizes - upto 32MB. You may need this if your system has
-	  a lot of RAM, and you need to able to allocate very large
-	  contiguous chunks. If unsure, say N.
+config PAGE_OFFSET
+	hex "Virtual address of memory base"
+	default 0xe0000000 if SOC_TMS320C6455
+	default 0xe0000000 if SOC_TMS320C6457
+	default 0xe0000000 if SOC_TMS320C6472
+	default 0x80000000
 
 config CONTIGUOUS_PAGE_ALLOC
-	bool "Non Power of two page allocator"
+	bool
+	default y
 
 config PGCACHE_LIMIT
 	bool "page cache limit"
@@ -248,7 +274,6 @@ source "net/Kconfig"
 menu "Device Drivers"
 
 source "drivers/Kconfig"
-
 
 endmenu
 

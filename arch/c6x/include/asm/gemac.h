@@ -4,7 +4,9 @@
  *  Port on Texas Instruments TMS320C6x architecture
  *
  *  Copyright (C) 2006, 2009, 2010 Texas Instruments Incorporated
- *  Author: Nicolas Videau (nicolas.videau@jaluna.com)
+ *  Author: Nicolas Videau <nicolas.videau@jaluna.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
+ *          
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -14,11 +16,18 @@
 #define __ASM_C6X_GEMAC_H_
 
 #ifdef __KERNEL__
+
 /*
  * Tx and Rx buffers parameters (total should be lower than 512)
  */
-#define RX_RING_SIZE      446
-#define TX_RING_SIZE      64 /* Must be 2^X */
+#define QUEUE_NUM         8                      /* Number of queues in the EMAC */
+#define DESC_NUM          512                    /* Max number of descriptors in the descriptor 
+						    memory (invariant) */
+#define QUEUE_DESC_NUM    (DESC_NUM / QUEUE_NUM) /* Number of descriptors per queue */
+#define MAC_ADDR_NUM      32                     /* Number of MAC addresses */
+
+#define TX_RING_SIZE      (QUEUE_DESC_NUM / 2)   /* Must be a power of 2 */
+#define RX_RING_SIZE      (QUEUE_DESC_NUM - TX_RING_SIZE)
 #define RX_RING_MOD_MAX   (RX_RING_SIZE - 1)
 #define TX_RING_MOD_MASK  (TX_RING_SIZE - 1)
 
@@ -27,6 +36,13 @@
 
 #define TX_TIMEOUT        (2*HZ)
 #define EMAC_TIMER_PERIOD (HZ/10)
+
+#define GEMAC_RESET_COLD  1
+#define GEMAC_RESET_WARM  2
+
+#define IDX_TO_CHAN(i)    ((i) << 1)              /* Convert index to channel */
+#define IDX_TO_MAC(i)     ((i) << 1)              /* Convert index to MAC addr offset */
+#define DEV_TO_MAC(d)     ((d) * CORE_NUM)        /* Convert dev_id to MAC addr offset */
 
 /*
  * EMAC descriptor
@@ -59,21 +75,20 @@ struct emac_private {
 	struct net_device *dev;
 	struct net_device_stats stats;
 	unsigned long mode_flags;
+	unsigned long slave;
 	unsigned long packet_mtu;
 	unsigned long tx_full;
-	unsigned long zero_copy;
 	unsigned long fatal_error;
-	spinlock_t lock;
+	spinlock_t    lock;
 	unsigned long emac_reg_base;
 	unsigned long ectl_reg_base;
 	unsigned long emac_dsc_base;
 	unsigned long mdio_reg_base;
-#ifdef CONFIG_TMS320DM648
-	unsigned int mcast_valid_len;
+#ifdef EMAC_HAS_ALE_SUPPORT
+	unsigned int  mcast_valid_len;
 	unsigned int *mcast_infos;
 #endif
 };
-
 
 /*
  * EMAC Configuration information
@@ -83,47 +98,47 @@ struct emac_config {
 	u32 enetaddr[6];
 };
 
-
-#define emac_setbit_reg(reg, val) \
+#define emac_setbit_reg(reg, val)					\
         *((volatile u32 *) (ep->emac_reg_base + (reg))) |= (u32) (val)
-	    
-#define emac_clearbit_reg(reg, val) \
+
+#define emac_clearbit_reg(reg, val)					\
         *((volatile u32 *) (ep->emac_reg_base + (reg))) &= ~((u32) (val))
         
-#define emac_set_reg(reg, val) \
+#define emac_set_reg(reg, val)						\
         *((volatile u32 *) (ep->emac_reg_base + (reg))) = (u32) (val)
         
-#define emac_get_reg(reg) \
+#define emac_get_reg(reg)				\
         *((volatile u32 *) (ep->emac_reg_base + (reg)))
 
-#define emac_addr_reg(reg) \
+#define emac_addr_reg(reg)				\
         ((volatile u32 *) (ep->emac_reg_base + (reg)))
 
-#define emac_set_stat(w, reg) \
-        do { \
-                u32 stat = emac_get_reg(reg); \
-                emac_set_reg(reg, stat); \
-                stat += (w); \
-                (w) = stat; \
+#define emac_set_stat(w, reg)			\
+        do {					\
+                u32 stat = emac_get_reg(reg);	\
+                emac_set_reg(reg, stat);	\
+                stat += (w);			\
+                (w) = stat;			\
         } while(0)
 
-#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_TMS320DM648)
-#define ectl_setbit_reg(reg, val) \
+#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
+#define ectl_setbit_reg(reg, val)					\
         *((volatile u32 *) (ep->ectl_reg_base + (reg))) |= (u32) (val)
 	    
-#define ectl_clearbit_reg(reg, val) \
+#define ectl_clearbit_reg(reg, val)					\
         *((volatile u32 *) (ep->ectl_reg_base + (reg))) &= ~((u32) (val))
         
-#define ectl_set_reg(reg, val) \
+#define ectl_set_reg(reg, val)						\
         *((volatile u32 *) (ep->ectl_reg_base + (reg))) = (u32) (val)
         
-#define ectl_get_reg(reg) \
+#define ectl_get_reg(reg)				\
         *((volatile u32 *) (ep->ectl_reg_base + (reg)))
 
 /* Value for interrupt pacing: (CPUCLK/6) / 250000 (1/4us) = 0x29a on 1GHz DSP */
-#define gemac_int_prescaler() \
+#define gemac_int_prescaler()					\
         (((CONFIG_TMS320C6X_MHZ * (1000000 / 6)) / 250000))
-#endif /* defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_TMS320DM648) */
+
+#endif /* defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
 
 #include <mach/gemac.h>
 

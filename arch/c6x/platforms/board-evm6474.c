@@ -37,55 +37,32 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 
-#include <mach/gemac.h>
 #include <mach/board.h>
 
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
-		.flags          =  IORESOURCE_IRQ,
-	},
+#ifdef CONFIG_RAPIDIO_TCI648X
+#include <linux/rio.h>
+#include <asm/rio.h>
+
+struct tci648x_rio_board_controller_info evm6474_rio_controller = {
+	0x3,                         /* bitfield of port(s) to probe on this controller */
+	TCI648X_RIO_MODE_0,          /* SERDES configuration (BOOTMODE8) */
+	0,                           /* host id */
+	RIO_DO_ENUMERATION,          /* initialisation method */
+	1                            /* large size (16bit)*/
 };
 
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
+static struct platform_device evm6474_rio_device = {
+	.name           = "tci648x-rapidio",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_rio_controller },
 };
 
-static void setup_emac(void)
+static void __init evm_init_rio(void)
 {
-        int status;
-
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac0 --> %d\n", status);
-        //else
-        //  /* Power domain need to be activated here */
+	platform_device_register(&evm6474_rio_device);
 }
-#else
-static void setup_emac(void) {}
+
+core_initcall(evm_init_rio);
 #endif
 
 static struct pll_data pll1_data = {
@@ -174,12 +151,6 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6474 board, Texas Instruments.\n");
 
-	/* Configure the interupt selector MUX registers */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-
-	irq_map(IRQ_EMACRXINT, IRQ_EMAC_RX_0);
-	irq_map(IRQ_EMACTXINT, IRQ_EMAC_TX_0);
-
 	gpio_direction(0xFFFF);  /* all input */
 
 	mach_progress      = dummy_progress;
@@ -189,10 +160,3 @@ void c6x_board_setup_arch(void)
 
 	mach_progress(1, "End of EVM6474 specific initialization");
 }
-
-__init void evm_init(void)
-{
-	setup_emac();
-}
-
-arch_initcall(evm_init);

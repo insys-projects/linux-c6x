@@ -5,6 +5,11 @@
  * Copyright 2005 MontaVista Software, Inc.
  * Matt Porter <mporter@kernel.crashing.org>
  *
+ * Add DirectI/O and /dev interface
+ *
+ * Copyright 2010 Texas Instruments Incorporated
+ * Aurelien Jacquiot <a-jacquiot@ti.com>
+ *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -14,6 +19,23 @@
 #ifndef LINUX_RIO_H
 #define LINUX_RIO_H
 
+#include <linux/ioctl.h>
+
+/* Device Ioctl */
+#define RIO_DIO_BASE_SET     _IOR('R', 0, int) /* Set base offset */
+#define RIO_DIO_BASE_GET     _IOW('R', 1, int) /* Get base offset */
+#define RIO_DIO_MODE_SET     _IOR('R', 2, int) /* Set Direct I/O mode */
+#define RIO_DIO_MODE_GET     _IOW('R', 3, int) /* Get Direct I/O mode */
+#define RIO_DBELL_TX         _IOR('R', 4, int) /* Sent a doorbell */
+#define RIO_DBELL_RX         _IOR('R', 5, int) /* Receive a doorbell */
+
+/* Direct I/O modes */
+#define RIO_DIO_MODE_READ    0x0000
+#define RIO_DIO_MODE_WRITER  0x0001
+#define RIO_DIO_MODE_WRITE   0x0002
+#define RIO_DIO_MODE_SWRITE  0x0003
+
+#ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/list.h>
@@ -22,6 +44,9 @@
 #include <linux/rio_regs.h>
 
 #define RIO_NO_HOPCOUNT		-1
+#define RIO_DO_DISCOVERY        0x0
+#define RIO_DO_DISCOVERY_WAIT   0x1
+#define RIO_DO_ENUMERATION      0x2
 #define RIO_INVALID_DESTID	0xffff
 
 #define RIO_MAX_MPORT_RESOURCES	16
@@ -41,12 +66,14 @@
 
 #define RIO_MAX_MBOX		4
 #define RIO_MAX_MSG_SIZE	0x1000
-
+#define RIO_MAX_DIO_PKT_SIZE    0x1000
+#define RIO_MAX_DIO_CHUNK_SIZE  (RIO_MAX_DIO_PKT_SIZE * 10)
+ 
 /*
  * Error values that may be returned by RIO functions.
  */
-#define RIO_SUCCESSFUL			0x00
-#define RIO_BAD_SIZE			0x81
+#define RIO_SUCCESSFUL		0x00
+#define RIO_BAD_SIZE		0x81
 
 /*
  * For RIO devices, the region numbers are assigned this way:
@@ -58,16 +85,29 @@
  *
  *	0	RapidIO inbound doorbells
  *	1	RapidIO inbound mailboxes
- *	1	RapidIO outbound mailboxes
+ *	2	RapidIO outbound mailboxes
  */
 #define RIO_DOORBELL_RESOURCE	0
 #define RIO_INB_MBOX_RESOURCE	1
 #define RIO_OUTB_MBOX_RESOURCE	2
 
+#define RIO_PW_MSG_SIZE		64
+
 extern struct bus_type rio_bus_type;
 extern struct list_head rio_devices;	/* list of all devices */
 
 struct rio_mport;
+union rio_pw_msg;
+
+/**
+ * struct dio_dev - DirectI/O info for a RIO device
+ * @write_mode: Indicate the type of DIO write operations for this device
+ * @base_offset: Address of the /dev file offset 0 in the device address space
+ */
+struct dio_dev {
+	u16 write_mode;
+	u32 base_offset;
+};
 
 /**
  * struct rio_dev - RIO device info
@@ -90,7 +130,8 @@ struct rio_mport;
  * @driver: Driver claiming this device
  * @dev: Device model device
  * @riores: RIO resources this device owns
- * @destid: Network destination ID
+ * @destid: Network destination I
+ * @dio: Pointer to DirectIO struct
  */
 struct rio_dev {
 	struct list_head global_list;	/* node in list of all RIO devices */
@@ -107,12 +148,17 @@ struct rio_dev {
 	u32 swpinfo;		/* Only used for switches */
 	u32 src_ops;
 	u32 dst_ops;
+	u32 comp_tag;
+	u32 phys_efptr;
+	u32 em_efptr;
 	u64 dma_mask;
 	struct rio_switch *rswitch;	/* RIO switch info */
 	struct rio_driver *driver;	/* RIO driver claiming this device */
 	struct device dev;	/* LDM device structure */
 	struct resource riores[RIO_MAX_DEV_RESOURCES];
+	int (*pwcback) (struct rio_dev *rdev, union rio_pw_msg *msg, int step);
 	u16 destid;
+	struct dio_dev dio;
 };
 
 #define rio_dev_g(n) list_entry(n, struct rio_dev, global_list)
@@ -139,6 +185,7 @@ struct rio_msg {
 struct rio_dbell {
 	struct list_head node;
 	struct resource *res;
+        struct rio_mport *mport;
 	void (*dinb) (struct rio_mport *mport, void *dev_id, u16 src, u16 dst, u16 info);
 	void *dev_id;
 };
@@ -158,6 +205,7 @@ enum rio_phy_type {
  * @inb_msg: RIO inbound message event descriptors
  * @outb_msg: RIO outbound message event descriptors
  * @host_deviceid: Host device ID associated with this master port
+ * @init: RIO bus method of initialization (enumeration/discovery)
  * @ops: configuration space functions
  * @id: Port ID, unique among all ports
  * @index: Port index, unique among all port interfaces of the same type
@@ -175,6 +223,7 @@ struct rio_mport {
 	struct rio_msg inb_msg[RIO_MAX_MBOX];
 	struct rio_msg outb_msg[RIO_MAX_MBOX];
 	int host_deviceid;	/* Host device ID */
+        int init;               /* initialization (enumeration/discovery) methods */
 	struct rio_ops *ops;	/* maintenance transaction functions */
 	unsigned char id;	/* port ID, unique among all ports */
 	unsigned char index;	/* port index, unique among all port
@@ -211,8 +260,10 @@ struct rio_net {
  * @hopcount: Hopcount to this switch
  * @destid: Associated destid in the path
  * @route_table: Copy of switch routing table
+ * @port_ok: Status of each port (one bit per port) - OK=1 or UNINIT=0
  * @add_entry: Callback for switch-specific route add function
  * @get_entry: Callback for switch-specific route get function
+ * @clr_table: Callback for switch-specific clear route table function
  */
 struct rio_switch {
 	struct list_head node;
@@ -220,21 +271,30 @@ struct rio_switch {
 	u16 hopcount;
 	u16 destid;
 	u8 *route_table;
+	u32 port_ok;
 	int (*add_entry) (struct rio_mport * mport, u16 destid, u8 hopcount,
 			  u16 table, u16 route_destid, u8 route_port);
 	int (*get_entry) (struct rio_mport * mport, u16 destid, u8 hopcount,
 			  u16 table, u16 route_destid, u8 * route_port);
+	int (*clr_table) (struct rio_mport *mport, u16 destid, u8 hopcount,
+			  u16 table);
+	int (*em_init)   (struct rio_dev *dev);
+	int (*em_handle) (struct rio_dev *dev, u8 swport);
 };
 
 /* Low-level architecture-dependent routines */
 
 /**
- * struct rio_ops - Low-level RIO configuration space operations
+ * struct rio_ops - Low-level RIO operations
  * @lcread: Callback to perform local (master port) read of config space.
  * @lcwrite: Callback to perform local (master port) write of config space.
  * @cread: Callback to perform network read of config space.
  * @cwrite: Callback to perform network write of config space.
  * @dsend: Callback to send a doorbell message.
+ * @dwait: Callback to wait a doorbell message.
+ * @transfer: Callback to perform a Direct I/O transfer
+ * @fixup: Callback for architecture specific fixup fonction
+ * @pwenable: Callback to enable/disable port-write message handling.
  */
 struct rio_ops {
 	int (*lcread) (struct rio_mport *mport, int index, u32 offset, int len,
@@ -244,8 +304,13 @@ struct rio_ops {
 	int (*cread) (struct rio_mport *mport, int index, u16 destid,
 			u8 hopcount, u32 offset, int len, u32 *data);
 	int (*cwrite) (struct rio_mport *mport, int index, u16 destid,
-			u8 hopcount, u32 offset, int len, u32 data);
+		       u8 hopcount, u32 offset, int len, u32 data);
 	int (*dsend) (struct rio_mport *mport, int index, u16 destid, u16 data);
+	int (*dwait) (struct rio_mport *mport, u16 data);
+	int (*transfer) (struct rio_mport *mport, int index, u16 dest_id,
+			 u32 src_addr,u32 tgt_addr, int size_bytes, int write);
+	int (*fixup) (struct rio_mport *mport, struct rio_dev *rdev);
+	int (*pwenable) (struct rio_mport *mport, int enable);
 };
 
 #define RIO_RESOURCE_MEM	0x00000100
@@ -307,6 +372,7 @@ struct rio_device_id {
  * @did: RIO device ID
  * @add_hook: Callback that adds a route entry
  * @get_hook: Callback that gets a route entry
+ * @clr_hook: Callback that clears a switch route table (may be NULL)
  *
  * Defines the operations that are necessary to manipulate the route
  * tables for a particular RIO switch device.
@@ -317,6 +383,35 @@ struct rio_route_ops {
 			 u16 table, u16 route_destid, u8 route_port);
 	int (*get_hook) (struct rio_mport * mport, u16 destid, u8 hopcount,
 			 u16 table, u16 route_destid, u8 * route_port);
+	int (*clr_hook) (struct rio_mport *mport, u16 destid, u8 hopcount,
+			 u16 table);
+};
+
+/**
+ * struct rio_em_ops - Per-switch error management operations
+ * @vid: RIO vendor ID
+ * @did: RIO device ID
+ * @init_hook: Switch specific error management initialization (may be NULL)
+ * @handler_hook: Switch specific error management handler (may be NULL)
+ *
+ * Defines the operations that are necessary to initialize and handle
+ * error management events for a particular RIO switch device.
+ */
+struct rio_em_ops {
+	u16 vid, did;
+	int (*init_hook) (struct rio_dev *dev);
+	int (*handler_hook) (struct rio_dev *dev, u8 swport);
+};
+
+union rio_pw_msg {
+	struct {
+		u32 comptag;	/* Component Tag CSR */
+		u32 errdetect;	/* Port N Error Detect CSR */
+		u32 is_port;	/* Implementation specific + PortID */
+		u32 ltlerrdet;	/* LTL Error Detect CSR */
+		u32 padding[12];
+	} em;
+	u32 raw[RIO_PW_MSG_SIZE/sizeof(u32)];
 };
 
 /* Architecture and hardware-specific functions */
@@ -331,4 +426,5 @@ extern void rio_close_inb_mbox(struct rio_mport *, int);
 extern int rio_open_outb_mbox(struct rio_mport *, void *, int, int);
 extern void rio_close_outb_mbox(struct rio_mport *, int);
 
+#endif				/* __KERNEL__ */
 #endif				/* LINUX_RIO_H */

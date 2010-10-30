@@ -11,32 +11,43 @@
  *  published by the Free Software Foundation.
  */
 
-/* board memory map */
-#define VECTADDR        0xE0000000
-#define TEXTADDR	0xE0000400
-#define TEXTLEN         0x07FFFC00
-#define RAMEND		0xE8000000
+/* 
+ * Board memory
+ */
+#define BOARD_RAM_SIZE	0x08000000
 
-/* davinci i2c bus specs */
-#define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
-#define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
+/* 
+ * I2C bus specs 
+ */
+#define ARCH_I2C_FREQ   400   /* KHz  */
+#define ARCH_I2C_DELAY    0   /* usec */
+
+/*
+ * Timer definitions
+ */
+#define LINUX_TIMER_SRC TIMER_1
+#define LINUX_TIMER_EVT IRQ_TINT1
 
 /*
  * Interrupt Assignments
  */
+#define IRQ_EMAC_RX_0   INT6
+#define IRQ_EMAC_TX_0   INT6   /* same IRQ for both Tx and Rx */
+
+#define IRQ_I2C	        INT13
+
 #define IRQ_CLOCKEVENTS INT15
-#define IRQ_DAVINCI_I2C	INT14
-#define IRQ_EMAC        INT6
+ 
+/* 
+ * DSK6455 CPLD registers
+ */
+#define DSK6455_CPLD_REG_BASE  0xa0000000
 
-
-#define DSK6455_CPLD_REG_BASE                    0xa0000000
-
-/* DSK6455 CPLD registers */
-#define DSK6455_CPLD_USER                        0x0
-#define DSK6455_CPLD_DC                          0x1
-#define DSK6455_CPLD_VERSION                     0x4
-#define DSK6455_CPLD_MISC                        0x6
-#define DSK6455_CPLD_MISC2                       0x7
+#define DSK6455_CPLD_USER      0x0
+#define DSK6455_CPLD_DC        0x1
+#define DSK6455_CPLD_VERSION   0x4
+#define DSK6455_CPLD_MISC      0x6
+#define DSK6455_CPLD_MISC2     0x7
 
 #ifndef __ASSEMBLY__
 #define cpld_setbit_reg(reg, val) \
