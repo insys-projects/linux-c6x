@@ -84,8 +84,11 @@ int evm_phy_init(void)
 	sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode */
 	sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
 
+#ifdef CONFIG_ARCH_BOARD_EVM6474
+	/* EVMC6474 board is wired up with TX differential +/- swapped. */
+	sgmiic.txconfig  |= 0x80;
+#endif
 	sgmii_config(&sgmiic);
-
 	phy_init();
 
 	return 0;
