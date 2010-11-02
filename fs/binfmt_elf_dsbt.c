@@ -963,11 +963,11 @@ static int find_unmapped_sections(struct elf_dsbt_params *params, struct unmappe
 		/* look for this offset in code segment */
 		p = &params->code_seg;
 		if (p->p_offset <= d->d_un.d_ptr &&
-		    (p->p_offset + p->p_memsz) > d->d_un.d_ptr)
+		    (p->p_offset + p->p_filesz) > d->d_un.d_ptr)
 			continue;
 		p = &params->data_seg;
 		if (p->p_offset <= d->d_un.d_ptr &&
-		    (p->p_offset + p->p_memsz) > d->d_un.d_ptr)
+                   (p->p_offset + p->p_filesz) > d->d_un.d_ptr)
 			continue;
 
 		s = find_section_by_offset(params, d->d_un.d_ptr);
