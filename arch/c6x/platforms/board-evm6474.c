@@ -65,6 +65,49 @@ static void __init evm_init_rio(void)
 core_initcall(evm_init_rio);
 #endif
 
+#ifdef CONFIG_MCBSP
+#include <asm/mcbsp.h>
+#include <asm/edma.h>
+
+static const struct mcbsp_info evm6474_mcbsp_info[] = {
+	[0] = {.phys_base   = IO_ADDRESS(MCBSP0_BASE_ADDR),
+	       .dma_rx_sync = DMA_MCBSP0_RX,
+	       .dma_tx_sync = DMA_MCBSP0_TX,
+	       .dma_rx_data = MCBSP0_EDMA_RX_DATA,
+	       .dma_tx_data = MCBSP0_EDMA_TX_DATA,
+	       .rx_irq      = IRQ_MCBSP0_RX,
+	       .tx_irq      = IRQ_MCBSP0_TX},
+
+	[1] = {.phys_base   = IO_ADDRESS(MCBSP1_BASE_ADDR),
+	       .dma_rx_sync = DMA_MCBSP1_RX,
+	       .dma_tx_sync = DMA_MCBSP1_TX,
+	       .dma_rx_data = MCBSP1_EDMA_RX_DATA,
+	       .dma_tx_data = MCBSP1_EDMA_TX_DATA,
+	       .rx_irq      = IRQ_MCBSP1_RX,
+	       .tx_irq      = IRQ_MCBSP1_RX},
+};
+
+static struct platform_device evm6474_mcbsp_device0 = {
+	.name           = "tci648x-mcbsp",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_mcbsp_info[0] },
+};
+
+static struct platform_device evm6474_mcbsp_device1 = {
+	.name           = "tci648x-mcbsp",
+	.id             = 2,
+	.dev		= { .platform_data = &evm6474_mcbsp_info[1] },
+};
+
+static void __init evm_init_mcbsp(void)
+{
+	platform_device_register(&evm6474_mcbsp_device0);
+	platform_device_register(&evm6474_mcbsp_device1);
+}
+
+core_initcall(evm_init_mcbsp);
+#endif
+
 static struct pll_data pll1_data = {
 	.num       = 1,
 	.phys_base = ARCH_PLL1_BASE,
@@ -129,6 +172,11 @@ static struct clk i2c_clk = {
 	.parent = &pll1_sysclk10,
 };
 
+static struct clk mcbsp_clk = {
+	.name = "mcbsp",
+	.parent = &pll1_sysclk10,
+};
+
 static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1", &pll1_clk),
 	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
@@ -138,6 +186,8 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
 	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK("tci648x-mcbsp.1", NULL, &mcbsp_clk),
+	CLK("tci648x-mcbsp.2", NULL, &mcbsp_clk),
 	CLK("", NULL, NULL)
 };
 

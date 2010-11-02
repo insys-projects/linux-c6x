@@ -187,6 +187,8 @@
  */
 #define MCBSP0_BASE_ADDR             0x028c0000
 #define MCBSP1_BASE_ADDR             0x028d0000
+#define MCBSP0_EDMA_BASE_ADDR        0x30000000
+#define MCBSP1_EDMA_BASE_ADDR        0x34000000
 #endif
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

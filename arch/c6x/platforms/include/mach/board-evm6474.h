@@ -43,6 +43,12 @@
 #define IRQ_RIO_RXTX    INT8
 #define IRQ_RIO_LSU     INT9
 
+/* Not used */
+#define IRQ_MCBSP0_RX   INT10
+#define IRQ_MCBSP0_TX   INT11
+#define IRQ_MCBSP1_RX   INT10
+#define IRQ_MCBSP1_TX   INT11
+
 #define IRQ_I2C	        INT13
 
 #define IRQ_CLOCKEVENTS INT15
