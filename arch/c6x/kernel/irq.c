@@ -54,10 +54,19 @@ static void c64x_mask_irq(unsigned int irq)
 	disable_irq_mask(1 << irq);
 }
 
+static unsigned int c64x_startup_irq(unsigned int irq)
+{
+    	struct irq_desc *desc = irq_to_desc(irq);
+
+	clear_irq_mask(~(1 << irq));
+	desc->chip->enable(irq);
+	return 0;
+}
 static struct irq_chip c64x_irq_chip = {
 	.name		= "C64x+",
 	.mask		= c64x_mask_irq,
 	.unmask		= c64x_unmask_irq,
+	.startup        = c64x_startup_irq,
 };
 
 /* The number of spurious interrupts */
@@ -133,6 +142,12 @@ void irq_map(unsigned int irq_src, unsigned int cpu_irq)
 	if (cpu_irq < INT4 || cpu_irq > INT15)
 		return;
 		
+	/* Clear pending source event */
+	offset = IRQ_EVTCLR0_REG + ((irq_src >> 5) << 2);
+	reg    = (volatile unsigned int*) (offset);
+	*reg   = (1 << (irq_src & 0x1f));
+
+	/* Set mapping */
 	if ((cpu_irq >= INT4) && (cpu_irq <= INT7)) {
 		offset = ((cpu_irq - INT4) << 3);
 		reg = (unsigned int *) IRQ_INTMUX1_REG;
@@ -147,7 +162,7 @@ void irq_map(unsigned int irq_src, unsigned int cpu_irq)
 		offset = ((cpu_irq - INT12) << 3);
 		reg = (unsigned int *) IRQ_INTMUX3_REG;
 	}
-
+	    
 	__dint();
 	*reg &= ~(0x7f << offset);
 	*reg |= ((irq_src & 0x7f) << offset);

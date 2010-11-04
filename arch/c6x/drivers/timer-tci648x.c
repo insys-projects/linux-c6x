@@ -135,14 +135,14 @@ int __init c6x_arch_init_clockevents(void)
 	cd->set_next_event	= next_event;
 	cd->cpumask		= cpumask_of(smp_processor_id());
 
-	clockevents_register_device(cd);
-
 	/* Configure the interupt selector MUX registers */
   	irq_map(LINUX_TIMER_EVT, cd->irq);
 
 	/* Set handler */
 	request_irq(cd->irq, timer_interrupt, IRQF_DISABLED | IRQF_TIMER,
 		    "timer", NULL);
+
+	clockevents_register_device(cd);
 
 	return 0;
 }
