@@ -9,8 +9,8 @@ include $(srctree)/arch/c6x/Makefile.lib
 obj-$(CONFIG_TMS320C6X) += platform-c64xx.o
 
 # SoC objects
-obj-$(CONFIG_SOC_TMS320C6472)	+= mcore.o ipc.o
-obj-$(CONFIG_SOC_TMS320C6474)	+= mcore.o ipc.o
+obj-$(CONFIG_SOC_TMS320C6472)	+= mcore.o
+obj-$(CONFIG_SOC_TMS320C6474)	+= mcore.o
 
 # Board objects
 obj-$(CONFIG_ARCH_BOARD_DSK6455)  += board-dsk6455.o
