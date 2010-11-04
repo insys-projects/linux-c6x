@@ -172,7 +172,25 @@ config MCBSP
 	default n
 	help
 	  If you say Y here, the kernel will include drivers and
-          infrastructure code to support TI McBSP device.
+          infrastructure code to support TI McBSP devices.
+
+config MCBSP_UART
+	bool "UART over McBSP support"
+	depends on MCBSP
+	default n
+	help
+	  If you say Y here, the kernel will include drivers and
+          infrastructure code to support UART over McBSP devices.
+
+config MCBSP_UART_CONSOLE
+        bool "Console on McBSP UART"
+        depends on MCBSP_UART
+        select SERIAL_CORE_CONSOLE
+        help
+          If you say Y here, it will be possible to use the McBSP UART port as
+          the system console (the system console is the device which receives all
+          kernel messages and warnings and which allows logins in single user
+          mode).
 
 config EDMA3
 	bool "EDMA3 support"
@@ -180,7 +198,7 @@ config EDMA3
 	default y if (MCBSP || RAPIDIO_TCI648X)
 	help 
           If you say Y here, the kernel will include drivers and
-          infrastructure code to support TI EDMA3 device.
+          infrastructure code to support TI EDMA3 devices.
 
 config RAPIDIO_TCI648X
         bool "RapidIO support"

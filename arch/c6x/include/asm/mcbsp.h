@@ -303,7 +303,7 @@ struct mcbsp {
 	struct clk        *clk;
 };
 
-extern struct mcbsp mcbsp[MAX_MCBSP_COUNT];
+extern struct mcbsp *mcbsp_ptr[MAX_MCBSP_COUNT];
 
 void mcbsp_config(unsigned int id,
 		  const struct mcbsp_reg_cfg *config);

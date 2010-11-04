@@ -1,5 +1,5 @@
 /*
- * arch/c6x/kernel/mcbsp.c
+ * arch/c6x/drivers/mcbsp.c
  *
  * Copyright (C) 2004 Nokia Corporation
  * Author: Samuel Ortiz <samuel.ortiz@nokia.com>
@@ -709,7 +709,7 @@ static struct platform_driver mcbsp_driver = {
 	.probe		= mcbsp_probe,
 	.remove		= __devexit_p(mcbsp_remove),
 	.driver		= {
-		.name	= "tci648x-mcbsp",
+		.name	= "mcbsp",
 	},
 };
 

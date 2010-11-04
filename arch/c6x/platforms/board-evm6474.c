@@ -88,24 +88,46 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 };
 
 static struct platform_device evm6474_mcbsp_device0 = {
-	.name           = "tci648x-mcbsp",
+	.name           = "mcbsp",
 	.id             = 1,
 	.dev		= { .platform_data = &evm6474_mcbsp_info[0] },
 };
 
 static struct platform_device evm6474_mcbsp_device1 = {
-	.name           = "tci648x-mcbsp",
+	.name           = "mcbsp",
 	.id             = 2,
 	.dev		= { .platform_data = &evm6474_mcbsp_info[1] },
 };
 
 static void __init evm_init_mcbsp(void)
 {
-	platform_device_register(&evm6474_mcbsp_device0);
-	platform_device_register(&evm6474_mcbsp_device1);
+	platform_device_register(&evm6474_mcbsp_device0); /* McBSP0 */
+	platform_device_register(&evm6474_mcbsp_device1); /* McBSP1 */
 }
 
 core_initcall(evm_init_mcbsp);
+#endif
+
+#ifdef CONFIG_MCBSP_UART
+#include <asm/mcbsp-uart.h>
+
+static const struct mcbsp_uart_info evm6474_mcbsp_uart_info = {
+    .mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
+    .mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+};
+
+static struct platform_device evm6474_mcbsp_uart_device = {
+	.name           = "mcbsp_serial",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_mcbsp_uart_info },
+};
+
+static void __init evm_init_mcbsp_uart(void)
+{
+	platform_device_register(&evm6474_mcbsp_uart_device);
+}
+
+core_initcall(evm_init_mcbsp_uart);
 #endif
 
 static struct pll_data pll1_data = {
@@ -115,7 +137,8 @@ static struct pll_data pll1_data = {
 
 static struct clk clkin1 = {
 	.name = "clkin1",
-	.rate = 61440000,
+//	.rate = 61440000, This is when using SYSCLK (SW5 CORE_CLOK_SEL to ON)
+	.rate = 50000000, /* default one is 50MHz clock */
 };
 
 static struct clk pll1_clk = {
@@ -186,8 +209,8 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
 	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
-	CLK("tci648x-mcbsp.1", NULL, &mcbsp_clk),
-	CLK("tci648x-mcbsp.2", NULL, &mcbsp_clk),
+	CLK("mcbsp.1", NULL, &mcbsp_clk),
+	CLK("mcbsp.2", NULL, &mcbsp_clk),
 	CLK("", NULL, NULL)
 };
 
