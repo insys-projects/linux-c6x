@@ -35,7 +35,7 @@ int phy_init(void)
 	mdio_phy_write(26, 0xe, 0x47); /* set PHY port 6 SERDES to 0.7V swing */
 	mdio_phy_wait();
 
-#if !defined(CONFIG_SOC_TMS320C6457) && !defined(CONFIG_ARCH_BOARD_EVM6474L)
+#ifdef CONFIG_ARCH_BOARD_EVM6474
 	mdio_phy_write(26, 0xd, 0x47); /* set PHY port 5 SERDES to 0.7V swing */
 	mdio_phy_wait();
 #endif
@@ -43,7 +43,7 @@ int phy_init(void)
 	mdio_phy_write(0, 0xe, 0x8140); /* configure PHY port 6 SERDES --> Faraday 1 at 1000mpbs, full duplex */
 	mdio_phy_wait();
 
-#if !defined(CONFIG_SOC_TMS320C6457) && !defined(CONFIG_ARCH_BOARD_EVM6474L)
+#ifdef CONFIG_ARCH_BOARD_EVM6474
 	mdio_phy_write(0, 0xd, 0x8140); /* configure PHY port 5 SERDES --> Faraday 2 at 1000mbps, full duplex */
 	mdio_phy_wait();
 
@@ -72,6 +72,7 @@ int phy_init(void)
 
 int evm_phy_init(void)
 {
+#if !defined(CONFIG_ARCH_BOARD_EVM6472)
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
@@ -87,11 +88,15 @@ int evm_phy_init(void)
 #ifdef CONFIG_ARCH_BOARD_EVM6474
 	/* EVMC6474 board is wired up with TX differential +/- swapped. */
 	sgmiic.txconfig  |= 0x80;
-#endif
+#endif /* CONFIG_ARCH_BOARD_EVM6474 */
+
 	sgmii_config(&sgmiic);
+
+#endif /* !defined(CONFIG_ARCH_BOARD_EVM6472) */
+
 	phy_init();
 
 	return 0;
 }
 
-module_init(evm_phy_init);
+arch_initcall(evm_phy_init);
