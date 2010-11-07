@@ -229,7 +229,13 @@ void c6x_soc_setup_arch(void)
 
 	/* Enable timers (in regs PERLOCK & PERCFG0) */
 	val = dscr_get_reg(DSCR_PERCFG0);
-	dscr_set_device(val | DSCR_B_PERCFG0_TIMER0 | DSCR_B_PERCFG0_TIMER1, DSCR_PERCFG0);
+	dscr_set_device(val |
+#ifdef CONFIG_I2C
+			DSCR_B_PERCFG0_I2C |
+#endif
+			DSCR_B_PERCFG0_TIMER0 |
+			DSCR_B_PERCFG0_TIMER1,
+			DSCR_PERCFG0);
 
 	/* Wait for enabling (reg PERSTAT0) */
 	val = 0;
