@@ -5,6 +5,7 @@ config SOC_TMS320C6455
 	select TMS320C64XPLUS
 	select PLL_TCI648X
 	select TIMER_TCI648X
+	select PIC_C64XPLUS
 
 config SOC_TMS320C6457
 	bool "TMS320C6457"
@@ -12,6 +13,7 @@ config SOC_TMS320C6457
 	select TMS320C64XPLUS
 	select PLL_TCI648X
 	select TIMER_TCI648X
+	select PIC_C64XPLUS
 	select SGMII
 
 config SOC_TMS320C6472
@@ -20,6 +22,7 @@ config SOC_TMS320C6472
 	select TMS320C64XPLUS
 	select PLL_TCI648X
 	select TIMER_TCI648X
+	select PIC_C64XPLUS
 
 config SOC_TMS320C6474
 	bool "TMS320C6474"
@@ -27,6 +30,7 @@ config SOC_TMS320C6474
 	select TMS320C64XPLUS
 	select PLL_TCI648X
 	select TIMER_TCI648X
+	select PIC_C64XPLUS
 	select SGMII
 
 comment "Board Selection"
