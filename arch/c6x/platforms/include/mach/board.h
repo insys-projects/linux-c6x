@@ -29,4 +29,8 @@
 #include <mach/board-evm6474l.h>
 #endif
 
+#ifndef NR_BOARD_IRQS
+#define NR_BOARD_IRQS 0
+#endif
+
 #endif

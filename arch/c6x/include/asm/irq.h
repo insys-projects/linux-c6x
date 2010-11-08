@@ -14,21 +14,37 @@
 #define __ASM_C6X_IRQ_H_
 
 #include <asm/hardware.h>
+#include <asm/percpu.h>
 #include <mach/irq.h>
+#include <mach/board.h>
 
 #define irq_canonicalize(irq)  (irq)
 
-/*
- * Number of C6x interrupts:
- * 16 processor interrupt sources
- * 32 platform interrupt sources
- */
-#define SYS_IRQS            16
-#define NR_IRQS             32
+#ifdef CONFIG_PIC_C64XPLUS
+#define NR_IRQS (NR_SOC_IRQS + NR_BOARD_IRQS)
+#else
+#define NR_IRQS (NR_SYS_IRQS + NR_BOARD_IRQS)
+#endif
 
 /*
- * Processor interrupt definitions
- * General interrupt sources are the level 1-15.
+ * Number of C6x interrupt vectors.
+ *
+ * There are 16 vectors. One each is used by Reset and NMI. Two are reserved.
+ * The remaining 12 vectors are used to route SoC interrupt sources. These
+ * interrupt vectors are prioritized with INT4 having the highest priority
+ * and INT15 having the lowest.
+ *
+ * The C64x+ megamodule provides a way to combine SoC IRQ sources into a single
+ * IRQ vector. There are four combined sources, each of which feed into one of
+ * the 12 general interrupt vectors. The remaining 8 vectors can each route a
+ * single SoC interrupt directly.
+ *
+ */
+#define NR_SYS_IRQS 16
+
+/*
+ * Processor interrupt vector definitions
+ * Interrupt sources are prioritized from INT0 (highest) to INT15 (lowest).
  */
 #define INT0                0    /* RESET */
 #define INT1		    1	 /* NMI */
@@ -47,6 +63,42 @@
 #define INT14		    14   /* level 14 interrupt */
 #define INT15		    15   /* level 15 interrupt */
 
-extern void irq_map(unsigned int irq_src, unsigned int cpu_irq);
+#ifdef CONFIG_PIC_C64XPLUS
+/* holds mapping of hw interrupt number to kernel IRQ number */
+extern uint16_t prio_to_irq[];
+
+#define hw_to_kernel_irq(hw) prio_to_irq[(hw)]
+
+/*
+ * Functions used to map/unmap interrupts from one level to another.
+ *
+ * For irq_map:
+ *    irq_src is a kernel IRQ number corresponding to megamodule combiner event
+ *    irq_dst is a hardware interrupt number (INT4 - INT15)
+ *
+ * For irq_unmap:
+ *    irq_src is a kernel IRQ number corresponding to megamodule combiner event
+ *
+ * For irq_cic_map:
+ *    irq_src is a kernel IRQ number corresponding to CIC combiner event
+ *    irq_dst is a kernel IRQ number corresponding to megamodule combiner event
+ *
+ * For irq_cic_unmap:
+ *    irq_src is a kernel IRQ number corresponding to CIC combiner event
+ *
+ *
+ * In order to map a CIC event directly to a core hardware interrupt, it must
+ * first be mapped to a megamodule event with irq_cic_map(). Then the megamodule
+ * event can be mapped to a core hardware interrupt with irq_map(). To unmap,
+ * first unmap the megamodule event, then the CIC event.
+ *
+ */
+extern void irq_map(unsigned int irq_src, unsigned int irq_dst);
+extern void irq_unmap(unsigned int irq_src);
+extern void irq_cic_map(unsigned int irq_src, unsigned int irq_dst);
+extern void irq_cic_unmap(unsigned int irq_src);
+
+extern void __init init_pic_c64xplus(void);
+#endif
 
 #endif /* __ASM_C6X_IRQ_H_ */

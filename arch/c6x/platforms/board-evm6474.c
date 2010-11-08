@@ -62,7 +62,7 @@ static struct resource emac_resources0 [] = {
 	},
 	{
 		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
+		.start          =  IRQ_EMACRXINT,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };
@@ -167,6 +167,17 @@ static struct clk_lookup evm_clks[] = {
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
+static void __init board_init_IRQ(void)
+{
+	/* Map our IRQs */
+	irq_map(IRQ_TINT1, INT11);
+
+#ifdef CONFIG_TMS320C64X_GEMAC
+	irq_map(IRQ_EMACRXINT, INT9);
+	irq_map(IRQ_EMACTXINT, INT10);
+#endif
+}
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -174,16 +185,11 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6474 board, Texas Instruments.\n");
 
-	/* Configure the interupt selector MUX registers */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-
-	irq_map(IRQ_EMACRXINT, IRQ_EMAC_RX_0);
-	irq_map(IRQ_EMACTXINT, IRQ_EMAC_TX_0);
-
 	gpio_direction(0xFFFF);  /* all input */
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
+	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 

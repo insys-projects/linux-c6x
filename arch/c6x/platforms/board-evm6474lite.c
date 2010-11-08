@@ -62,7 +62,7 @@ static struct resource emac_resources0 [] = {
 	},
 	{
 		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
+		.start          =  IRQ_EMACRXINT,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };
@@ -91,6 +91,17 @@ static void setup_emac(void) {}
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
+static void __init board_init_IRQ(void)
+{
+	/* Map our IRQs */
+	irq_map(IRQ_TINT1, INT11);
+
+#ifdef CONFIG_TMS320C64X_GEMAC
+	irq_map(IRQ_EMACRXINT, INT9);
+	irq_map(IRQ_EMACTXINT, INT10);
+#endif
+}
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -98,15 +109,12 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6474 Lite EVM\n");
 
-	/* Configure the interupt selector MUX registers */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-
 	gpio_direction(0xFFFF);  /* all input */
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
-//	c6x_clk_init(evm_clks);
+	mach_init_IRQ      = board_init_IRQ;
 
 	mach_progress(1, "End of EVM6474 Lite specific initialization");
 }

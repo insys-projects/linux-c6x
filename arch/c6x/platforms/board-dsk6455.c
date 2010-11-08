@@ -91,7 +91,7 @@ static struct resource emac_resources0 [] = {
 	},
 	{
 		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC,
+		.start          =  IRQ_EMACINT,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };
@@ -216,6 +216,13 @@ static struct clk_lookup evm_clks[] = {
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
+static void __init board_init_IRQ(void)
+{
+	/* Map our IRQs */
+	irq_map(IRQ_TINT1, INT11);
+	irq_map(IRQ_EMACINT, INT10);
+}
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -228,16 +235,12 @@ void c6x_board_setup_arch(void)
 	for (i = 0; i < NR_RESOURCES; i++)
 		request_resource(&iomem_resource, dsk_resources[i]);
 
-	/* Map our IRQs */
-	irq_map(IRQ_TINT1, IRQ_CLOCKEVENTS);
-	irq_map(IRQ_EMACINT, IRQ_EMAC);
-	irq_map(IRQ_I2CINT, IRQ_DAVINCI_I2C);
-
 	/* Initialize led register */
 	cpld_set_reg(DSK6455_CPLD_USER, 0x0);
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
+	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 

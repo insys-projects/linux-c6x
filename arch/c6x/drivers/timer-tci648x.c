@@ -29,8 +29,10 @@ unsigned int timer_clock_divisor;
 
 #ifdef CONFIG_SOC_TMS320C6472
 #define LINUX_TIMER (TIMER_0 + get_coreid())
+#define LINUX_TIMER_IRQ IRQ_TINT
 #else
 #define LINUX_TIMER TIMER_1
+#define LINUX_TIMER_IRQ IRQ_TINT1
 #endif
 
 static int next_event(unsigned long delta,
@@ -115,7 +117,7 @@ int __init c6x_arch_init_clockevents(void)
 
 	timer_clock_divisor = (TIMER_REG(timer_EMUMGTCLKSPD) & (0xf << 16)) >> 16;
 
-	cd->irq		= INT15;
+	cd->irq		= LINUX_TIMER_IRQ;
 	cd->name	= "TIMER64_EVT32_TIMER";
 	cd->features	= CLOCK_EVT_FEAT_ONESHOT;
 

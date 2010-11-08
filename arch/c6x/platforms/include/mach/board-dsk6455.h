@@ -21,14 +21,6 @@
 #define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
 #define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
 
-/*
- * Interrupt Assignments
- */
-#define IRQ_CLOCKEVENTS INT15
-#define IRQ_DAVINCI_I2C	INT14
-#define IRQ_EMAC        INT6
-
-
 #define DSK6455_CPLD_REG_BASE                    0xa0000000
 
 /* DSK6455 CPLD registers */

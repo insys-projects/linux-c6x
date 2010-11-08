@@ -13,52 +13,6 @@
 #ifndef __MACH_IRQ_C6472_H
 #define __MACH_IRQ_C6472_H
 
-/*
- * Interrupt selector registers
- */
-#define IRQ_EVTFLAG0_REG  0x01800000
-#define IRQ_EVTFLAG1_REG  0x01800004
-#define IRQ_EVTFLAG2_REG  0x01800008
-#define IRQ_EVTFLAG3_REG  0x0180000c
-#define IRQ_EVTSET0_REG   0x01800020
-#define IRQ_EVTSET1_REG   0x01800024
-#define IRQ_EVTSET2_REG   0x01800028
-#define IRQ_EVTSET3_REG   0x0180002c
-#define IRQ_EVTCLR0_REG   0x01800040
-#define IRQ_EVTCLR1_REG   0x01800044
-#define IRQ_EVTCLR2_REG   0x01800048
-#define IRQ_EVTCLR3_REG   0x0180004c
-#define IRQ_EVTMASK0_REG  0x01800080
-#define IRQ_EVTMASK1_REG  0x01800084
-#define IRQ_EVTMASK2_REG  0x01800088
-#define IRQ_EVTMASK3_REG  0x0180008c
-#define IRQ_MEVTFLAG0_REG 0x018000a0
-#define IRQ_MEVTFLAG1_REG 0x018000a4
-#define IRQ_MEVTFLAG2_REG 0x018000a8
-#define IRQ_MEVTFLAG3_REG 0x018000ac
-#define IRQ_EXPMASK0_REG  0x018000c0
-#define IRQ_EXPMASK1_REG  0x018000c4
-#define IRQ_EXPMASK2_REG  0x018000c8
-#define IRQ_EXPMASK3_REG  0x018000cc
-#define IRQ_MEXPMASK0_REG 0x018000e0
-#define IRQ_MEXPMASK1_REG 0x018000e4
-#define IRQ_MEXPMASK2_REG 0x018000e8
-#define IRQ_MEXPMASK3_REG 0x018000ec
-#define IRQ_INTMUX1_REG   0x01800104
-#define IRQ_INTMUX2_REG   0x01800108
-#define IRQ_INTMUX3_REG   0x0180010c
-#define IRQ_AEGMUX0_REG   0x01800140
-#define IRQ_AEGMUX1_REG   0x01800144
-#define IRQ_INTXSTAT_REG  0x01800180
-#define IRQ_INTXCLR_REG   0x01800184
-#define IRQ_INTDMASK_REG  0x01800188
-#define IRQ_EVTASRT_REG   0x018001c0
-
-/* 
- * EVTASRT bits
- */
-#define IRQ_B_EVTPULSE4   (1 << 4)
-
 #define IRQ_EVT0          0   /* combined events */
 #define IRQ_EVT1          1
 #define IRQ_EVT2          2
@@ -173,64 +127,6 @@
 #define IRQ_EMCCMPA       126 /* external CPU memory protection fault */
 #define IRQ_EMCBUSERR     127 /* bus error interrupt */
 
-/*
- * C6x Chip Interrupt Controller (CIC) events
- */ 
-#define CIC_EVT0          0   /* combined events */ 
-#define CIC_EVT1          1
-#define CIC_IICINT        4   /* I2C event */
-#define CIC_FSERR1        5   /* error/alarm interrupts */ 
-#define CIC_RIOINT7       6   
-#define CIC_FSERR2        7
-#define CIC_VCPINT        8
-#define CIC_TCPINT        9
-#define CIC_RINT0         10  /* McBSP event */
-#define CIC_XINT0         11
-#define CIC_RINT1         12
-#define CIC_XINT1         13
-#define CIC_REVT0         14
-#define CIC_XEVT0         15
-#define CIC_REVT1         16
-#define CIC_XEVT1         17
-#define CIC_IREVT1        18  /* I2C EDMA events */
-#define CIC_IXEVT1        19
-#define CIC_FSEVT18       20  /* frame synchronization events */
-#define CIC_FSEVT19       21
-#define CIC_FSEVT20       22
-#define CIC_FSEVT21       23
-#define CIC_FSEVT22       24
-#define CIC_FSEVT23       25
-#define CIC_FSEVT24       26
-#define CIC_FSEVT25       27
-#define CIC_FSEVT26       28
-#define CIC_FSEVT27       29
-#define CIC_FSEVT28       30
-#define CIC_FSEVT29       31
-#define CIC_VCPREVT       32  /* VCP events */
-#define CIC_VCPXEVT       33
-#define CIC_TCPREVT       34  /* TCP events */
-#define CIC_TCPXEVT       35
-#define CIC_TPCCERRINT    36  /* TPCC error interrupt */
-#define CIC_TPCCMPINT     37  /* TPCSS memory protection interrupt */
-#define CIC_TPTCERRINT0   38  /* TPTC error interrupts */
-#define CIC_TPTCERRINT1   39  
-#define CIC_TPTCERRINT2   40
-#define CIC_TPTCERRINT3   41
-#define CIC_TPTCERRINT4   42
-#define CIC_TPTCERRINT5   43
-#define CIC_TPTCAETEVT    44  /* TPTC AET event */
-#define CIC_AIFEVT2       45  /* AIF CPU interrupts */
-#define CIC_AIFEVT3       46
-#define CIC_AIFPSEVT0     47  /* packet switched transfer events */
-#define CIC_AIFPSEVT1     48
-#define CIC_AIFPSEVT2     49
-#define CIC_AIFPSEVT3     50
-#define CIC_AIFPSEVT4     51
-#define CIC_AIFPSEVT5     52
-#define CIC_AIFPSEVT6     53
-#define CIC_AIFBUFEVT     54
-#define CIC_RACDEVENT0    56  /* debug events */
-#define CIC_RACDEVENT1    57
-#define CIC_SEMERR        58
+#define NR_SOC_IRQS	  128
 
 #endif /* __MACH_IRQ_C6472_H */

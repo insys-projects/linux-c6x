@@ -29,7 +29,7 @@ static struct resource i2c_resources[] = {
 		.flags		= IORESOURCE_MEM,
 	},
 	{
-		.start		= IRQ_DAVINCI_I2C,
+		.start		= IRQ_I2CINT,
 		.flags		= IORESOURCE_IRQ,
 	},
 };
@@ -47,9 +47,9 @@ static struct platform_device c6x_i2c_device = {
 	.dev		= { .platform_data = &i2c_pdata },
 };
 
-static void __init c6x_init_i2c(void)
+static int __init c6x_init_i2c(void)
 {
-	platform_device_register(&c6x_i2c_device);
+	return platform_device_register(&c6x_i2c_device);
 }
 
 core_initcall(c6x_init_i2c);

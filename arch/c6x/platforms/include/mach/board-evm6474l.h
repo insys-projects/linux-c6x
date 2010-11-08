@@ -18,13 +18,5 @@
 #define TEXTLEN         0x07FFFC00
 #define RAMEND		0x88000000
 
-/*
- * Interrupt Assignments
- */
-#define IRQ_CLOCKEVENTS INT15
-
-/* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
-#define IRQ_EMAC_TX_0   INT7
-#define IRQ_EMAC_RX_0   INT6
 
 

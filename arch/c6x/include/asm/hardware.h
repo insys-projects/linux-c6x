@@ -15,6 +15,9 @@
 
 #include <mach/hardware.h>
 
+#define __SYSREG(ADDR, TYPE) (*(volatile TYPE*)(ADDR))
+#define __SYSREGA(ADDR, TYPE) ((volatile TYPE*)(ADDR))
+
 #ifndef __ASSEMBLY__
 extern void c6x_soc_setup_arch(void);
 extern void c6x_board_setup_arch(void);

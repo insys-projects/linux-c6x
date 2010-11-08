@@ -26,18 +26,6 @@
 #define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
 #define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
 
-/*
- * Interrupt Assignments
- */
-#define IRQ_CLOCKEVENTS INT15
-
-/* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
-#define IRQ_EMAC_TX   INT7
-#define IRQ_EMAC_RX   INT6
-
-#define IRQ_UART_BRIDGE	INT5
-#define IRQ_DAVINCI_I2C	INT4
-
 #ifdef CONFIG_IDLE_LED
 #ifndef __ASSEMBLY__
 static inline void c6x_arch_idle_led(int state)

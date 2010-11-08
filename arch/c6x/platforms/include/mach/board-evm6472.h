@@ -26,20 +26,6 @@
 #define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
 #define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
 
-/*
- * Interrupt Assignments
- */
-#define IRQ_CLOCKEVENTS INT15
-
-/* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
-#define IRQ_EMAC_TX_1   INT9
-#define IRQ_EMAC_RX_1   INT8
-#define IRQ_EMAC_TX_0   INT7
-#define IRQ_EMAC_RX_0   INT6
-
-#define IRQ_UART_BRIDGE	INT5
-#define IRQ_DAVINCI_I2C	INT4
-
 #define LED0_GPIO_PIN   GPIO_PIN12
 #define LED1_GPIO_PIN   GPIO_PIN13
 

@@ -64,7 +64,7 @@ static struct resource emac_resources0 [] = {
 	},
 	{
 		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_0,
+		.start          =  IRQ_EMACRXINT0,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };
@@ -99,7 +99,7 @@ static struct resource emac_resources1 [] = {
 	},
 	{
 		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMAC_RX_1,
+		.start          =  IRQ_EMACRXINT1,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };
@@ -157,7 +157,7 @@ static struct sc16is7xx_platform_data uart_data = {
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_SERIAL_SC16IS7XX
 	{ I2C_BOARD_INFO("sc16is750", 0x4d),
-	  .irq = IRQ_UART_BRIDGE,
+	  .irq = IRQ_GPIO15,
 	  .platform_data = &uart_data,
 	},
 #endif
@@ -291,24 +291,27 @@ static struct clk_lookup evm_clks[] = {
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
-/* Called from arch/kernel/setup.c */
-void c6x_board_setup_arch(void)
-{   
-	printk("Designed for the EVM6472 board, Texas Instruments.\n");
+static void __init board_init_IRQ(void)
+{
+	/* Map our IRQs */
+	irq_map(IRQ_TINT, INT11);
 
-	/* Configure the interupt selector MUX registers */
-  	irq_map(IRQ_TINT, IRQ_CLOCKEVENTS);
-#ifdef CONFIG_I2C
-	irq_map(IRQ_I2CINT, IRQ_DAVINCI_I2C);
-#endif
 #ifdef CONFIG_TMS320C64X_GEMAC_0
-	irq_map(IRQ_EMACRXINT0, IRQ_EMAC_RX_0);
-	irq_map(IRQ_EMACTXINT0, IRQ_EMAC_TX_0);
+	irq_map(IRQ_EMACRXINT0, INT7);
+	irq_map(IRQ_EMACTXINT0, INT8);
 #endif
 #ifdef CONFIG_TMS320C64X_GEMAC_1
-	irq_map(IRQ_EMACRXINT1, IRQ_EMAC_RX_1);
-	irq_map(IRQ_EMACTXINT1, IRQ_EMAC_TX_1);
+	irq_map(IRQ_EMACRXINT1, INT9);
+	irq_map(IRQ_EMACTXINT1, INT10);
 #endif
+}
+
+/* Called from arch/kernel/setup.c */
+void c6x_board_setup_arch(void)
+{
+	int i, ret;
+
+	printk(KERN_INFO "Designed for the EVM6472 board, Texas Instruments.\n");
 
 	gpio_direction(0xFFFF);  /* all input */
 	
@@ -320,11 +323,11 @@ void c6x_board_setup_arch(void)
 	/* setup GP15 for interrupt from i2c UART */
 	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
 	gpio_bank_int_enable();
-	irq_map(IRQ_GPIO15, IRQ_UART_BRIDGE);
 #endif
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
+	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 
