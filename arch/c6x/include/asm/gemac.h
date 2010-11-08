@@ -40,7 +40,7 @@
 #define GEMAC_RESET_COLD  1
 #define GEMAC_RESET_WARM  2
 
-#define IDX_TO_CHAN(i)    ((i) << 1)              /* Convert index to channel */
+#define IDX_TO_CHAN(i)    (i)                     /* Convert index to channel */
 #define IDX_TO_MAC(i)     ((i) << 1)              /* Convert index to MAC addr offset */
 #define DEV_TO_MAC(d)     ((d) * CORE_NUM)        /* Convert dev_id to MAC addr offset */
 
