@@ -116,6 +116,9 @@ unsigned int mdio_get_status(void)
  */
 unsigned int mdio_get_macsel(void)
 {
+	mdios.macsel = (dscr_get_reg(DSCR_DEVSTAT) >> DEVSTAT_MACSEL_OFFSET) &
+		DEVSTAT_MACSEL_MASK;
+
         return mdios.macsel;
 }
 
@@ -128,7 +131,7 @@ void mdio_lsi_linkstatus(unsigned int status)
 	unsigned short val = 0, ack = 0;
 
 	mdio_phy_read(17, mdios.phy_addr);
-	mdio_phy_wait_res_ack(val, ack);
+	mdio_phy_wait_res_ack(val, ack); 
 
 	if (ack) {
 		val &= 0xff3f;
@@ -211,7 +214,7 @@ static unsigned int mdio_init_phy_1(volatile unsigned int phy_addr)
 	}
 #endif
 
-#ifndef CONFIG_ARCH_EVM6488
+#if 1
 	if (mdios.macsel == DEVSTAT_MACSEL_GMII) {
 		/* Put phy in copper mode */
 		mdio_phy_write(MDIO_PHY_REG_ACCESS, phy_addr,
@@ -433,7 +436,7 @@ unsigned int mdio_timer_tick(void)
 
 		/* Process differently based on state */
 		switch(mdios.phy_state) {
-#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_TMS320DM648)
+#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_SOC_TMS3206457)
 		case MDIO_PHY_RESET:
 			/* Don't read reset status for the first 100 to 200 ms */
 			if (mdios.phy_ticks < 2)
@@ -526,7 +529,7 @@ unsigned int mdio_timer_tick(void)
 
 			if (!(val & MDIO_PHY_B_AUTOCOMPLETE))
 				goto check_timeout;
-#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_TMS320DM648)
+#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_SOC_TMS3206457)
 			/* We can now check the negotiation results */
 			if ((mdios.macsel == DEVSTAT_MACSEL_GMII) ||
 			    (mdios.macsel == DEVSTAT_MACSEL_RGMII)) {
@@ -544,7 +547,7 @@ unsigned int mdio_timer_tick(void)
 			mdio_phy_wait_res(val2);
 
 			val2 &= val;
-#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_TMS320DM648)
+#if !(defined(CONFIG_SOC_TMS3206472) || defined(CONFIG_SOC_TMS3206474)) && !defined(CONFIG_SOC_TMS3206457)
 			if ((valgig & MDIO_PHY_ADV_FD1000) &&
 			    (valgig2 & MDIO_PHY_PRT_FD1000))
 				mdios.pending_status = MDIO_LINKSTATUS_FD1000;

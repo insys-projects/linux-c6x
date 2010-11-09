@@ -73,7 +73,7 @@ struct emac_private {
 	struct emac_desc *head_tx;      /* the new list head to be sent */
 
 	struct net_device *dev;
-	struct net_device_stats stats;
+
 	unsigned long mode_flags;
 	unsigned long slave;
 	unsigned long packet_mtu;
