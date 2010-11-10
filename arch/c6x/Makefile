@@ -85,6 +85,9 @@ KBUILD_CFLAGS   += -mbig-endian
 KBUILD_AFLAGS	+= -mbig-endian
 LINKFLAGS	+= -mbig-endian
 KBUILD_LDFLAGS	+= -mbig-endian
+ifndef CONFIG_TI_C6X_LINKER
+LDFLAGS	+= -EB
+endif
 endif
 
 KBUILD_CFLAGS	+= $(arch-y)

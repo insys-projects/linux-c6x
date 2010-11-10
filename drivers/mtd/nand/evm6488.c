@@ -71,7 +71,7 @@ static struct mtd_partition partition_info_evm6488[] = {
 	  offset: 0,
 	  size: 32*1024*1024 }
 };
-#elif defined(CONFIG_ARCH_BOARD_EVM6457) || defined(CONFIG_ARCH_BOARD_EVM6472)
+#elif defined(CONFIG_ARCH_BOARD_EVM6457) || defined(CONFIG_ARCH_BOARD_EVM6472) || defined(CONFIG_ARCH_BOARD_EVM6474L)
 static struct mtd_partition partition_info_evm6488[] = {
 	{ name: "EVM NAND Flash",
 	  offset: 0,

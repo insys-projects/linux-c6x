@@ -142,6 +142,9 @@ config PLL_TCI648X
 config TIMER_TCI648X
 	bool "TIMER_TCI648X"
 
+config PIC_C64XPLUS
+	bool "C64X+ Megamodule Interrupt Controller"
+
 source "arch/c6x/platforms/Kconfig"
 
 config USE_RT_TIMER

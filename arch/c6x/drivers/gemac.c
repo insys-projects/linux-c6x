@@ -107,22 +107,22 @@ __setup("emac_shared", set_emac_shared);
 /*
  * Get the device statistic
  */
-static void emac_get_stats(struct net_device *dev)
+static struct net_device_stats *emac_get_stats(struct net_device *dev)
 {
 	struct emac_private *ep = netdev_priv(dev);
 	unsigned int reg;
 	unsigned int dummy;
 	int i;
 
-	emac_set_stat(ep->stats.multicast,         EMAC_RXMCASTFRAMES);
-	emac_set_stat(ep->stats.collisions,        EMAC_TXCOLLISION);
-	emac_set_stat(ep->stats.rx_length_errors,  EMAC_RXOVERSIZED);
-	emac_set_stat(ep->stats.rx_length_errors,  EMAC_RXUNDERSIZED);
-	emac_set_stat(ep->stats.rx_crc_errors,     EMAC_RXCRCERRORS);
-	emac_set_stat(ep->stats.rx_frame_errors,   EMAC_RXALIGNCODEERRORS);
-	emac_set_stat(ep->stats.tx_carrier_errors, EMAC_TXCARRIERSLOSS);
-	emac_set_stat(ep->stats.tx_fifo_errors,    EMAC_TXUNDERRUN);
-	emac_set_stat(ep->stats.tx_window_errors,  EMAC_TXLATECOLL);
+	emac_set_stat(dev->stats.multicast,         EMAC_RXMCASTFRAMES);
+	emac_set_stat(dev->stats.collisions,        EMAC_TXCOLLISION);
+	emac_set_stat(dev->stats.rx_length_errors,  EMAC_RXOVERSIZED);
+	emac_set_stat(dev->stats.rx_length_errors,  EMAC_RXUNDERSIZED);
+	emac_set_stat(dev->stats.rx_crc_errors,     EMAC_RXCRCERRORS);
+	emac_set_stat(dev->stats.rx_frame_errors,   EMAC_RXALIGNCODEERRORS);
+	emac_set_stat(dev->stats.tx_carrier_errors, EMAC_TXCARRIERSLOSS);
+	emac_set_stat(dev->stats.tx_fifo_errors,    EMAC_TXUNDERRUN);
+	emac_set_stat(dev->stats.tx_window_errors,  EMAC_TXLATECOLL);
 
 	/* ACK statistic by write-to-decrement */
 	reg = EMAC_RXGOODFRAMES;
@@ -131,12 +131,8 @@ static void emac_get_stats(struct net_device *dev)
 		emac_set_reg(reg, dummy);
 		reg += 4;
 	}
-}
 
-static struct net_device_stats *emac_get_dev_stats(struct net_device *dev)
-{
-	struct emac_private *ep = netdev_priv(dev);
-	return &ep->stats;
+	return &dev->stats;
 }
 
 /*
@@ -187,11 +183,11 @@ static int emac_rx(struct net_device *dev, struct emac_desc *desc_ack)
 			dev->last_rx = jiffies;
 
 			/* Fill statistic */
-			ep->stats.rx_packets++;
-			ep->stats.rx_bytes += pkt_len;
+			dev->stats.rx_packets++;
+			dev->stats.rx_bytes += pkt_len;
 		} else {
 			printk(KERN_WARNING "%s: Memory squeeze, dropping packet.\n", dev->name);
-			ep->stats.rx_dropped++;
+			dev->stats.rx_dropped++;
 		}
 
 		/* Update RX dirty */
@@ -301,7 +297,7 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (ep->tx_full) {
 		printk(KERN_WARNING "%s: tx queue full\n", dev->name);
-		ep->stats.tx_dropped++;
+		dev->stats.tx_dropped++;
 		return NETDEV_TX_BUSY;
 	}
 
@@ -334,8 +330,8 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Save skb */
 	ep->tx_skbuff[ep->skb_cur] = skb;
 	ep->skb_cur = (ep->skb_cur + 1) & TX_RING_MOD_MASK;
-	ep->stats.tx_packets++;
-	ep->stats.tx_bytes += pkt_len;
+	dev->stats.tx_packets++;
+	dev->stats.tx_bytes += pkt_len;
 	dev->trans_start = jiffies;
 
 	desc->packet_flags_len |= EMAC_DESC_FLAG_SOP
@@ -402,7 +398,7 @@ static void emac_handle_host_interrupt(struct net_device *dev)
 
 	if ((status & EMAC_M_RXERRCODE) == (EMAC_V_OWNERSHIP <<  EMAC_S_RXERRCODE)) {
 		printk(KERN_ERR "%s: EMAC rx ring full\n", dev->name);
-		ep->stats.rx_fifo_errors++;
+		dev->stats.rx_fifo_errors++;
 	} else
 		printk(KERN_ERR "%s: EMAC fatal host error 0x%lx\n",
 		       dev->name, status);
@@ -437,7 +433,7 @@ static irqreturn_t emac_rx_interrupt(int irq, void * netdev_id)
 	irq_flags = emac_arch_get_int_vector();
 
 	if (irq_flags & EMAC_B_STATPEND)
-		emac_get_stats(dev);
+		(void) emac_get_stats(dev);
 	
 	if (irq_flags & EMAC_B_HOSTPEND)
 		emac_handle_host_interrupt(dev);
@@ -476,7 +472,7 @@ static irqreturn_t emac_tx_interrupt(int irq, void * netdev_id)
 	irq_flags = emac_arch_get_int_vector();
 
 	if (irq_flags & EMAC_B_STATPEND)
-		emac_get_stats(dev);
+		(void) emac_get_stats(dev);
 	
 	if (irq_flags & EMAC_B_HOSTPEND)
 		emac_handle_host_interrupt(dev);
@@ -518,7 +514,7 @@ static irqreturn_t emac_interrupt(int irq, void * netdev_id)
 	irq_flags = emac_get_reg(EMAC_MACINVECTOR);
 
 	if (irq_flags & EMAC_B_STATPEND)
-		emac_get_stats(dev);
+		(void) emac_get_stats(dev);
 	
 	if (irq_flags & EMAC_B_HOSTPEND) {
 		emac_handle_host_interrupt(dev);
@@ -1002,7 +998,7 @@ static void emac_timeout(struct net_device *dev)
 	struct emac_private *ep = netdev_priv(dev);
 
 	printk(KERN_WARNING "%s: transmit timed out\n", dev->name);
-	ep->stats.tx_errors++;
+	dev->stats.tx_errors++;
 	dev->trans_start = jiffies;
 	if (!ep->tx_full)
 		netif_wake_queue(dev);
@@ -1406,7 +1402,7 @@ static const struct net_device_ops gemac_netdev_ops = {
 	.ndo_tx_timeout		= emac_timeout,
 	.ndo_set_multicast_list	= emac_set_rx_mode,
 	.ndo_set_mac_address	= eth_mac_addr,
-	.ndo_get_stats		= emac_get_dev_stats,
+	.ndo_get_stats		= emac_get_stats,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= emac_poll,
 #endif
@@ -1576,8 +1572,8 @@ static int __init emac_probe(struct platform_device *pdev)
 	printk("%02x PHY=SGMII\n", netdev->dev_addr[i]);
 #else
 	printk("%02x PHY=%s%sMII\n", netdev->dev_addr[i],
-	       ((mdio_get_macsel() & 0x1) ? "R" : ""),
-	       ((mdio_get_macsel() & 0x2) ? "G" : ""));
+	       ((mdio_get_macsel() & DEVSTAT_MACSEL_RMII) ? "R" : ""),
+	       ((mdio_get_macsel() & DEVSTAT_MACSEL_GMII) ? "G" : ""));
 #endif
 	++ndevs;
 	return 0;

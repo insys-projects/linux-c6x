@@ -490,7 +490,7 @@ config MTD_NAND_W90P910
 
 config MTD_NAND_EVM6488
         tristate "NAND Flash device on EVM6488 board"
-	depends on ARCH_BOARD_EVM6457 || ARCH_BOARD_EVM6472
+	depends on ARCH_BOARD_EVM6457 || ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6474L
         help
           Support for NAND flash on Texas Instruments EVM6488-like platforms.
 

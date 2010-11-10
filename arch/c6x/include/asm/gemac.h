@@ -40,7 +40,7 @@
 #define GEMAC_RESET_COLD  1
 #define GEMAC_RESET_WARM  2
 
-#define IDX_TO_CHAN(i)    ((i) << 1)              /* Convert index to channel */
+#define IDX_TO_CHAN(i)    (i)                     /* Convert index to channel */
 #define IDX_TO_MAC(i)     ((i) << 1)              /* Convert index to MAC addr offset */
 #define DEV_TO_MAC(d)     ((d) * CORE_NUM)        /* Convert dev_id to MAC addr offset */
 
@@ -73,7 +73,7 @@ struct emac_private {
 	struct emac_desc *head_tx;      /* the new list head to be sent */
 
 	struct net_device *dev;
-	struct net_device_stats stats;
+
 	unsigned long mode_flags;
 	unsigned long slave;
 	unsigned long packet_mtu;

@@ -23,6 +23,44 @@
 
 int phy_init(void)
 {
+#ifdef CONFIG_ARCH_BOARD_EVM6472
+
+	mdio_set_reg(MDIO_CONTROL, 0x4000001f); /* enable MII interface */
+
+	_c6x_delay(145844);
+
+	/* Port 0 */
+	mdio_phy_write(27, 0x18, 0x848b); /* set RGMII to copper mode */
+	mdio_phy_wait();
+
+	mdio_phy_write(20, 0x18, 0xce0); /* Rx-clock delayed */
+	mdio_phy_wait();
+
+	mdio_phy_write(24, 0x18, 0x4101); /* leds */
+	mdio_phy_wait();
+
+	mdio_phy_write(0, 0x18, 0x9140); /* soft-reset */
+	mdio_phy_wait();
+
+	_c6x_delay(145844);
+
+	/* Port 1 */
+	mdio_phy_write(27, 0x19, 0x848b); /* set RGMII to copper mode */
+	mdio_phy_wait();
+
+	mdio_phy_write(20, 0x19, 0xce0); /* Rx-clock delayed */
+	mdio_phy_wait();
+
+	mdio_phy_write(24, 0x19, 0x4101); /* leds */
+	mdio_phy_wait();
+
+	mdio_phy_write(0, 0x19, 0x9140); /* soft-reset */
+	mdio_phy_wait();
+
+	_c6x_delay(145844);
+
+#else /* !CONFIG_ARCH_BOARD_EVM6472 */ 
+
 	mdio_set_reg(MDIO_CONTROL, 0x4004001f); /* enable MII interface */
 
 	_c6x_delay(145844);
@@ -35,16 +73,16 @@ int phy_init(void)
 	mdio_phy_write(26, 0xe, 0x47); /* set PHY port 6 SERDES to 0.7V swing */
 	mdio_phy_wait();
 
-#if !defined(CONFIG_SOC_TMS320C6457) && !defined(CONFIG_ARCH_BOARD_EVM6474L)
+#ifdef CONFIG_ARCH_BOARD_EVM6474
 	mdio_phy_write(26, 0xd, 0x47); /* set PHY port 5 SERDES to 0.7V swing */
 	mdio_phy_wait();
 #endif
 
-	mdio_phy_write(0, 0xe, 0x8140); /* configure PHY port 6 SERDES --> Faraday 1 at 1000mpbs, full duplex */
+	mdio_phy_write(0, 0xe, 0x8140); /* configure PHY port 6 SERDES --> DSP 1 at 1000mpbs, full duplex */
 	mdio_phy_wait();
 
-#if !defined(CONFIG_SOC_TMS320C6457) && !defined(CONFIG_ARCH_BOARD_EVM6474L)
-	mdio_phy_write(0, 0xd, 0x8140); /* configure PHY port 5 SERDES --> Faraday 2 at 1000mbps, full duplex */
+#ifdef CONFIG_ARCH_BOARD_EVM6474
+	mdio_phy_write(0, 0xd, 0x8140); /* configure PHY port 5 SERDES --> DSP 2 at 1000mbps, full duplex */
 	mdio_phy_wait();
 
 	mdio_phy_write(1, 0x15, 0x43e); /* force internal switch --> port 5 SERDES to 1000MPBS, full Duplex */
@@ -53,6 +91,8 @@ int phy_init(void)
 
 	mdio_phy_write(1, 0x16, 0x43e); /* force internal switch --> port 6 SERDES to 1000MBPS, full Duplex */
 	mdio_phy_wait();
+
+#endif /* !CONFIG_ARCH_BOARD_EVM6472 */ 
 
 #if 0  /* Use autoneg at PHY level */
 
@@ -72,6 +112,7 @@ int phy_init(void)
 
 int evm_phy_init(void)
 {
+#if !defined(CONFIG_ARCH_BOARD_EVM6472)
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
@@ -87,11 +128,15 @@ int evm_phy_init(void)
 #ifdef CONFIG_ARCH_BOARD_EVM6474
 	/* EVMC6474 board is wired up with TX differential +/- swapped. */
 	sgmiic.txconfig  |= 0x80;
-#endif
+#endif /* CONFIG_ARCH_BOARD_EVM6474 */
+
 	sgmii_config(&sgmiic);
+
+#endif /* !defined(CONFIG_ARCH_BOARD_EVM6472) */
+
 	phy_init();
 
 	return 0;
 }
 
-module_init(evm_phy_init);
+arch_initcall(evm_phy_init);
