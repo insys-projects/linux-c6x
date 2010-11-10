@@ -66,6 +66,30 @@ static void __init evm_init_rio(void)
 core_initcall(evm_init_rio);
 #endif
 
+#ifdef CONFIG_I2C
+static struct at24_platform_data at24_eeprom_data = {
+	.byte_len	= 0x100000 / 8,
+	.page_size	= 256,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
+static struct i2c_board_info evm_i2c_info[] = {
+#ifdef CONFIG_EEPROM_AT24
+	{ I2C_BOARD_INFO("24c1024", 0x50),
+	  .platform_data = &at24_eeprom_data,
+	},
+#endif
+};
+
+static void __init board_setup_i2c(void)
+{
+	i2c_register_board_info(1, evm_i2c_info,
+				ARRAY_SIZE(evm_i2c_info));
+}
+#else
+#define board_setup_i2c()
+#endif /* CONFIG_I2C */
+
 static struct pll_data pll1_data = {
 	.num       = 1,
 	.phys_base = ARCH_PLL1_BASE,
@@ -159,3 +183,10 @@ void c6x_board_setup_arch(void)
 
 	mach_progress(1, "End of EVM6474 Lite specific initialization");
 }
+
+__init void evm_init(void)
+{
+	board_setup_i2c();
+}
+
+arch_initcall(evm_init);
