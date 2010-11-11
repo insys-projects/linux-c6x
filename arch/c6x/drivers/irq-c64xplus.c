@@ -190,6 +190,17 @@ static struct irqaction combiner_actions[] = {
 #endif
 };
 
+/*
+ * When handling IRQs through the CIC, ack after the handler runs.
+ * For IRQs through the megamodule, ack before handler runs.
+ */
+#if NR_CIC_COMBINERS
+#define PRE_ACK (irq < IRQ_CIC_START || \
+		 irq >= (IRQ_CIC_START + NR_CIC_COMBINERS))
+#else
+#define PRE_ACK 1
+#endif
+
 static void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct combiner_info *info;
@@ -209,8 +220,15 @@ static void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 	info = get_irq_desc_data(desc);
 	while ((events = *info->mevtflag) != 0) {
 		n = __ffs(events);
-		*info->evtclr = (1 << n);
-		generic_handle_irq(info->irqmap[n]);
+		irq = info->irqmap[n]; /* irq to handle */
+
+		if (PRE_ACK)
+			*info->evtclr = (1 << n);
+
+		generic_handle_irq(irq);
+
+		if (!PRE_ACK)
+			*info->evtclr = (1 << n);
 	}
 
 	raw_spin_lock(&desc->lock);
