@@ -73,7 +73,19 @@ static struct at24_platform_data at24_eeprom_data = {
 	.flags		= AT24_FLAG_ADDR16,
 };
 
+#ifdef CONFIG_SERIAL_SC16IS7XX
+static struct sc16is7xx_platform_data uart_data = {
+	.baud_base = 921600,
+};
+#endif
+
 static struct i2c_board_info evm_i2c_info[] = {
+#ifdef CONFIG_SERIAL_SC16IS7XX
+	{ I2C_BOARD_INFO("sc16is750", 0x4d),
+	  .irq = IRQ_UART_BRIDGE,
+	  .platform_data = &uart_data,
+	},
+#endif
 #ifdef CONFIG_EEPROM_AT24
 	{ I2C_BOARD_INFO("24c1024", 0x50),
 	  .platform_data = &at24_eeprom_data,
@@ -176,6 +188,14 @@ void c6x_board_setup_arch(void)
 	printk("Designed for the EVM6474 Lite EVM\n");
 
 	gpio_direction(0xFFFF);  /* all input */
+
+#if defined(CONFIG_SERIAL_SC16IS7XX)
+	/* setup GP15 for interrupt from i2c UART */
+	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
+	gpio_bank_int_enable();
+	irq_map(IRQ_GPIO15, IRQ_UART_BRIDGE);
+#endif
+
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
