@@ -18,6 +18,11 @@
 #define BOARD_RAM_SIZE	0x08000000
 
 /* 
+ * I2C UART Bridge (14.7456MHz / 16)
+ */
+#define BASE_BAUD	921600
+
+/* 
  * I2C bus specs 
  */
 #define ARCH_I2C_FREQ   400   /* KHz  */
@@ -44,6 +49,7 @@
 #define IRQ_RIO_LSU     INT9
 
 #define IRQ_I2C	        INT13
+#define IRQ_UART_BRIDGE	INT12
 
 #define IRQ_CLOCKEVENTS INT15
 
