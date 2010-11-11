@@ -305,13 +305,14 @@ void irq_map(unsigned int irq_src, unsigned int prio)
 		prio_saved_chip[prio] = desc->chip;
 		set_irq_chip(cic_irq, &direct_chips[prio]);
 
-		if (output < NR_CIC_COMBINERS)
-			desc->chip->startup(cic_irq);
-
 		irq_to_prio[cic_irq] = prio;
 		prio_to_irq[prio] = cic_irq;
 
 		__irq_megamod_map(irq_src, prio);
+
+		if (output < NR_CIC_COMBINERS)
+			desc->chip->startup(cic_irq);
+
 		goto out_unlock;
 	}
 #endif
@@ -324,6 +325,8 @@ void irq_map(unsigned int irq_src, unsigned int prio)
 	prio_saved_chip[prio] = desc->chip;
 	set_irq_chip(irq_src, &direct_chips[prio]);
 
+	__irq_megamod_map(irq_src, prio);
+
 	if (irq_src < NR_MEGAMOD_COMBINERS) {
 		desc->handler_data = &chip_info[irq_src];
 		desc->handle_irq = handle_combined_irq;
@@ -331,7 +334,6 @@ void irq_map(unsigned int irq_src, unsigned int prio)
 		/* only so it shows up in /proc */
 		desc->action = &combiner_actions[irq_src];
 	}
-	__irq_megamod_map(irq_src, prio);
 
 out_unlock:
 	spin_unlock_irqrestore(&map_lock, flags);
