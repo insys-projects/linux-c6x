@@ -1764,8 +1764,7 @@ int register_edma_interrupts
 		return -1;
 	}
 
-	irq_map(IRQ_EDMA3CCINT, IRQ_EDMA3);
-	if (request_irq(IRQ_EDMA3, edma_irq0_handler_l, 0, "EDMA", NULL)) {
+	if (request_irq(IRQ_EDMA3CCINT, edma_irq0_handler_l, 0, "EDMA", NULL)) {
 		DEV_DBG(&edma_dev.dev, "request_irq failed\n");
 		return -1;
 	}

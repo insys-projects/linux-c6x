@@ -97,13 +97,6 @@ head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/
 libs-y		+= arch/c6x/lib/
 
-ifdef CONFIG_TI_C6X_COMPILER
-LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-file-name=libcl6x.a)
-else
-LIBGCC := $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
-endif
-libs-y		+= $(LIBGCC)
-
 ifdef CONFIG_TI_C6X_LINKER
 TI_LDSCRIPT := $(obj)/arch/c6x/vmlinux.cmd
 BUILTINSCRIPT := $(srctree)/arch/c6x/builtin.cmd

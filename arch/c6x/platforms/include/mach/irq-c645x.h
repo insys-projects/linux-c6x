@@ -14,45 +14,7 @@
 #define __MACH_IRQ_C645X_H
 
 /*
- * Interrupt selector registers
- */
-#define IRQ_EVTFLAG0_REG  0x01800000
-#define IRQ_EVTFLAG1_REG  0x01800004
-#define IRQ_EVTFLAG2_REG  0x01800008
-#define IRQ_EVTFLAG3_REG  0x0180000c
-#define IRQ_EVTSET0_REG   0x01800020
-#define IRQ_EVTSET1_REG   0x01800024
-#define IRQ_EVTSET2_REG   0x01800028
-#define IRQ_EVTSET3_REG   0x0180002c
-#define IRQ_EVTCLR0_REG   0x01800040
-#define IRQ_EVTCLR1_REG   0x01800044
-#define IRQ_EVTCLR2_REG   0x01800048
-#define IRQ_EVTCLR3_REG   0x0180004c
-#define IRQ_EVTMASK0_REG  0x01800080
-#define IRQ_EVTMASK1_REG  0x01800084
-#define IRQ_EVTMASK2_REG  0x01800088
-#define IRQ_EVTMASK3_REG  0x0180008c
-#define IRQ_MEVTFLAG0_REG 0x018000a0
-#define IRQ_MEVTFLAG1_REG 0x018000a4
-#define IRQ_MEVTFLAG2_REG 0x018000a8
-#define IRQ_MEVTFLAG3_REG 0x018000ac
-#define IRQ_INTMUX1_REG   0x01800104
-#define IRQ_INTMUX2_REG   0x01800108
-#define IRQ_INTMUX3_REG   0x0180010c
-#define IRQ_INTXSTAT_REG  0x01800180
-#define IRQ_INTXCLR_REG   0x01800184
-#define IRQ_INTDMASK_REG  0x0180018c
-#define IRQ_EXPMASK0_REG  0x01800090
-#define IRQ_EXPMASK1_REG  0x01800094
-#define IRQ_EXPMASK2_REG  0x01800098
-#define IRQ_EXPMASK3_REG  0x0180009c
-#define IRQ_MEXPMASK0_REG 0x018000e0
-#define IRQ_MEXPMASK1_REG 0x018000e4
-#define IRQ_MEXPMASK2_REG 0x018000e8
-#define IRQ_MEXPMASK3_REG 0x018000ec
-
-/*
- * C6x peripheral interrupt sources
+ * C645x peripheral interrupt sources
  */
 #define IRQ_EVT0          0   /* combined events */
 #define IRQ_EVT1          1
@@ -163,5 +125,6 @@
 #define IRQ_IDMACMPA      126 /* IDMA CPU memory protection fault */
 #define IRQ_IDMABUSERR    127 /* IDMA bus error fault */
 
+#define NR_SOC_IRQS	  128
 
 #endif /* __MACH_IRQ_C645X_H */

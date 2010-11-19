@@ -75,16 +75,16 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 	       .dma_tx_sync = DMA_MCBSP0_TX,
 	       .dma_rx_data = MCBSP0_EDMA_RX_DATA,
 	       .dma_tx_data = MCBSP0_EDMA_TX_DATA,
-	       .rx_irq      = IRQ_MCBSP0_RX,
-	       .tx_irq      = IRQ_MCBSP0_TX},
+	       .rx_irq      = IRQ_REVT0,
+	       .tx_irq      = IRQ_XEVT0},
 
 	[1] = {.phys_base   = IO_ADDRESS(MCBSP1_BASE_ADDR),
 	       .dma_rx_sync = DMA_MCBSP1_RX,
 	       .dma_tx_sync = DMA_MCBSP1_TX,
 	       .dma_rx_data = MCBSP1_EDMA_RX_DATA,
 	       .dma_tx_data = MCBSP1_EDMA_TX_DATA,
-	       .rx_irq      = IRQ_MCBSP1_RX,
-	       .tx_irq      = IRQ_MCBSP1_RX},
+	       .rx_irq      = IRQ_REVT1,
+	       .tx_irq      = IRQ_XEVT1},
 };
 
 static struct platform_device evm6474_mcbsp_device0 = {

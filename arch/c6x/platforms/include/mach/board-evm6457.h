@@ -32,19 +32,7 @@
  * Timer definitions
  */
 #define LINUX_TIMER_SRC TIMER_1
-#define LINUX_TIMER_EVT IRQ_TINT1
-
-/*
- * Interrupt Assignments
- */
-#define IRQ_I2C	        INT4
-#define IRQ_UART_BRIDGE	INT5
-
-/* Note. IRQ_EMAC_TX must be IRQ_EMAC_RX + 1 */
-#define IRQ_EMAC_RX_0   INT6
-#define IRQ_EMAC_TX_0   INT7
-
-#define IRQ_CLOCKEVENTS INT15
+#define LINUX_TIMER_IRQ IRQ_TINT1
 
 #ifdef CONFIG_IDLE_LED
 #ifndef __ASSEMBLY__

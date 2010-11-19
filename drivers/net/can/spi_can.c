@@ -358,9 +358,8 @@ static void spi_can_interrupt_setup(struct spi_can_priv *can)
 	unsigned long flags;
 	unsigned long status;
 
-	/* Set handler for DTC */
-	irq_map(IRQ_GPIO14, IRQ_CAN);  /* LM3S CAN INT (GPIO14) on IRQ_CAN */
-	request_irq(IRQ_CAN, 
+	/* Set handler for LM3S CAN INT (GPIO14) */
+	request_irq(IRQ_GPIO14, 
 		    spi_can_interrupt_handler,
 		    IRQF_DISABLED,
 		    "SPI-CAN",
@@ -368,7 +367,7 @@ static void spi_can_interrupt_setup(struct spi_can_priv *can)
 
 	gpio_bank_int_disable();
 
-	/* Configure GPIO pin */
+	/* Configure GPIO pins */
 	local_irq_save(flags);
 	gpio_direction_set(0xffff, (1 << GPIO_PIN14));  /* input pin */
 	local_irq_restore(flags);
@@ -384,7 +383,7 @@ static void spi_can_interrupt_clear(struct spi_can_priv *can)
 {
 	gpio_int_edge_detection_set(GPIO_PIN14, GPIO_CLEAR_EDGE);
 
-	free_irq(IRQ_CAN, can);
+	free_irq(IRQ_GPIO14, can);
 }
 
 static int spi_can_setup(struct net_device *ndev, struct spi_can_priv *priv)

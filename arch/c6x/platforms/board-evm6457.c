@@ -56,7 +56,7 @@ static struct sc16is7xx_platform_data uart_data = {
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_SERIAL_SC16IS7XX
 	{ I2C_BOARD_INFO("sc16is750", 0x4d),
-	  .irq = IRQ_UART_BRIDGE,
+	  .irq = IRQ_GPIO15,
 	  .platform_data = &uart_data,
 	},
 #endif
@@ -142,13 +142,12 @@ static void dummy_progress(unsigned int step, char *s) {}
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {
-	printk("Designed for the EVM6457 board, Texas Instruments.\n");
+	printk(KERN_INFO "Designed for the EVM6457 board, Texas Instruments.\n");
 
 #if defined(CONFIG_SERIAL_SC16IS7XX)
 	/* setup GP15 for interrupt from i2c UART */
 	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
 	gpio_bank_int_enable();
-	irq_map(IRQ_GPIO15, IRQ_UART_BRIDGE);
 #endif
 
 	mach_progress      = dummy_progress;

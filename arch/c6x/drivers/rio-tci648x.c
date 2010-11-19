@@ -782,18 +782,14 @@ static void tci648x_rio_interrupt_setup(void)
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_INTDST6_RATE_CNTL,  0x00000000);
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_INTDST7_RATE_CNTL,  0x00000000);
 
-	/* Map sRIO interrupt events to DSP interrupts */
-	irq_map(TCI648X_LSU_RIO_EVT,  TCI648X_LSU_MACH_INT);
-	irq_map(TCI648X_RXTX_RIO_EVT, TCI648X_RXTX_MACH_INT);
-
 	/* Attach interrupt handlers */
-	request_irq(TCI648X_RXTX_MACH_INT,
+	request_irq(TCI648X_RXTX_RIO_EVT,
 		    rxtx_interrupt_handler,
 		    0,
 		    "sRIO",
 		    &_tci648x_rio);
 
-	request_irq(TCI648X_LSU_MACH_INT,
+	request_irq(TCI648X_LSU_RIO_EVT,
 		    lsu_interrupt_handler,
 		    0,
 		    "sRIO LSU",
@@ -803,8 +799,8 @@ static void tci648x_rio_interrupt_setup(void)
 
 static void tci648x_rio_interrupt_release(void)
 {
-	free_irq(TCI648X_RXTX_MACH_INT, &_tci648x_rio);
-	free_irq(TCI648X_LSU_MACH_INT, &_tci648x_rio);
+	free_irq(TCI648X_LSU_RIO_EVT, &_tci648x_rio);
+	free_irq(TCI648X_RXTX_RIO_EVT, &_tci648x_rio);
 }
 
 /*---------------------------------- Direct I/O -------------------------------*/
@@ -1087,7 +1083,7 @@ retry_transfer:
 		__delay(100);
 	}
 
-	/* Set LSU1 transmit interrupt to EDMA event */
+	/* Set LSU1 transmit interrupt to LSU event */
       	tci648x_rio_interrupt_map(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU_ICRR0,
 				  0x00000001,
 				  TCI648X_LSU_RIO_INT);
@@ -1119,7 +1115,7 @@ retry_transfer:
 
 	/* 
 	 * Try to transfer again in case of retry doorbell receive
-	 *  or unavailable outbound credit.
+	 * or unavailable outbound credit.
 	 */
 	if ((res == -EAGAIN) && (retry_count-- > 0)) {
 		edmacc_paramentry_regs edma_params;
