@@ -13,52 +13,6 @@
 #ifndef __MACH_IRQ_C6472_H
 #define __MACH_IRQ_C6472_H
 
-/*
- * Interrupt selector registers
- */
-#define IRQ_EVTFLAG0_REG  0x01800000
-#define IRQ_EVTFLAG1_REG  0x01800004
-#define IRQ_EVTFLAG2_REG  0x01800008
-#define IRQ_EVTFLAG3_REG  0x0180000c
-#define IRQ_EVTSET0_REG   0x01800020
-#define IRQ_EVTSET1_REG   0x01800024
-#define IRQ_EVTSET2_REG   0x01800028
-#define IRQ_EVTSET3_REG   0x0180002c
-#define IRQ_EVTCLR0_REG   0x01800040
-#define IRQ_EVTCLR1_REG   0x01800044
-#define IRQ_EVTCLR2_REG   0x01800048
-#define IRQ_EVTCLR3_REG   0x0180004c
-#define IRQ_EVTMASK0_REG  0x01800080
-#define IRQ_EVTMASK1_REG  0x01800084
-#define IRQ_EVTMASK2_REG  0x01800088
-#define IRQ_EVTMASK3_REG  0x0180008c
-#define IRQ_MEVTFLAG0_REG 0x018000a0
-#define IRQ_MEVTFLAG1_REG 0x018000a4
-#define IRQ_MEVTFLAG2_REG 0x018000a8
-#define IRQ_MEVTFLAG3_REG 0x018000ac
-#define IRQ_EXPMASK0_REG  0x018000c0
-#define IRQ_EXPMASK1_REG  0x018000c4
-#define IRQ_EXPMASK2_REG  0x018000c8
-#define IRQ_EXPMASK3_REG  0x018000cc
-#define IRQ_MEXPMASK0_REG 0x018000e0
-#define IRQ_MEXPMASK1_REG 0x018000e4
-#define IRQ_MEXPMASK2_REG 0x018000e8
-#define IRQ_MEXPMASK3_REG 0x018000ec
-#define IRQ_INTMUX1_REG   0x01800104
-#define IRQ_INTMUX2_REG   0x01800108
-#define IRQ_INTMUX3_REG   0x0180010c
-#define IRQ_AEGMUX0_REG   0x01800140
-#define IRQ_AEGMUX1_REG   0x01800144
-#define IRQ_INTXSTAT_REG  0x01800180
-#define IRQ_INTXCLR_REG   0x01800184
-#define IRQ_INTDMASK_REG  0x01800188
-#define IRQ_EVTASRT_REG   0x018001c0
-
-/* 
- * EVTASRT bits
- */
-#define IRQ_B_EVTPULSE4   (1 << 4)
-
 #define IRQ_EVT0          0   /* combined events */
 #define IRQ_EVT1          1
 #define IRQ_EVT2          2
@@ -172,5 +126,7 @@
 #define IRQ_L2CDMPA       125 /* L2 DMA memory protection fault */
 #define IRQ_EMCCMPA       126 /* external CPU memory protection fault */
 #define IRQ_EMCBUSERR     127 /* bus error interrupt */
+
+#define NR_SOC_IRQS	  128
 
 #endif /* __MACH_IRQ_C6472_H */

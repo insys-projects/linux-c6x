@@ -256,7 +256,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				zone_dma_start = memparse(from + 1, &from);
 				userdef = 1;
 			}
-		} else if (!memcmp(from, "console=ttyS0", 13)) {
+		} else if (!memcmp(from, "console=ttyS", 12)) {
 			/* This is for the case we want to use a very early UART console */
 			c6x_early_uart_cons = 1;
 		}

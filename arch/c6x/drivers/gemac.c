@@ -1425,8 +1425,7 @@ static int __init emac_probe(struct platform_device *pdev)
 #endif
 	struct resource        *cur_res;
 	static int              ndevs = 0;
-	int                     irq        = 0;
-	int                     map_irq;
+	int                     irq   = 0;
 
 	emac_idx = get_emac_idx();
 
@@ -1452,12 +1451,6 @@ static int __init emac_probe(struct platform_device *pdev)
 	cur_res = platform_get_resource_byname(pdev, IORESOURCE_IRQ,"IRQ_SRC");
 	if (cur_res)
 		irq = cur_res->start;
-
-	cur_res = platform_get_resource_byname(pdev, IORESOURCE_IRQ,"IRQ_DST");
-	if (cur_res)
-		map_irq = cur_res->start;
-	else
-		map_irq = INT10;
 
 	/* Get EMAC I/O addresses */
 	ep->emac_reg_base = 0;
@@ -1548,17 +1541,12 @@ static int __init emac_probe(struct platform_device *pdev)
 	
 	/* Install our interrupt handler(s) */
 #ifdef EMAC_HAS_SEPARATE_RXTX_IRQS
-	irq_map(irq, map_irq);
-	if (request_irq(map_irq, emac_rx_interrupt, _INTFLAG, "GEMAC RX", netdev) == 0)
-		netdev->irq = map_irq;
-
-	irq_map(irq + 1, map_irq + 1);
-	if (request_irq(map_irq + 1, emac_tx_interrupt, _INTFLAG, "GEMAC TX", netdev) == 0)
-		netdev->irq = map_irq + 1;
+	if ((request_irq(irq, emac_rx_interrupt, _INTFLAG, "GEMAC RX", netdev) == 0) &&
+	    (request_irq(irq + 1, emac_tx_interrupt, _INTFLAG, "GEMAC TX", netdev) == 0)) 
+		netdev->irq = irq;
 #else
- 	irq_map(irq, map_irq);
-	if (request_irq(map_irq, emac_interrupt, 0, "GEMAC", netdev) == 0)
-		netdev->irq = map_irq;
+	if (request_irq(irq, emac_interrupt, 0, "GEMAC", netdev) == 0)
+		netdev->irq = irq;
 #endif
 	
 	printk("%s: EMAC(%d) driver version 2.1 IRQ=%d queue=%d %s",

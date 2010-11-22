@@ -111,7 +111,7 @@ int __init c6x_arch_init_clockevents(void)
 
 	timer_clock_divisor = (TIMER_REG(timer_EMUMGTCLKSPD) & (0xf << 16)) >> 16;
 
-	cd->irq		= IRQ_CLOCKEVENTS;
+	cd->irq		= LINUX_TIMER_IRQ;
 	cd->name	= "TIMER64_EVT32_TIMER";
 	cd->features	= CLOCK_EVT_FEAT_ONESHOT;
 
@@ -135,14 +135,11 @@ int __init c6x_arch_init_clockevents(void)
 	cd->set_next_event	= next_event;
 	cd->cpumask		= cpumask_of(smp_processor_id());
 
-	/* Configure the interupt selector MUX registers */
-  	irq_map(LINUX_TIMER_EVT, cd->irq);
+	clockevents_register_device(cd);
 
 	/* Set handler */
 	request_irq(cd->irq, timer_interrupt, IRQF_DISABLED | IRQF_TIMER,
 		    "timer", NULL);
-
-	clockevents_register_device(cd);
 
 	return 0;
 }

@@ -169,17 +169,36 @@ config TMS320C64X_GEMAC_1
 	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
 	default n
 
-config DAVINCI_MCBSP
-	bool "DaVinci McBSP Driver"
-	depends on TMS320DM644X || TMS320DM643X
-	default y
+config MCBSP
+	bool "McBSP support"
+	depends on SOC_TMS320C6474
+	default n
 	help
-	  DaVinci McBSP driver.
+	  If you say Y here, the kernel will include drivers and
+          infrastructure code to support TI McBSP devices.
+
+config MCBSP_UART
+	bool "UART over McBSP support"
+	depends on MCBSP
+	default n
+	help
+	  If you say Y here, the kernel will include drivers and
+          infrastructure code to support UART over McBSP devices.
+
+config MCBSP_UART_CONSOLE
+        bool "Console on McBSP UART"
+        depends on MCBSP_UART
+        select SERIAL_CORE_CONSOLE
+        help
+          If you say Y here, it will be possible to use the McBSP UART port as
+          the system console (the system console is the device which receives all
+          kernel messages and warnings and which allows logins in single user
+          mode).
 
 config EDMA3
 	bool "EDMA3 support"
 	depends on SOC_TMS320C6474 || SOC_TMS320C6472
-	default y if (DAVINCI_MCBSP || RAPIDIO_TCI648X)
+	default y if (MCBSP || RAPIDIO_TCI648X)
 	help 
           If you say Y here, the kernel will include drivers and
           infrastructure code to support TI EDMA3 devices.

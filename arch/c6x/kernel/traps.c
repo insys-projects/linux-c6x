@@ -41,11 +41,9 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr);
 void __init unmask_eexception(void)
 {
 #ifdef CONFIG_TMS320C64XPLUS
-	volatile unsigned int* reg = (unsigned int *) IRQ_EXPMASK3_REG;
-
 	/* Unmask events number 119 to 127 */
 	__dint();
-	*reg &= 0x00ffffff;
+	IC_EXPMASK[3] &= 0x00ffffff;
 	__rint();
 
 	/* 
@@ -327,17 +325,17 @@ static int process_iexcept(struct pt_regs *regs)
  */
 static void process_eexcept(struct pt_regs *regs)
 {
-	volatile unsigned int* reg = (unsigned int *) IRQ_MEXPMASK0_REG;
 	unsigned int eexcept_num;
 	unsigned int bank = 0;
+	int i;
 
 	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
 
-	for (; reg <= (unsigned int *) IRQ_MEXPMASK3_REG; reg++) {
-		while(*reg) {
+	for (i = 0; i <= 3; i++) {
+		while (IC_MEXPMASK[i]) {
 			__dint();
-			eexcept_num = __ffs(*reg);
-			*reg &= ~(1 << eexcept_num); /* ack the external exception */
+			eexcept_num = __ffs(IC_MEXPMASK[i]);
+			IC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
 			__rint();
 			do_trap(&eexcept_table[eexcept_num + (bank << 5)], regs);
 		}

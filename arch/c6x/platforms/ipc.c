@@ -180,8 +180,7 @@ static int __init tci648x_ipc_init(void)
 		ipc_list[i].handler = NULL;
 	}
 		
-	irq_map(IRQ_IPCLOCAL, INT5);
-	res = request_irq(IRQ_IPC,
+	res = request_irq(IRQ_IPCLOCAL,
 			  tci648x_ipc_rx_interrupt,
 			  IRQF_DISABLED,
 			  "IPC",

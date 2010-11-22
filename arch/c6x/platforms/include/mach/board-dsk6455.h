@@ -26,17 +26,7 @@
  * Timer definitions
  */
 #define LINUX_TIMER_SRC TIMER_1
-#define LINUX_TIMER_EVT IRQ_TINT1
-
-/*
- * Interrupt Assignments
- */
-#define IRQ_EMAC_RX_0   INT6
-#define IRQ_EMAC_TX_0   INT6   /* same IRQ for both Tx and Rx */
-
-#define IRQ_I2C	        INT13
-
-#define IRQ_CLOCKEVENTS INT15
+#define LINUX_TIMER_IRQ IRQ_TINT1
  
 /* 
  * DSK6455 CPLD registers

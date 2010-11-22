@@ -809,7 +809,7 @@ preempt_schedule:
 	MVKH	.S2	preempt_schedule_irq,B0
 	AND	.D1	_TIF_NEED_RESCHED,A1,A1	; check for TIF_NEED_RESCHED flag
  [!A1]	BNOP	.S2X	A0,5
-	B	B0
+	B	.S2	B0
 	ADDKPC	.S2	preempt_schedule,B3,4
 #endif
 

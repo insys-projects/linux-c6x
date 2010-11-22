@@ -27,24 +27,7 @@ struct davinci_i2c_platform_data {
 	unsigned int    sda_pin;        /* GPIO pin ID to use for SDA (UNUSED) */
 	unsigned int    scl_pin;        /* GPIO pin ID to use for SCL (UNUSED) */
 };
-
-/* 
- * Configuration of the interupt selector MUX registers
- */
-#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
-
-#define i2c_arch_interrupt_setup()      irq_map(IRQ_I2CINT, IRQ_I2C)
-
-#elif defined(CONFIG_SOC_TMS320C6474)
-
-#define i2c_arch_interrupt_setup()      do { \
-	cic_map(CIC_IICINT, CIC4);	     \
-	irq_map(IRQ_CICEVT4, IRQ_I2C);	     \
-        } while(0)
-
-#endif /* defined(CONFIG_SOC_TMS320C6474) */
-
-#endif /* __ASSEMBLY__ */
+#endif
 
 /*
  * I2C registers base

@@ -114,12 +114,6 @@ static struct resource emac_resources0 [] = {
 		.end            =  IRQ_EMACTXINT,
 		.flags          =  IORESOURCE_IRQ,
 	},
-	{
-		.name           = "IRQ_DST",
-		.start          =  IRQ_EMAC_RX_0,
-		.end            =  IRQ_EMAC_TX_0,
-		.flags          =  IORESOURCE_IRQ,
-	},
 };
 
 static struct platform_device emac_dev0 = {
@@ -154,12 +148,6 @@ static struct resource emac_resources1 [] = {
 		.name           = "IRQ_SRC",
 		.start          =  IRQ_EMACRXINT1, 
 		.end            =  IRQ_EMACTXINT1,
-		.flags          =  IORESOURCE_IRQ,
-	},
-	{
-		.name           = "IRQ_DST",
-		.start          =  IRQ_EMAC_RX_1,
-		.end            =  IRQ_EMAC_TX_1,
 		.flags          =  IORESOURCE_IRQ,
 	},
 };

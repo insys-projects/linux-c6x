@@ -733,6 +733,7 @@ struct spi_board_info {
 	 * needed to behave without being bound to a driver:
 	 *  - quirks like clock rate mattering when not selected
 	 */
+	u8              bits_per_word;
 };
 
 #ifdef	CONFIG_SPI

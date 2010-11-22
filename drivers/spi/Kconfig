@@ -150,6 +150,12 @@ config SPI_LM70_LLP
 	  which interfaces to an LM70 temperature sensor using
 	  a parallel port.
 
+config SPI_MCBSP
+        tristate "SPI emulation on top of McBSP interface"
+        depends on SPI_MASTER && MCBSP
+        help
+         This enables using SPI emulation on top of McBSP interface.
+
 config SPI_MPC52xx
 	tristate "Freescale MPC52xx SPI (non-PSC) controller support"
 	depends on PPC_MPC52xx && SPI

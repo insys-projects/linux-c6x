@@ -62,7 +62,7 @@ static ssize_t control_proc_write(struct file* file,
 	case 'B':
 #ifdef CONFIG_SOC_TMS320C6474
 		/* First boot for the Faraday case */
-	        assert_event(IRQ_B_EVTPULSE4);
+		assert_event(IC_B_EVTPULSE4);
 #endif
 		if ((num == 0) || (num == 10)) {
 			/* Boot all cores */
