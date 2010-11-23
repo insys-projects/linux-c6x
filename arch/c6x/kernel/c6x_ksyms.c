@@ -51,6 +51,10 @@ EXPORT_SYMBOL(__c6xabi_remu);
 extern unsigned long long __c6xabi_mpyll(unsigned long long src1, unsigned long long src2);
 EXPORT_SYMBOL(__c6xabi_mpyll);
 
+extern unsigned long long __c6xabi_divull(unsigned long long n,
+					  unsigned long long d);
+EXPORT_SYMBOL(__c6xabi_divull);
+
 extern long long __c6xabi_negll(long long src);
 EXPORT_SYMBOL(__c6xabi_negll);
 
