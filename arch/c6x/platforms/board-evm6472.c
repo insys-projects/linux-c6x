@@ -26,6 +26,10 @@
 #include <linux/i2c/sc16is7xx.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/nand-evm6488.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -190,6 +194,37 @@ static void __init evm_setup_i2c(void)
 #define evm_setup_i2c()
 #endif /* CONFIG_I2C */
 
+#if defined(CONFIG_MTD_NAND_EVM6488) || defined(CONFIG_MTD_NAND_EVM6488_MODULE)
+static struct mtd_partition evm_nand_parts[] = {
+	[0] = {
+		.name	= "evm-nand",
+		.size	= MTDPART_SIZ_FULL,
+		.offset	= 0,
+	},
+};
+
+static struct gpio_nand_platdata evm_nand_platdata = {
+	.parts = evm_nand_parts,
+	.num_parts = ARRAY_SIZE(evm_nand_parts),
+	.chip_delay = 25,
+};
+
+static struct platform_device evm_nand = {
+	.name		= "nand-evm6488",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &evm_nand_platdata,
+	}
+};
+
+static void __init evm_setup_nand(void)
+{
+	platform_device_register(&evm_nand);
+}
+#else
+static inline void evm_setup_nand(void) {}
+#endif
+
 static struct pll_data pll1_data = {
 	.num       = 1,
 	.phys_base = ARCH_PLL1_BASE,
@@ -341,6 +376,7 @@ void c6x_board_setup_arch(void)
 __init int evm_init(void)
 {
 	evm_setup_i2c();
+	evm_setup_nand();
         setup_emac();
 	return 0;
 }
