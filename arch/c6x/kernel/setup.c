@@ -28,6 +28,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/clk.h>
 
 #ifdef CONFIG_MTD_UCLINUX
 #include <linux/mtd/map.h>
@@ -91,6 +92,12 @@ void (*mach_print_value) (char *, unsigned long) = NULL;
 
 struct tag_header *c6x_tags_pointer __initdata;
 
+unsigned int ticks_per_ns_scaled;
+EXPORT_SYMBOL(ticks_per_ns_scaled);
+
+unsigned int c6x_core_freq;
+EXPORT_SYMBOL(c6x_core_freq);
+
 static unsigned long dummy_gettimeoffset(void)
 {
 	return 0;
@@ -98,9 +105,22 @@ static unsigned long dummy_gettimeoffset(void)
 
 unsigned long (*mach_gettimeoffset)(void) = dummy_gettimeoffset;;
 
-void get_cpuinfo(void)
+static void __init get_cpuinfo(void)
 {
 	unsigned cpu_id, rev_id, csr;
+	struct clk *coreclk = clk_get_sys(NULL, "core");
+	unsigned long core_khz;
+
+	if (!IS_ERR(coreclk))
+		c6x_core_freq = clk_get_rate(coreclk);
+	else {
+		printk(KERN_WARNING "Cannot find core clock frequency. Using 700MHz\n");
+		c6x_core_freq = 700000000;
+	}
+
+	core_khz = c6x_core_freq / 1000;
+
+	ticks_per_ns_scaled = ((uint64_t)core_khz << C6X_NDELAY_SCALE) / 1000000;
 
 	csr = get_creg(CSR);
 	cpu_id = csr >> 24;
@@ -176,12 +196,13 @@ void get_cpuinfo(void)
 	}
 
 #ifndef CONFIG_TMS320C64XPLUS
-	printk("CPU: %s revision %s core voltage %s\n",
-	       cpu_name, cpu_rev, cpu_voltage);
+	printk(KERN_INFO "CPU: %s rev %s %s %uMHz\n",
+	       cpu_name, cpu_rev, cpu_voltage, c6x_core_freq / 1000000);
 #else
 	cpu_num = get_creg(DNUM) & 0xff;
-	printk("CPU: %s revision %s core voltage %s core number %d\n",
-	       cpu_name, cpu_rev, cpu_voltage, cpu_num);
+	printk(KERN_INFO "CPU%d: %s rev %s %s %uMHz\n",
+	       cpu_num, cpu_name, cpu_rev,
+	       cpu_voltage, c6x_core_freq / 1000000);
 #endif
 }
 
@@ -490,38 +511,27 @@ void __init setup_arch(char **cmdline_p)
 
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
-	unsigned long clock_freq = ((loops_per_jiffy<<1)+(500000/HZ))
-		/((500000<<1)/HZ);
-#ifndef CONFIG_TMS320C64XPLUS
 	seq_printf(m, 
 		   "CPU:\t\t%s\n"
 		   "Revision:\t%s\n"
 		   "Core voltage:\t%s\n"
-		   "MMU:\t\t%s\n"
-		   "FPU:\t\t%s\n"
-		   "Clocking:\t%luMHz\n"
-		   "BogoMips:\t%lu.%02lu\n"
-		   "Calibration:\t%lu loops\n",
-		   cpu_name, cpu_rev, cpu_voltage, mmu, fpu,
-		   clock_freq,
-		   (loops_per_jiffy/(500000/HZ)),(loops_per_jiffy/(5000/HZ))%100,
-		   loops_per_jiffy);
-#else
-	seq_printf(m, 
-		   "CPU:\t\t%s\n"
-		   "Revision:\t%s\n"
-		   "Core voltage:\t%s\n"
+#ifdef CONFIG_TMS320C64XPLUS
 		   "Core num:\t%d\n"
+#endif
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
-		   "Clocking:\t%luMHz\n"
+		   "Clocking:\t%uMHz\n"
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
-		   cpu_name, cpu_rev, cpu_voltage, cpu_num, mmu, fpu,
-		   clock_freq,
-		   (loops_per_jiffy/(500000/HZ)),(loops_per_jiffy/(5000/HZ))%100,
-		   loops_per_jiffy);
+		   cpu_name, cpu_rev, cpu_voltage,
+#ifdef CONFIG_TMS320C64XPLUS
+		   cpu_num,
 #endif
+		   mmu, fpu,
+		   (c6x_core_freq + 500000) / 1000000,
+		   (loops_per_jiffy/(500000/HZ)),
+		   (loops_per_jiffy/(5000/HZ))%100,
+		   loops_per_jiffy);
 	return 0;
 }
 

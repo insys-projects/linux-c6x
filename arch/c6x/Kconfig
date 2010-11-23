@@ -122,10 +122,6 @@ config HPI_CONSOLE
          Say Y if you want a write-only console on the Host Port Interface.
          This is only useful for running kernels from a debugger or simulator.
 
-config TMS320C6X_MHZ
-	int "CPU frequency (Mhz) (600)"
-	default 600
-
 config PLL_TCI648X
 	bool "PLL_TCI648X"
 	depends on COMMON_CLKDEV
