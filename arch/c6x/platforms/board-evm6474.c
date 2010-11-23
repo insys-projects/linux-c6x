@@ -209,8 +209,6 @@ void c6x_board_setup_arch(void)
 
 	printk("Designed for the EVM6474 board, Texas Instruments.\n");
 
-	gpio_direction(0xFFFF);  /* all input */
-
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 	mach_init_IRQ      = board_init_IRQ;

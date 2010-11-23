@@ -6,28 +6,20 @@
 mainmenu "Linux Kernel Configuration"
 
 config TMS320C6X
-	bool
-	default y
+	def_bool y
+	select ARCH_REQUIRE_GPIOLIB
 
 config MMU
-	bool
-	default n
+	def_bool n
 
 config ZONE_DMA
-	bool
-	default y
-
-config NO_FORK
-	bool
-	default y
+	def_bool y
 
 config SBUS
-	bool
-	default n
+	def_bool n
 
 config FPU
-	bool
-	default n
+	def_bool n
 
 config HIGHMEM
 	def_bool n
@@ -36,22 +28,21 @@ config NUMA
 	def_bool n
 
 config UID16
-	bool
-	default y
+	def_bool y
 
 config RWSEM_GENERIC_SPINLOCK
-	bool
-	default y
+	def_bool y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
-	default n
+	def_bool n
 
 config GENERIC_CALIBRATE_DELAY
-	bool
-	default y
+	def_bool y
 
 config GENERIC_FIND_NEXT_BIT
+	def_bool y
+
+config GENERIC_GPIO
 	def_bool y
 
 config GENERIC_HWEIGHT
@@ -144,6 +135,9 @@ config TIMER_TCI648X
 
 config PIC_C64XPLUS
 	bool "C64X+ Megamodule Interrupt Controller"
+
+config GPIO_TCI648X
+	bool
 
 source "arch/c6x/platforms/Kconfig"
 

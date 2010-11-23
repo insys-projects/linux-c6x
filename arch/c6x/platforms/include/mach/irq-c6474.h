@@ -64,6 +64,7 @@
 #define IRQ_TINT5       43
 #define IRQ_TINTLO5     43
 #define IRQ_TINTHI5     44
+#define IRQ_GPIO_START  45
 #define IRQ_GPIO0       45  /* GPIO events */
 #define IRQ_GPIO1       46
 #define IRQ_GPIO2       47

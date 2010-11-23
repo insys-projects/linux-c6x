@@ -23,7 +23,6 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c/at24.h>
-#include <linux/i2c/pca953x.h>
 #include <linux/i2c/sc16is7xx.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
@@ -104,8 +103,8 @@ static struct sc16is7xx_platform_data uart_data = {
 
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_SERIAL_SC16IS7XX
+	/* this must come first */
 	{ I2C_BOARD_INFO("sc16is750", 0x4d),
-	  .irq = IRQ_GPIO15,
 	  .platform_data = &uart_data,
 	},
 #endif
@@ -116,8 +115,26 @@ static struct i2c_board_info evm_i2c_info[] = {
 #endif
 };
 
+#define I2C_UART_GPIO 15
+
 static void __init evm_setup_i2c(void)
 {
+#if defined(CONFIG_SERIAL_SC16IS7XX)
+	int status, irq;
+	/* setup gpio for interrupt from i2c UART */
+	status = gpio_request(I2C_UART_GPIO, "I2C-UART IRQ");
+	if (status < 0)
+		printk(KERN_ERR "Cannot get GPIO for I2C UART: %d\n", status);
+	else {
+		gpio_direction_input(I2C_UART_GPIO);
+		irq = gpio_to_irq(I2C_UART_GPIO);
+		if (irq < 0)
+			printk(KERN_ERR "GPIO for I2C UART has no IRQ: %d\n", irq);
+		else
+			set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
+		evm_i2c_info[0].irq = irq;
+	}
+#endif
 	i2c_register_board_info(1, evm_i2c_info,
 				ARRAY_SIZE(evm_i2c_info));
 }
@@ -202,12 +219,6 @@ static void __init board_init_IRQ(void)
 void c6x_board_setup_arch(void)
 {
 	printk(KERN_INFO "Designed for the EVM6457 board, Texas Instruments.\n");
-
-#if defined(CONFIG_SERIAL_SC16IS7XX)
-	/* setup GP15 for interrupt from i2c UART */
-	gpio_int_edge_detection_set(15, GPIO_FALLING_EDGE);
-	gpio_bank_int_enable();
-#endif
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
