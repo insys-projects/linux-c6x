@@ -23,7 +23,6 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c/at24.h>
-#include <linux/i2c/pca953x.h>
 #include <linux/i2c/sc16is7xx.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
@@ -73,10 +72,6 @@ static struct at24_platform_data at24_eeprom_data = {
 	.flags		= AT24_FLAG_ADDR16,
 };
 
-static struct pca953x_platform_data pca9536_data = {
-	.gpio_base = 16,
-};
-
 #ifdef CONFIG_SERIAL_SC16IS7XX
 static struct sc16is7xx_platform_data uart_data = {
 	.baud_base = 921600,
@@ -86,13 +81,9 @@ static struct sc16is7xx_platform_data uart_data = {
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_SERIAL_SC16IS7XX
 	{ I2C_BOARD_INFO("sc16is750", 0x4d),
-	  .irq = IRQ_GPIO15,
 	  .platform_data = &uart_data,
 	},
 #endif
-	{ I2C_BOARD_INFO("pca9536", 0x41),
-	  .platform_data = &pca9536_data
-	},
 #ifdef CONFIG_EEPROM_AT24
 	{ I2C_BOARD_INFO("24c1024", 0x50),
 	  .platform_data = &at24_eeprom_data,
@@ -100,8 +91,27 @@ static struct i2c_board_info evm_i2c_info[] = {
 #endif
 };
 
+#define I2C_UART_GPIO 15
+
 static void __init evm_setup_i2c(void)
 {
+#if defined(CONFIG_SERIAL_SC16IS7XX)
+	int status, irq;
+
+	/* setup gpio for interrupt from i2c UART */
+	status = gpio_request(I2C_UART_GPIO, "I2C-UART IRQ");
+	if (status < 0)
+		printk(KERN_ERR "Cannot get GPIO for I2C UART: %d\n", status);
+	else {
+		gpio_direction_input(I2C_UART_GPIO);
+		irq = gpio_to_irq(I2C_UART_GPIO);
+		if (irq < 0)
+			printk(KERN_ERR "GPIO for I2C UART has no IRQ: %d\n", irq);
+		else
+			set_irq_type(irq, IRQ_TYPE_EDGE_FALLING);
+		evm_i2c_info[0].irq = irq;
+	}
+#endif
 	i2c_register_board_info(1, evm_i2c_info,
 				ARRAY_SIZE(evm_i2c_info));
 }
@@ -246,18 +256,6 @@ void c6x_board_setup_arch(void)
 	int i, ret;
 
 	printk(KERN_INFO "Designed for the EVM6472 board, Texas Instruments.\n");
-
-	gpio_direction(0xFFFF);  /* all input */
-	
-	/* setup LED pins as outputs */
-	gpio_pin_direction(LED0_GPIO_PIN, GPIO_OUTPUT);
-	gpio_pin_direction(LED1_GPIO_PIN, GPIO_OUTPUT);
-
-#if defined(CONFIG_SERIAL_SC16IS7XX)
-	/* setup GP15 for interrupt from i2c UART */
-	gpio_int_edge_detection_set(GPIO_PIN15, GPIO_FALLING_EDGE);
-	gpio_bank_int_enable();
-#endif
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;

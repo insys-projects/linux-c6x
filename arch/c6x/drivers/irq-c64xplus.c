@@ -42,26 +42,47 @@
 
 #define NR_COMBINERS (NR_MEGAMOD_COMBINERS + NR_CIC_COMBINERS)
 
-/* combiner info used by flow handlers and combiner chips */
-struct combiner_info {
-	int irq_base;
-	volatile uint32_t *evtmask;
+struct combiner_handler_info {
 	volatile uint32_t *mevtflag;
 	volatile uint32_t *evtclr;
 	uint16_t irqmap[32];
 };
 
-static struct combiner_info chip_info[NR_COMBINERS];
+struct combiner_mask_info {
+	int irq_base;
+	volatile uint32_t *evtmask;
+};
+
+struct c6x_irq_chip {
+	struct irq_chip	chip;
+	struct combiner_mask_info *minfo;
+};
+
+#define c6x_irq_to_chip(i) ((struct c6x_irq_chip *)irq_to_desc((i))->chip)
+#define c6x_irq_desc_to_chip(d) ((struct c6x_irq_chip *)(d)->chip)
+
+static struct combiner_mask_info    megamod_mask_info[NR_MEGAMOD_COMBINERS];
+static struct combiner_handler_info megamod_handler_info[NR_MEGAMOD_COMBINERS];
 
 uint16_t prio_to_irq[NR_SYS_IRQS];
 
 static uint8_t  irq_to_prio[NR_IRQS];
 
-static struct irq_chip *prio_saved_chip[NR_SYS_IRQS];
+/* The 16 SoC GPIOs can span more than one megamodule */
+#define NR_GPIO_CHIPS 2
+
+static struct c6x_irq_chip direct_chips[(INT15 - INT4) + 1];
+static struct c6x_irq_chip gpio_chips[NR_GPIO_CHIPS];
+static struct c6x_irq_chip *prio_saved_chips[NR_SYS_IRQS];
 
 #if NR_CIC_COMBINERS > 0
+static struct combiner_mask_info    cic_mask_info[NR_CIC_COMBINERS];
+static struct combiner_handler_info cic_handler_info[NR_CIC_COMBINERS];
+
 static uint8_t  cic_output_to_evt[NR_CIC_OUTPUTS];
 static uint8_t  cic_evt_to_output[NR_CIC_IRQS];
+static struct c6x_irq_chip cic_mapped_chips[CIC_MAPLEN - NR_CIC_COMBINERS];
+static struct c6x_irq_chip *cic_saved_chips[CIC_MAPLEN - NR_CIC_COMBINERS];
 #endif
 
 /* lock protecting irq mappings */
@@ -87,27 +108,20 @@ static void unmask_direct(unsigned int irq)
 	enable_irq_mask(1 << prio);
 }
 
-#define __CHIP(namestr, i, m, u)	\
-	{				\
-		.name = namestr #i,	\
-		.mask = m,		\
-		.unmask = u,		\
-	}
-/* Direct HW interrupt chip */
-#define DIRECT_CHIP(i)			\
-	__CHIP("direct-", i, mask_direct, unmask_direct)
-
-static struct irq_chip direct_chips[] = {
-	DIRECT_CHIP(0),	 DIRECT_CHIP(1),
-	DIRECT_CHIP(2),	 DIRECT_CHIP(3),
-	DIRECT_CHIP(4),	 DIRECT_CHIP(5),
-	DIRECT_CHIP(6),	 DIRECT_CHIP(7),
-	DIRECT_CHIP(8),	 DIRECT_CHIP(9),
-	DIRECT_CHIP(10), DIRECT_CHIP(11),
-	DIRECT_CHIP(12), DIRECT_CHIP(13),
-	DIRECT_CHIP(14), DIRECT_CHIP(15),
+static const char *direct_chip_names[] = {
+	"direct-4",
+	"direct-5",
+	"direct-6",
+	"direct-7",
+	"direct-8",
+	"direct-9",
+	"direct-10",
+	"direct-11",
+	"direct-12",
+	"direct-13",
+	"direct-14",
+	"direct-15",
 };
-
 
 #if NR_CIC_COMBINERS > 0
 /*
@@ -139,33 +153,46 @@ static inline int cic_mapped_irq(uint16_t irq)
 
 static void mask_combined(unsigned int irq)
 {
-	struct combiner_info *info = get_irq_chip_data(irq);
+	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
 
 	irq = cic_mapped_irq(irq);
-	*info->evtmask |= (1 << ((irq - info->irq_base) & 31));
+	*chip->minfo->evtmask |= (1 << (irq - chip->minfo->irq_base));
 }
 
 static void unmask_combined(unsigned int irq)
 {
-	struct combiner_info *info = get_irq_chip_data(irq);
+	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
 
 	irq = cic_mapped_irq(irq);
-	*info->evtmask &= ~(1 << ((irq - info->irq_base) & 31));
+	*chip->minfo->evtmask &= ~(1 << (irq - chip->minfo->irq_base));
 }
+
+#define __CHIP(namestr, i, m, u)	\
+	{				\
+		.chip = { .name = namestr #i,	\
+			  .mask = m,		\
+			  .unmask = u,		\
+		},				\
+	}
 
 /* Combiner chips */
 #define MEGAMOD_CHIP(i)	\
 	__CHIP("combiner-", i, mask_combined, unmask_combined)
 
+static struct c6x_irq_chip megamod_chips[] = {
+	MEGAMOD_CHIP(0),
+	MEGAMOD_CHIP(1),
+	MEGAMOD_CHIP(2),
+	MEGAMOD_CHIP(3),
+};
+
+#if NR_CIC_COMBINERS > 0
+
 #define CIC_CHIP(i)	\
 	__CHIP("cicombiner-", i, mask_combined, unmask_combined)
 
-static struct irq_chip combiner_chips[] = {
-	MEGAMOD_CHIP(0), MEGAMOD_CHIP(1),
-	MEGAMOD_CHIP(2), MEGAMOD_CHIP(3),
-#if NR_CIC_COMBINERS > 0
+static struct c6x_irq_chip cic_chips[] = {
 	CIC_CHIP(0),
-#endif
 #if NR_CIC_COMBINERS > 1
 	CIC_CHIP(1),
 #endif
@@ -176,6 +203,7 @@ static struct irq_chip combiner_chips[] = {
 	CIC_CHIP(3),
 #endif
 };
+#endif /* NR_CIC_COMBINERS > 0 */
 
 static struct irqaction combiner_actions[] = {
 	{ .name = "combined-0-31", },
@@ -203,7 +231,7 @@ static struct irqaction combiner_actions[] = {
 
 static void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 {
-	struct combiner_info *info;
+	struct combiner_handler_info *info = get_irq_desc_data(desc);
 	unsigned long events;
 	int n;
 
@@ -217,7 +245,6 @@ static void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 	desc->status |= IRQ_INPROGRESS;
 	raw_spin_unlock(&desc->lock);
 
-	info = get_irq_desc_data(desc);
 	while ((events = *info->mevtflag) != 0) {
 		n = __ffs(events);
 		irq = info->irqmap[n]; /* irq to handle */
@@ -236,7 +263,6 @@ static void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 out_unlock:
 	raw_spin_unlock(&desc->lock);
 }
-
 
 /*
  * Setup megamodule event mappings.
@@ -265,7 +291,9 @@ static inline void __irq_megamod_map(unsigned int src, unsigned int dst)
 void irq_map(unsigned int irq_src, unsigned int prio)
 {
 	struct irq_desc *desc;
+	struct c6x_irq_chip *chip, *direct;
 	unsigned long flags;
+	unsigned int prio_idx = prio - INT4;
 
 	if (prio < INT4 || prio > INT15)
 		return;
@@ -293,7 +321,7 @@ void irq_map(unsigned int irq_src, unsigned int prio)
 
 		if (output < NR_CIC_COMBINERS) {
 			cic_irq = IRQ_CIC_START + output;
-
+			/* mask it in the megamodule combiner */
 			mask_combined(cic_irq);
 		} else {
 			cic_src = cic_output_to_evt[output];
@@ -302,37 +330,51 @@ void irq_map(unsigned int irq_src, unsigned int prio)
 			cic_irq = IRQ_CIC_START + cic_src;
 		}
 		desc = irq_to_desc(cic_irq);
-		prio_saved_chip[prio] = desc->chip;
-		set_irq_chip(cic_irq, &direct_chips[prio]);
+		chip = (struct c6x_irq_chip *)desc->chip;
 
+		direct = &direct_chips[prio_idx];
+		*direct = *chip;
+		direct->chip.name = direct_chip_names[prio_idx];
+		direct->chip.mask = mask_direct;
+		direct->chip.unmask = unmask_direct;
+
+		prio_saved_chips[prio] = chip;
+		desc->chip = (struct irq_chip *)direct;
 		irq_to_prio[cic_irq] = prio;
 		prio_to_irq[prio] = cic_irq;
 
 		__irq_megamod_map(irq_src, prio);
 
 		if (output < NR_CIC_COMBINERS)
-			desc->chip->startup(cic_irq);
+			direct->chip.startup(cic_irq);
 
 		goto out_unlock;
 	}
 #endif
-	/* record the mapping */
+	desc = irq_to_desc(irq_src);
+	chip = (struct c6x_irq_chip *)desc->chip;
+
+	direct = &direct_chips[prio_idx];
+	if (irq_src < NR_MEGAMOD_COMBINERS)
+		memset(&direct->chip, 0, sizeof(direct->chip));
+	else
+		*direct = *(struct c6x_irq_chip *)desc->chip;
+	direct->chip.name = direct_chip_names[prio_idx];
+	direct->chip.mask = mask_direct;
+	direct->chip.unmask = unmask_direct;
+
+	prio_saved_chips[prio] = chip;
+	set_irq_chip(irq_src, (struct irq_chip *)direct);
 	irq_to_prio[irq_src] = prio;
 	prio_to_irq[prio] = irq_src;
-
-	desc = irq_to_desc(irq_src);
-
-	prio_saved_chip[prio] = desc->chip;
-	set_irq_chip(irq_src, &direct_chips[prio]);
 
 	__irq_megamod_map(irq_src, prio);
 
 	if (irq_src < NR_MEGAMOD_COMBINERS) {
-		desc->handler_data = &chip_info[irq_src];
-		desc->handle_irq = handle_combined_irq;
-		desc->chip->startup(irq_src);
-		/* only so it shows up in /proc */
 		desc->action = &combiner_actions[irq_src];
+		desc->handler_data = &megamod_handler_info[irq_src];
+		desc->handle_irq = handle_combined_irq;
+		direct->chip.startup(irq_src);
 	}
 
 out_unlock:
@@ -379,30 +421,30 @@ void irq_unmap(unsigned int irq)
 		irq_to_prio[cic_irq] = 0;
 		prio_to_irq[prio] = IRQ_UNMAPPED;
 
-		set_irq_chip(cic_irq, prio_saved_chip[prio]);
+		desc->chip = (struct irq_chip *)prio_saved_chips[prio];
 
 		if (output < NR_CIC_COMBINERS)
 			unmask_combined(cic_irq);
-	} else
-#endif
-	{
-		prio = irq_to_prio[irq];
-		if (!prio)
-			goto out_unlock;
 
-		desc = irq_to_desc(irq);
-
-		and_creg(IER, ~(1 << prio));
-		irq_to_prio[irq] = 0;
-		prio_to_irq[prio] = IRQ_UNMAPPED;
-
-		if (irq < NR_MEGAMOD_COMBINERS) {
-			set_irq_chip(irq, &dummy_irq_chip);
-			desc->handle_irq = handle_bad_irq;
-			desc->action = NULL;
-		} else
-			set_irq_chip(irq, prio_saved_chip[prio]);
+		goto out_unlock;
 	}
+#endif
+	prio = irq_to_prio[irq];
+	if (!prio)
+		goto out_unlock;
+
+	desc = irq_to_desc(irq);
+
+	and_creg(IER, ~(1 << prio));
+	irq_to_prio[irq] = 0;
+	prio_to_irq[prio] = IRQ_UNMAPPED;
+
+	if (irq < NR_MEGAMOD_COMBINERS) {
+		desc->chip = &dummy_irq_chip;
+		desc->handle_irq = handle_bad_irq;
+		desc->action = NULL;
+	} else
+		desc->chip = (struct irq_chip *)prio_saved_chips[prio];
 
 out_unlock:
 	spin_unlock_irqrestore(&map_lock, flags);
@@ -438,9 +480,12 @@ static inline void __irq_cic_map(int core, unsigned int src, unsigned int dst)
  */
 void irq_cic_map(unsigned int irq_src, unsigned int irq_dst)
 {
+	struct irq_desc *desc;
+	struct c6x_irq_chip *chip, *mmchip;
 	unsigned long flags;
 	int src, output;
-	struct combiner_info *info;
+	struct combiner_handler_info *info;
+	unsigned int idx = irq_dst - (CIC_MAPBASE + NR_CIC_COMBINERS);
 
 	if (irq_dst < (CIC_MAPBASE + NR_CIC_COMBINERS) ||
 	    irq_dst >= (CIC_MAPBASE + CIC_MAPLEN))
@@ -468,11 +513,19 @@ void irq_cic_map(unsigned int irq_src, unsigned int irq_dst)
 	cic_evt_to_output[src] = output;
 	cic_output_to_evt[output] = src;
 
-	info = &chip_info[(CIC_MAPBASE + output) / 32];
+	mmchip = &megamod_chips[(CIC_MAPBASE + output) / 32];
+	info = &megamod_handler_info[(CIC_MAPBASE + output) / 32];
 	info->irqmap[(CIC_MAPBASE + output) & 31] = irq_src;
 
-	set_irq_chip(irq_src, &combiner_chips[(CIC_MAPBASE + output) / 32]);
-	set_irq_chip_data(irq_src, info);
+	desc = irq_to_desc(irq_src);
+	cic_saved_chips[idx] = (struct c6x_irq_chip *)desc->chip;
+
+	chip = &cic_mapped_chips[idx];
+	*chip = *(struct c6x_irq_chip *)desc->chip;
+	chip->chip.name = mmchip->chip.name;
+	chip->minfo = mmchip->minfo;
+
+	desc->chip = (struct irq_chip *)chip;
 
 	__irq_cic_map(get_coreid(), src, output);
 out_unlock:
@@ -485,10 +538,12 @@ EXPORT_SYMBOL(irq_cic_map);
  */
 void irq_cic_unmap(unsigned int irq)
 {
+	struct irq_desc *desc = irq_to_desc(irq);
 	uint16_t src = irq - IRQ_CIC_START;
 	uint8_t output;
 	unsigned long flags;
-	struct combiner_info *info;
+	struct combiner_handler_info *info;
+	unsigned int idx = src - NR_CIC_COMBINERS;
 
 	/* only unmap cic event sources */
 	if (irq < (IRQ_CIC_START + NR_CIC_COMBINERS) ||
@@ -505,11 +560,10 @@ void irq_cic_unmap(unsigned int irq)
 	cic_evt_to_output[src] = 0;
 	cic_output_to_evt[output] = 0;
 
-	info = get_irq_chip_data(irq);
+	info = &megamod_handler_info[(CIC_MAPBASE + output) / 32];
 	info->irqmap[(CIC_MAPBASE + output) & 31] = CIC_MAPBASE + output;
 
-	set_irq_chip(irq, &combiner_chips[NR_MEGAMOD_COMBINERS + (src / 32)]);
-	set_irq_chip_data(irq, &chip_info[NR_MEGAMOD_COMBINERS + (src / 32)]);
+	desc->chip = (struct irq_chip *)cic_saved_chips[idx];
 
 out_unlock:
 	spin_unlock_irqrestore(&map_lock, flags);
@@ -529,8 +583,11 @@ EXPORT_SYMBOL(cic_raw_map);
 
 void __init init_pic_c64xplus(void)
 {
-	int i, j;
-	struct combiner_info *info = &chip_info[0];
+	int i, j, idx;
+	struct irq_desc *desc;
+	struct c6x_irq_chip *chip, *last_chip;
+	struct combiner_mask_info *minfo;
+	struct combiner_handler_info *hinfo;
 #if NR_CIC_COMBINERS > 0
 	unsigned core = get_coreid();
 #endif
@@ -538,24 +595,30 @@ void __init init_pic_c64xplus(void)
 	spin_lock_init(&map_lock);
 
 	/* initialize chip info */
+	minfo = &megamod_mask_info[0];
+	hinfo = &megamod_handler_info[0];
 	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
-		info->irq_base = IRQ_EVT0 + (i * 32);
-		info->mevtflag = &IC_MEVTFLAG[i];
-		info->evtclr   = &IC_EVTCLR[i];
-		info->evtmask  = &IC_EVTMASK[i];
+		minfo->irq_base = IRQ_EVT0 + (i * 32);
+		minfo->evtmask  = &IC_EVTMASK[i];
+		hinfo->mevtflag = &IC_MEVTFLAG[i];
+		hinfo->evtclr   = &IC_EVTCLR[i];
 		for (j = 0; j < 32; j++)
-			info->irqmap[j] = info->irq_base + j;
-		info++;
+			hinfo->irqmap[j] = minfo->irq_base + j;
+		minfo++;
+		hinfo++;
 	}
 #if NR_CIC_COMBINERS > 0
+	minfo = &cic_mask_info[0];
+	hinfo = &cic_handler_info[0];
 	for (i = 0; i < NR_CIC_COMBINERS; i++) {
-		info->irq_base = IRQ_CIC_START + (i * 32);
-		info->mevtflag = &CIC_MEVTFLAG(core)[i];
-		info->evtclr   = &CIC_EVTCLR(core)[i];
-		info->evtmask  = &CIC_EVTMASK(core)[i];
+		minfo->irq_base = IRQ_CIC_START + (i * 32);
+		minfo->evtmask  = &CIC_EVTMASK(core)[i];
+		hinfo->mevtflag = &CIC_MEVTFLAG(core)[i];
+		hinfo->evtclr   = &CIC_EVTCLR(core)[i];
 		for (j = 0; j < 32; j++)
-			info->irqmap[j] = info->irq_base + j;
-		info++;
+			hinfo->irqmap[j] = minfo->irq_base + j;
+		minfo++;
+		hinfo++;
 	}
 #endif
 
@@ -570,7 +633,7 @@ void __init init_pic_c64xplus(void)
 
 	/* initialize megamodule combined IRQs */
 	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
-		struct irq_desc *desc = irq_to_desc(i);
+		desc = irq_to_desc(i);
 
 		IC_EVTMASK[i] = ~0;	/* mask all events */
 		IC_EVTCLR[i] = ~0;	/* clear all events */
@@ -578,19 +641,21 @@ void __init init_pic_c64xplus(void)
 		desc->status |= (IRQ_NOREQUEST | IRQ_NOPROBE);
 		set_irq_chip(i, &dummy_irq_chip);
 		set_irq_handler(i, handle_bad_irq);
+
+		megamod_chips[i].minfo = &megamod_mask_info[i];
+		set_irq_data(i, &megamod_handler_info[i]);
 	}
 
 	/* initialize individual megamodule IRQs */
 	for (i = NR_MEGAMOD_COMBINERS; i < (NR_MEGAMOD_COMBINERS * 32); i++) {
-		set_irq_chip(i, &combiner_chips[i / 32]);
-		set_irq_chip_data(i, &chip_info[i / 32]);
+		set_irq_chip(i, (struct irq_chip *)&megamod_chips[i / 32]);
 		set_irq_handler(i, handle_level_irq);
 	}
 
 #if NR_CIC_COMBINERS > 0
 	/* megamodule IRQs coming from CIC cannot be used directly */
 	for (i = CIC_MAPBASE; i < (CIC_MAPBASE + CIC_MAPLEN); i++) {
-		struct irq_desc *desc = irq_to_desc(i);
+		desc = irq_to_desc(i);
 
 		desc->status |= (IRQ_NOREQUEST | IRQ_NOPROBE);
 		set_irq_chip(i, &dummy_irq_chip);
@@ -599,38 +664,53 @@ void __init init_pic_c64xplus(void)
 
 	/* CIC combined IRQs are hardwired to CIC_MAPBASE in megamodule */
 	for (i = 0; i < NR_CIC_COMBINERS; i++) {
-		struct irq_desc *desc = irq_to_desc(IRQ_CIC_START + i);
-		struct combiner_info *info;
+		int irq = IRQ_CIC_START + i;
+		struct c6x_irq_chip *chip;
 
 		CIC_EVTMASK(core)[i] = ~0;	/* mask all events */
 		CIC_EVTCLR(core)[i] = ~0;	/* clear all events */
 
+		cic_chips[i].minfo = &cic_mask_info[i];
+
 		/* chip info for megamodule combiner we are wired through */
-		info = &chip_info[(CIC_MAPBASE + i) / 32];
-
-		set_irq_chip(IRQ_CIC_START + i,
-			     &combiner_chips[(CIC_MAPBASE + i) / 32]);
-		desc->chip_data = info;
-		desc->handle_irq = handle_combined_irq;
-		desc->handler_data = &chip_info[NR_MEGAMOD_COMBINERS + i];
-		desc->action = &combiner_actions[NR_MEGAMOD_COMBINERS + i];
-
-		desc->chip->startup(IRQ_CIC_START + i);
+		chip = &megamod_chips[(CIC_MAPBASE + i) / 32];
+		hinfo = &megamod_handler_info[(CIC_MAPBASE + i) / 32];
 
 		/* redirect megamodule irq to right place */
-		info->irqmap[(CIC_MAPBASE + i) & 31] = IRQ_CIC_START + i;
+		hinfo->irqmap[(CIC_MAPBASE + i) & 31] = irq;
+
+		set_irq_chip(irq, (struct irq_chip *)chip);
+		set_irq_handler(irq, handle_combined_irq);
+		set_irq_data(irq, &cic_handler_info[i]);
+
+		desc = irq_to_desc(irq);
+		desc->action = &combiner_actions[NR_MEGAMOD_COMBINERS + i];
+		chip->chip.startup(irq);
 	}
 
 	/* initialize individual CIC IRQs */
 	for (i = NR_CIC_COMBINERS; i < (NR_CIC_COMBINERS * 32); i++) {
-		struct irq_desc *desc = irq_to_desc(IRQ_CIC_START + i);
+		int irq = IRQ_CIC_START + i;
 
-		set_irq_chip(desc->irq,
-			     &combiner_chips[NR_MEGAMOD_COMBINERS + (i / 32)]);
-		desc->chip_data = &chip_info[NR_MEGAMOD_COMBINERS + (i / 32)];
-		desc->handle_irq = handle_level_irq;
+		set_irq_chip(irq, (struct irq_chip *)&cic_chips[i / 32]);
+		set_irq_handler(irq, handle_level_irq);
 	}
 #endif
+
+	/*
+	 * GPIO interrupts need separate copies of megamodule chips
+	 * so gpio code can add edge triggering support.
+	 */
+	last_chip = NULL;
+	idx = 0;
+	for (i = IRQ_GPIO_START; i <= IRQ_GPIO15; i++) {
+		chip = (struct c6x_irq_chip *)irq_to_desc(i)->chip;
+		if (chip != last_chip) {
+			last_chip = chip;
+			gpio_chips[idx++] = *chip;
+		}
+		irq_to_desc(i)->chip = (struct irq_chip *)&gpio_chips[idx - 1];
+	}
 
 	/* map megamodule combined IRQs to low-priority core IRQs */
 	irq_map(IRQ_EVT0, INT12);
