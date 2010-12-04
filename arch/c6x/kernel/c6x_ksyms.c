@@ -17,7 +17,6 @@
 #include <linux/delay.h>
 #include <asm/pgtable.h>
 #include <asm/unaligned.h>
-#include <asm/delay.h>
 
 /* platform dependent support */
 struct pt_regs;
@@ -51,10 +50,6 @@ EXPORT_SYMBOL(__c6xabi_remu);
 
 extern unsigned long long __c6xabi_mpyll(unsigned long long src1, unsigned long long src2);
 EXPORT_SYMBOL(__c6xabi_mpyll);
-
-extern unsigned long long __c6xabi_divull(unsigned long long n,
-					  unsigned long long d);
-EXPORT_SYMBOL(__c6xabi_divull);
 
 extern long long __c6xabi_negll(long long src);
 EXPORT_SYMBOL(__c6xabi_negll);
@@ -131,9 +126,3 @@ EXPORT_SYMBOL(put_unaligned_le64);
 EXPORT_SYMBOL(put_unaligned_be64);
 EXPORT_SYMBOL(put_unaligned_le32);
 EXPORT_SYMBOL(put_unaligned_be32);
-
-/* delay helpers */
-#ifdef CONFIG_TI_C6X_COMPILER
-/* we inline this with gcc */
-EXPORT_SYMBOL(_c6x_tickdelay);
-#endif

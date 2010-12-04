@@ -233,9 +233,6 @@ void c6x_soc_setup_arch(void)
 #ifdef CONFIG_I2C
 			DSCR_B_PERCFG0_I2C |
 #endif
-#ifdef CONFIG_GENERIC_GPIO
-			DSCR_B_PERCFG0_GPIO |
-#endif
 			DSCR_B_PERCFG0_TIMER0 |
 			DSCR_B_PERCFG0_TIMER1,
 			DSCR_PERCFG0);

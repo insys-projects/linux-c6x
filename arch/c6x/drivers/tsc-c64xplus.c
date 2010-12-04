@@ -39,7 +39,7 @@ int __init c6x_arch_init_clocksource(void)
 	/* Find a shift value */
 	for (shift = 32; shift > 0; shift--) {
 		temp = (u64) NSEC_PER_SEC << shift;
-		do_div(temp, c6x_core_freq);
+		do_div(temp, (CONFIG_TMS320C6X_MHZ*1000000));
 		if ((temp >> 32) == 0)
 			break;
 	}

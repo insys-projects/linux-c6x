@@ -18,52 +18,24 @@
 
 extern asmlinkage void _c6x_delay(unsigned long);
 
-extern unsigned int ticks_per_ns_scaled;
-
 static inline void __delay(unsigned long loop)
 {
 	_c6x_delay(loop / 3); /* Because a loop takes 6 cycles on C6x instead
 				 of 2 on Intel and others */
 }
-
-#ifdef CONFIG_TI_C6X_COMPILER
-extern asmlinkage void _c6x_tickdelay(unsigned int);
-#else
-static inline void _c6x_tickdelay(unsigned int x)
+/*
+ * Use only for very small delays ( < 1 msec).  Should probably use a
+ * lookup table, really, as the multiplications take much too long with
+ * short delays.  This is a "reasonable" implementation, though (and the
+ * first constant multiplications gets optimized away if the delay is
+ * a constant)  
+ */
+static inline void udelay(unsigned long usecs)
 {
-	uint32_t cnt, endcnt;
-	asm volatile (" mvc .s2 TSCL,%0\n"
-		      " add .s2x %0,%1,%2\n"
-		      " || mvk .l2 1,B0\n"
-		      "0: [B0] b .s2 0b\n"
-		      " mvc .s2 TSCL,%0\n"
-		      " sub .s2 %0,%2,%0\n"
-		      " cmpgt .l2 0,%0,B0\n"
-		      " nop\n"
-		      " nop\n"
-		      : "=b"(cnt), "+a"(x), "=b"(endcnt) : : "B0");
-}
-#endif
-
-/* use scaled math to avoid slow division */
-#define C6X_NDELAY_SCALE 10
-
-static inline void _ndelay(unsigned int n)
-{
-	_c6x_tickdelay((ticks_per_ns_scaled * n) >> C6X_NDELAY_SCALE);
+	/* A loop takes 6 cycles on C6x */
+	_c6x_delay((usecs * CONFIG_TMS320C6X_MHZ) / 6);
 }
 
-static inline void _udelay(unsigned int n)
-{
-	while (n >= 10) {
-		_ndelay(10000);
-		n -= 10;
-	}
-	while (n-- > 0)
-		_ndelay(1000);
-}
-
-#define udelay(x) _udelay((unsigned int)(x))
-#define ndelay(x) _ndelay((unsigned int)(x))
+#define muldiv(a, b, c)    (((a)*(b))/(c))
 
 #endif /* __ASM_C6X_DELAY_H */

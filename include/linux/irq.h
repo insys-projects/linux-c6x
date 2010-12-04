@@ -32,6 +32,7 @@ struct irq_desc;
 typedef	void (*irq_flow_handler_t)(unsigned int irq,
 					    struct irq_desc *desc);
 
+
 /*
  * IRQ line status.
  *

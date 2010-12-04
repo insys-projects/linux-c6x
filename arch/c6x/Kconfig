@@ -6,20 +6,28 @@
 mainmenu "Linux Kernel Configuration"
 
 config TMS320C6X
-	def_bool y
-	select ARCH_REQUIRE_GPIOLIB
+	bool
+	default y
 
 config MMU
-	def_bool n
+	bool
+	default n
 
 config ZONE_DMA
-	def_bool y
+	bool
+	default y
+
+config NO_FORK
+	bool
+	default y
 
 config SBUS
-	def_bool n
+	bool
+	default n
 
 config FPU
-	def_bool n
+	bool
+	default n
 
 config HIGHMEM
 	def_bool n
@@ -28,21 +36,22 @@ config NUMA
 	def_bool n
 
 config UID16
-	def_bool y
+	bool
+	default y
 
 config RWSEM_GENERIC_SPINLOCK
-	def_bool y
+	bool
+	default y
 
 config RWSEM_XCHGADD_ALGORITHM
-	def_bool n
+	bool
+	default n
 
 config GENERIC_CALIBRATE_DELAY
-	def_bool y
+	bool
+	default y
 
 config GENERIC_FIND_NEXT_BIT
-	def_bool y
-
-config GENERIC_GPIO
 	def_bool y
 
 config GENERIC_HWEIGHT
@@ -122,6 +131,10 @@ config HPI_CONSOLE
          Say Y if you want a write-only console on the Host Port Interface.
          This is only useful for running kernels from a debugger or simulator.
 
+config TMS320C6X_MHZ
+	int "CPU frequency (Mhz) (600)"
+	default 600
+
 config PLL_TCI648X
 	bool "PLL_TCI648X"
 	depends on COMMON_CLKDEV
@@ -131,9 +144,6 @@ config TIMER_TCI648X
 
 config PIC_C64XPLUS
 	bool "C64X+ Megamodule Interrupt Controller"
-
-config GPIO_TCI648X
-	bool
 
 source "arch/c6x/platforms/Kconfig"
 

@@ -89,13 +89,7 @@
 #define IRQ_EMACINT0      70
 #define IRQ_EMACINT1      71
 #define IRQ_I2CINT        72  /* I2C interrupt */
-
-/*
- * An IRQ from one and only one of GPIO 0-5 gets routed to core 0-5.
- * core0 gets IRQ_GPIO0, core1 gets IRQ_GPIO1, etc.
- */
-#define IRQ_GPIO_START    73
-#define IRQ_GPIOINT       73
+#define IRQ_GPIOINT       73  /* GPIO interrupts */
 #define IRQ_GPIO6         74
 #define IRQ_GPIO7         75
 #define IRQ_GPIO8         76

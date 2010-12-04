@@ -60,7 +60,6 @@
 #define IRQ_XINT0         41
 #define IRQ_RINT1         42
 #define IRQ_XINT1         43
-#define IRQ_GPIO_START    51
 #define IRQ_GPIO0         51  /* GPIO events */
 #define IRQ_GPIO1         52
 #define IRQ_GPIO2         53
