@@ -38,7 +38,6 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 
-#include <mach/gemac.h>
 #include <mach/gmdio.h>
 #include <mach/board.h>
 
@@ -61,73 +60,6 @@ static struct resource _cpld_async_res = {
 #define NR_RESOURCES 2
 static struct resource *dsk_resources[NR_RESOURCES] = 
 	{ &_flash_res, &_cpld_async_res };
-
-
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "MDIO_REG_BASE",
-		.start          =  MDIO_REG_BASE,
-		.end            =  MDIO_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMACINT,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
-};
-
-static int setup_emac(void)
-{
-        int status;
-	unsigned long val;
-
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac --> %d\n", status);
-	else {
-		/* Enable EMAC device (in regs PERLOCK & PERCFG0) */
-		val = dscr_get_reg(DSCR_PERCFG0);
-		dscr_set_device(val | DSCR_B_PERCFG0_EMAC, DSCR_PERCFG0);
-
-		/* Wait for enabling (reg PERSTAT0) */
-		val = 0;
-		while (val != 0x1) {
-			val = dscr_get_reg(DSCR_PERSTAT0);
-			val = ((val & 0x1C0) >> 6);
-		}
-	}
-	return status;
-}
-#else
-static inline int setup_emac(void) { return 0; }
-#endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -216,13 +148,6 @@ static struct clk_lookup evm_clks[] = {
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
-static void __init board_init_IRQ(void)
-{
-	/* Map our IRQs */
-	irq_map(IRQ_TINT1, INT11);
-	irq_map(IRQ_EMACINT, INT10);
-}
-
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
@@ -240,7 +165,6 @@ void c6x_board_setup_arch(void)
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
-	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 
@@ -250,7 +174,7 @@ void c6x_board_setup_arch(void)
 static int __init evm_init(void)
 {
 	dsk_setup_i2c();
-        return setup_emac();
+        return 0;
 }
 
 arch_initcall(evm_init);

@@ -38,56 +38,7 @@
 #include <asm/clock.h>
 
 #include <mach/i2c.h>
-#include <mach/gemac.h>
 #include <mach/board.h>
-
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0[] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_MACRXINT,
-		.flags          =  IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device emac_dev0 = {
-	.name		= "EMAC",
-	.id		= 0,
-	.resource	= emac_resources0,
-	.num_resources	= ARRAY_SIZE(emac_resources0),
-};
-
-static void setup_emac(void)
-{
-	int status;
-
-	status	= platform_device_register(&emac_dev0);
-	if (status != 0)
-		pr_debug("setup_emac0 --> %d\n", status);
-
-	/* Power domain need to be activated here */
-}
-#else
-static void setup_emac(void) {}
-#endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -188,16 +139,6 @@ static struct clk_lookup evm_clks[] = {
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
-static void __init board_init_IRQ(void)
-{
-	/* Map our IRQs */
-#ifdef CONFIG_TMS320C64X_GEMAC
-	irq_map(IRQ_MACRXINT, INT9);
-	irq_map(IRQ_MACTXINT, INT10);
-#endif
-	irq_map(IRQ_TINT1, INT11);
-}
-
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {
@@ -211,17 +152,15 @@ void c6x_board_setup_arch(void)
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
-	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 
-	mach_progress(1, "End of EVM6486 specific initialization");
+	mach_progress(1, "End of EVM6457 specific initialization");
 }
 
 static __init int evm_init(void)
 {
 	evm_setup_i2c();
-	setup_emac();
 	return 0;
 }
 

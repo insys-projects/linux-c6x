@@ -12,12 +12,19 @@
  */
 #include <asm/gpio.h>
 
-/* board memory map */
-#define VECTADDR        0x80000000
-#define TEXTADDR	0x80000400
-#define TEXTLEN         0x07FFFC00
-#define RAMEND		0x88000000
+/* 
+ * Board memory
+ */
+#define BOARD_RAM_SIZE	0x08000000
 
-/* davinci i2c bus specs */
-#define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
-#define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
+/* 
+ * I2C bus specs 
+ */
+#define ARCH_I2C_FREQ   400   /* KHz  */
+#define ARCH_I2C_DELAY    0   /* usec */
+
+/*
+ * Timer definitions
+ */
+#define LINUX_TIMER_SRC (TIMER_5 - get_coreid())
+#define LINUX_TIMER_IRQ (IRQ_TINT5 - (get_coreid() << 1))

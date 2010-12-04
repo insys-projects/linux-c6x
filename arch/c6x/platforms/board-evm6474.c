@@ -37,76 +37,118 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 
-#include <mach/gemac.h>
 #include <mach/board.h>
 
-#ifdef CONFIG_TMS320C64X_GEMAC
-static struct resource emac_resources0 [] = {
-	{
-		.name           = "EMAC_REG_BASE",
-		.start          =  EMAC_REG_BASE,
-		.end            =  EMAC_REG_BASE + 0xFFF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "ECTL_REG_BASE",
-		.start          =  ECTL_REG_BASE,
-		.end            =  ECTL_REG_BASE + 0x7FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "EMAC_DSC_BASE",
-		.start          =  EMAC_DSC_BASE,
-		.end            =  EMAC_DSC_BASE + 0x17FF,
-		.flags          =  IORESOURCE_IO,
-	},
-	{
-		.name           = "IRQ_SRC",
-		.start          =  IRQ_EMACRXINT,
-		.flags          =  IORESOURCE_IRQ,
-	},
+#ifdef CONFIG_RAPIDIO_TCI648X
+#include <linux/rio.h>
+#include <asm/rio.h>
+
+struct tci648x_rio_board_controller_info evm6474_rio_controller = {
+	0x3,                         /* bitfield of port(s) to probe on this controller */
+	TCI648X_RIO_MODE_0,          /* SERDES configuration (BOOTMODE8) */
+	0,                           /* host id */
+	RIO_DO_ENUMERATION,          /* initialisation method */
+	1                            /* large size (16bit)*/
 };
 
-static struct platform_device emac_dev0 = {
-        .name           = "EMAC",
-        .id             = 0,
-	.resource       = emac_resources0,
-        .num_resources  = ARRAY_SIZE(emac_resources0),
+static struct platform_device evm6474_rio_device = {
+	.name           = "tci648x-rapidio",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_rio_controller },
 };
 
-static void setup_emac(void)
+static void __init evm_init_rio(void)
 {
-        int status;
-
-        status  = platform_device_register(&emac_dev0);
-        if (status != 0)
-                pr_debug("setup_emac0 --> %d\n", status);
-        //else
-        //  /* Power domain need to be activated here */
+	platform_device_register(&evm6474_rio_device);
 }
-#else
-static void setup_emac(void) {}
+
+core_initcall(evm_init_rio);
+#endif
+
+#ifdef CONFIG_MCBSP
+#include <asm/mcbsp.h>
+#include <asm/edma.h>
+
+static const struct mcbsp_info evm6474_mcbsp_info[] = {
+	[0] = {.phys_base   = IO_ADDRESS(MCBSP0_BASE_ADDR),
+	       .dma_rx_sync = DMA_MCBSP0_RX,
+	       .dma_tx_sync = DMA_MCBSP0_TX,
+	       .dma_rx_data = MCBSP0_EDMA_RX_DATA,
+	       .dma_tx_data = MCBSP0_EDMA_TX_DATA,
+	       .rx_irq      = IRQ_REVT0,
+	       .tx_irq      = IRQ_XEVT0},
+
+	[1] = {.phys_base   = IO_ADDRESS(MCBSP1_BASE_ADDR),
+	       .dma_rx_sync = DMA_MCBSP1_RX,
+	       .dma_tx_sync = DMA_MCBSP1_TX,
+	       .dma_rx_data = MCBSP1_EDMA_RX_DATA,
+	       .dma_tx_data = MCBSP1_EDMA_TX_DATA,
+	       .rx_irq      = IRQ_REVT1,
+	       .tx_irq      = IRQ_XEVT1},
+};
+
+static struct platform_device evm6474_mcbsp_device0 = {
+	.name           = "mcbsp",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_mcbsp_info[0] },
+};
+
+static struct platform_device evm6474_mcbsp_device1 = {
+	.name           = "mcbsp",
+	.id             = 2,
+	.dev		= { .platform_data = &evm6474_mcbsp_info[1] },
+};
+
+static void __init evm_init_mcbsp(void)
+{
+	platform_device_register(&evm6474_mcbsp_device0); /* McBSP0 */
+	platform_device_register(&evm6474_mcbsp_device1); /* McBSP1 */
+}
+
+core_initcall(evm_init_mcbsp);
+#endif
+
+#ifdef CONFIG_MCBSP_UART
+#include <asm/mcbsp-uart.h>
+
+static const struct mcbsp_uart_info evm6474_mcbsp_uart_info = {
+    .mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
+    .mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+};
+
+static struct platform_device evm6474_mcbsp_uart_device = {
+	.name           = "mcbsp_serial",
+	.id             = 1,
+	.dev		= { .platform_data = &evm6474_mcbsp_uart_info },
+};
+
+static void __init evm_init_mcbsp_uart(void)
+{
+	platform_device_register(&evm6474_mcbsp_uart_device);
+}
+
+core_initcall(evm_init_mcbsp_uart);
 #endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
-	.byte_len	= 0x100000 / 8,
-	.page_size	= 256,
-	.flags		= AT24_FLAG_ADDR16,
+       .byte_len       = 0x100000 / 8,
+       .page_size      = 256,
+       .flags          = AT24_FLAG_ADDR16,
 };
 
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_EEPROM_AT24
-	{ I2C_BOARD_INFO("24c1024", 0x50),
-	  .platform_data = &at24_eeprom_data,
-	},
+       { I2C_BOARD_INFO("24c1024", 0x50),
+         .platform_data = &at24_eeprom_data,
+       },
 #endif
 };
 
 static void __init board_setup_i2c(void)
 {
-	i2c_register_board_info(1, evm_i2c_info,
-				ARRAY_SIZE(evm_i2c_info));
+       i2c_register_board_info(1, evm_i2c_info,
+                               ARRAY_SIZE(evm_i2c_info));
 }
 #else
 #define board_setup_i2c()
@@ -119,7 +161,8 @@ static struct pll_data pll1_data = {
 
 static struct clk clkin1 = {
 	.name = "clkin1",
-	.rate = 61440000,
+//	.rate = 61440000, This is when using SYSCLK (SW5 CORE_CLOK_SEL to ON)
+	.rate = 50000000, /* default one is 50MHz clock */
 };
 
 static struct clk pll1_clk = {
@@ -176,6 +219,11 @@ static struct clk i2c_clk = {
 	.parent = &pll1_sysclk10,
 };
 
+static struct clk mcbsp_clk = {
+	.name = "mcbsp",
+	.parent = &pll1_sysclk10,
+};
+
 static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1", &pll1_clk),
 	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
@@ -185,22 +233,13 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
 	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK("mcbsp.1", NULL, &mcbsp_clk),
+	CLK("mcbsp.2", NULL, &mcbsp_clk),
 	CLK("", NULL, NULL)
 };
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
-
-static void __init board_init_IRQ(void)
-{
-	/* Map our IRQs */
-	irq_map(IRQ_TINT1, INT11);
-
-#ifdef CONFIG_TMS320C64X_GEMAC
-	irq_map(IRQ_EMACRXINT, INT9);
-	irq_map(IRQ_EMACTXINT, INT10);
-#endif
-}
 
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
@@ -213,7 +252,6 @@ void c6x_board_setup_arch(void)
 
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
-	mach_init_IRQ      = board_init_IRQ;
 
 	c6x_clk_init(evm_clks);
 
@@ -223,7 +261,6 @@ void c6x_board_setup_arch(void)
 __init void evm_init(void)
 {
 	board_setup_i2c();
-	setup_emac();
 }
 
 arch_initcall(evm_init);

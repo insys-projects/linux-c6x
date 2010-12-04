@@ -30,7 +30,7 @@
 #define IRQ_EMURTDXTX     12
 #define IRQ_IDMAINT0      13  /* IDMA channel 0 interrupt */
 #define IRQ_IDMAINT1      14  /* IDMA channel 1 interrupt */
-#define IRQ_EDMMA3CCINT   15  /* EDMA3CC completion interrupt */
+#define IRQ_EDMA3CCINT    15  /* EDMA3CC completion interrupt */
 #define IRQ_TINT          16  /* timer interrupts */
 #define IRQ_TINTLO        16
 #define IRQ_TINTHI        17

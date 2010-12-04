@@ -48,6 +48,10 @@
 #define DSCR_B_PERCFG1_DDR2          BIT(1)
 
 #define DSCR_B_EMACCFG_RMIIRST       (1<<19)
+
+#define DEVSTAT_MACSEL_OFFSET        9
+#define DEVSTAT_MACSEL_MASK          3
+
 #endif  /* CONFIG_SOC_TMS320C6455 */
 
 #if defined(CONFIG_SOC_TMS320C6457)
@@ -68,10 +72,16 @@
 #define DSCR_B_DEVSTAT_LENDIAN       BIT(0)
 #define DSCR_B_DEVSTAT_HPIWIDTH      BIT(14)
 #define DSCR_B_DEVSTAT_ECLKINSEL     BIT(15)
+
+/* Using SGMII */
+#define DEVSTAT_MACSEL_OFFSET        0
+#define DEVSTAT_MACSEL_MASK          0
+
 #endif  /* CONFIG_SOC_TMS320C6457 */
 
 #if defined(CONFIG_SOC_TMS320C6474)
 #define DSCR_DEVSTAT                 0x02880804
+#define DSCR_JTAGID                  0x02880814
 #define DSCR_PERLOCK                 0x02ac0004
 #define DSCR_PERCFG0                 0x02ac0008
 #define DSCR_PERSTAT0                0x02ac0014
@@ -99,6 +109,11 @@
 #define DSCR_B_PERCFG1_DDR2          BIT(1)
 
 #define DSCR_B_EMACCFG_RMIIRST       (1<<19)
+
+/* Using SGMII */
+#define DEVSTAT_MACSEL_OFFSET        0
+#define DEVSTAT_MACSEL_MASK          0
+
 #endif  /* CONFIG_SOC_TMS320C6474 */
 
 #if defined(CONFIG_SOC_TMS320C6472)
@@ -148,18 +163,21 @@
 #define DEVSTAT_B_EMAC0_OFFSET       8
 #define DEVSTAT_B_EMAC1_MACSEL       0x00C00000
 #define DEVSTAT_B_EMAC1_OFFSET       22
-#endif   /* CONFIG_SOC_TMS320C6474 */
 
+#define DEVSTAT_MACSEL_OFFSET        8
+#define DEVSTAT_MACSEL_MASK          7
+
+#endif   /* CONFIG_SOC_TMS320C6472 */
 
 /*
  * MDIO interfaces
  */
-#define DEVSTAT_MACSEL_MII     0
-#define DEVSTAT_MACSEL_RMII    1
-#define DEVSTAT_MACSEL_GMII    2
-#define DEVSTAT_MACSEL_RGMII   3
-#define DEVSTAT_MACSEL_OFFSET  9
-#define DEVSTAT_MACSEL_MASK    3
+#define DEVSTAT_MACSEL_MII           0
+#define DEVSTAT_MACSEL_RMII          1
+#define DEVSTAT_MACSEL_GMII          2
+#define DEVSTAT_MACSEL_RGMII         3
+#define DEVSTAT_MACSEL_S3MII         5
+#define DEVSTAT_MACSEL_DISABLE       7
 
 #endif /* __MACH_C6X_DSCR_H */
 

@@ -5,6 +5,7 @@
  *
  *  Copyright (C) 2010 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -14,32 +15,11 @@
 #define __MACH_C6X_GEMAC_H
 
 #include <asm/io.h>
-#include <asm/dscr.h>
-
-#if defined(CONFIG_SOC_TMS320C6472)
-#define EMAC_MAX_INSTANCE 2
-#else
-#define EMAC_MAX_INSTANCE 1
-#endif
+#include <mach/board.h>
 
 /*
- * GEMAC registers bases
+ * Packet flags (16 bits)
  */
-#define EMAC_REG_BASE     0x02c80000
-#define ECTL_REG_BASE     0x02c81000
-#define EMAC_DSC_BASE     0x02c82000
-
-#if defined(CONFIG_SOC_TMS320C6472)
-#define EMAC0_REG_BASE    0x02c80000
-#define ECTL0_REG_BASE    0x02c81000
-#define EMAC0_DSC_BASE    0x02c82000
-
-#define EMAC1_REG_BASE    0x02cc0000
-#define ECTL1_REG_BASE    0x02cc1000
-#define EMAC1_DSC_BASE    0x02cc2000
-#endif
-
-/* Packet flags (16 bits) */
 #define EMAC_DESC_FLAG_SOP        0x80000000
 #define EMAC_DESC_FLAG_EOP        0x40000000
 #define EMAC_DESC_FLAG_OWNER      0x20000000
@@ -57,7 +37,7 @@
 #define EMAC_DESC_FLAG_CRCERROR   0x00020000
 #define EMAC_DESC_FLAG_NOMATCH    0x00010000
 
-#define EMAC_PACKET_LEN_MASK  0x000007FF
+#define EMAC_PACKET_LEN_MASK      0x000007FF
 
 /*
  * EMAC registers
@@ -191,10 +171,7 @@
 #define EMAC_RX7INTACK            0x67c /* RX Channel 7 Interrupt Acknowledge Register */
 
 
-#if defined(CONFIG_SOC_TMS320C6455)
-#define EMAC_EWCTL                0x1004 /* Interrupt Control Register */
-#define EMAC_EWINTTCNT            0x1008 /* Interrupt Timer Count */
-#endif
+#if !(defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457))
 
 #if defined(CONFIG_SOC_TMS320C6472)
 #define EMAC_EMIC_PID             0x1000
@@ -213,9 +190,16 @@
 #define EMAC_B_MDIOUSER           (1 << 4)
 #define EMAC_B_TX0                (1 << 8)
 #define EMAC_B_RX0                (1 << 16)
-#endif
 
-#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6474)
+#else /* defined(CONFIG_SOC_TMS320C6472) */
+
+#define EMAC_EWCTL                0x1004 /* Interrupt Control Register */
+#define EMAC_EWINTTCNT            0x1008 /* Interrupt Timer Count */
+
+#endif /* defined(CONFIG_SOC_TMS320C6472) */
+
+#else /* !(defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)) */
+
 #define ECTL_IDVER                0x00
 #define ECTL_SOFTRESET            0x04
 #define ECTL_EMCONTROL            0x08
@@ -231,7 +215,8 @@
 #define ECTL_MISCSTAT             0x4c
 #define ECTL_RXIMAX               0x70
 #define ECTL_TXIMAX               0x74
-#endif
+
+#endif /* !(defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)) */
 
 #define EMAC_NUM_STATREGS         36
 
@@ -273,7 +258,7 @@
 #define EMAC_B_STATINT            (1 << 0)
 #define EMAC_B_HOSTINT            (1 << 1)  /* for MACINTMASKSET */
 
-#if defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6474)
+#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)
 #define EMAC_B_RXPEND0            (1 << 0) /* for MACINVECTOR */
 #define EMAC_B_RXTHRESPEND0       (1 << 8)
 #define EMAC_B_TXPEND0            (1 << 16)
@@ -281,14 +266,12 @@
 #define EMAC_B_LINKINT            (1 << 25)
 #define EMAC_B_HOSTPEND           (1 << 26)
 #define EMAC_B_STATPEND           (1 << 27)
-#endif
-
-#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6472)
+#else /* defined(CONFIG_SOC_TMS320C6474) */
 #define EMAC_B_TXPEND0            (1 << 0)
 #define EMAC_B_RXPEND0            (1 << 8)
 #define EMAC_B_STATPEND           (1 << 16)
 #define EMAC_B_HOSTPEND           (1 << 17) /* for MACINVECTOR */
-#endif
+#endif /* defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457) */
 
 #define EMAC_V_SOPERROR           1
 #define EMAC_V_OWNERSHIP          2
@@ -296,8 +279,12 @@
 #define EMAC_V_NULLPTR            4
 #define EMAC_V_NULLLEN            5
 #define EMAC_V_LENRRROR           6
+#define EMAC_S_RXERRCH            8
+#define EMAC_S_TXERRCH            16
 #define EMAC_S_RXERRCODE          12
 #define EMAC_S_TXERRCODE          20
+#define EMAC_M_RXERRCH            0x00000700
+#define EMAC_M_TXERRCH            0x00070000
 #define EMAC_M_RXERRCODE          0x0000f000
 #define EMAC_M_TXERRCODE          0x00f00000 /* for MACSTATUS */
 
@@ -312,43 +299,415 @@
 #define EMAC_CONFIG_TXCRC         0x08 /* Tx frames include CRC */
 #define EMAC_CONFIG_PASSERROR     0x10 /* pass error frames */
 #define EMAC_CONFIG_PASSCONTROL   0x20 /* pass control frames */
+#define EMAC_CONFIG_PACING        0x40 /* use interrupt pacing */
 
+#if defined(CONFIG_SGMII)
 
-/* 
+/*
  * SGMII registers
+ */
+#define SGMII_REG_BASE            0x02c40000
+#define SGMII_IDVER_REG           (SGMII_REG_BASE + 0x000)
+#define SGMII_SRESET_REG          (SGMII_REG_BASE + 0x004)
+#define SGMII_CTL_REG             (SGMII_REG_BASE + 0x010)
+#define SGMII_STATUS_REG          (SGMII_REG_BASE + 0x014)
+#define SGMII_MRADV_REG           (SGMII_REG_BASE + 0x018)
+#define SGMII_LPADV_REG           (SGMII_REG_BASE + 0x020)
+#define SGMII_TXCFG_REG           (SGMII_REG_BASE + 0x030)
+#define SGMII_RXCFG_REG           (SGMII_REG_BASE + 0x034)
+#define SGMII_AUXCFG_REG          (SGMII_REG_BASE + 0x038)
+
+#endif /* CONFIG_SGMII*/
+
+#if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)
+
+/*
+ * TCI6488/C6474/C6457 dependent definitions
  */ 
-#define SGMII_REG_BASE   0x02c40000
-#define SGMII_IDVER_REG  (SGMII_REG_BASE + 0x000)
-#define SGMII_SRESET_REG (SGMII_REG_BASE + 0x004)
-#define SGMII_CTL_REG    (SGMII_REG_BASE + 0x010)
-#define SGMII_STATUS_REG (SGMII_REG_BASE + 0x014)
-#define SGMII_MRADV_REG  (SGMII_REG_BASE + 0x018)
-#define SGMII_LPADV_REG  (SGMII_REG_BASE + 0x020)
-#define SGMII_TXCFG_REG  (SGMII_REG_BASE + 0x030)
-#define SGMII_RXCFG_REG  (SGMII_REG_BASE + 0x034)
-#define SGMII_AUXCFG_REG (SGMII_REG_BASE + 0x038)
+#define EMAC0_REG_BASE            0x02c80000
+#define ECTL0_REG_BASE            0x02c81000
+#define EMAC0_DSC_BASE            0x02c82000
+
+#define EMAC_MAX_INSTANCE         1
+#define PTR_TO_HW(x)              (x)
+#define HW_TO_PTR(x)              (x)
+#define _INTFLAG                  0
+#define get_emac_idx()            (get_coreid())
+
+#define emac_arch_get_hash1()     emac_get_reg(EMAC_MACHASH1)
+#define emac_arch_get_hash2()     emac_get_reg(EMAC_MACHASH2)
+#define emac_arch_get_promisc()   (emac_get_reg(EMAC_RXMBPENABLE) & EMAC_B_RXCAFEN)
+#define emac_arch_get_control()   (emac_get_reg(EMAC_MACCONTROL) &	\
+				       (EMAC_B_FULLDUPLEX | EMAC_B_RMIIDUPLEXMODE | \
+					EMAC_B_GIG | EMAC_B_RMIISPEED))
+#define emac_arch_set_hash1(a)    emac_set_reg(EMAC_MACHASH1, a)
+#define emac_arch_set_hash2(a)    emac_set_reg(EMAC_MACHASH2, a)
+#define emac_arch_set_promisc(a)  if (a) emac_setbit_reg(EMAC_RXMBPENABLE, EMAC_B_RXCAFEN)
+#define emac_arch_set_control(a)  if (a) emac_setbit_reg(EMAC_MACCONTROL, a)
+
+#define emac_arch_init_control(pace)					\
+	emac_setbit_reg(EMAC_MACCONTROL, (pace) ? EMAC_B_EXTEN | EMAC_B_GMIIEN | EMAC_B_TXPACE : \
+			EMAC_B_EXTEN | EMAC_B_GMIIEN)
+
+#define ectl_arch_rx_irq_enter(c) ectl_clearbit_reg(ECTL_RXEN + (get_coreid() << 4), \
+						    1 << (c))
+#define ectl_arch_rx_irq_leave(c) do {					\
+		emac_set_reg(EMAC_MACEOIVECTOR, 0x1 + (get_coreid() << 2)); \
+		ectl_setbit_reg(ECTL_RXEN + (get_coreid() << 4), 1 << (c)); \
+	} while(0)
+#define ectl_arch_tx_irq_enter(c) ectl_clearbit_reg(ECTL_TXEN + (get_coreid() << 4), \
+						    1 << (c))
+#define ectl_arch_tx_irq_leave(c) do {					\
+		emac_set_reg(EMAC_MACEOIVECTOR, 0x2 + (get_coreid() << 2)); \
+		ectl_setbit_reg(ECTL_TXEN + (get_coreid() << 4), 1 << (c)); \
+	} while(0)
+
+#define ectl_arch_enable_irq(c, misc) do {					\
+		if (misc) ectl_set_reg(ECTL_MISCEN + (get_coreid() << 4), 0x3); \
+		ectl_setbit_reg(ECTL_RXEN + (get_coreid() << 4), 1 << (c)); \
+		ectl_setbit_reg(ECTL_TXEN + (get_coreid() << 4), 1 << (c)); \
+	} while(0)
+
+#define ectl_arch_disable_irq(c) do {					\
+		ectl_set_reg(ECTL_MISCEN + (get_coreid() << 4), 0);	\
+		ectl_clearbit_reg(ECTL_RXEN + (get_coreid() << 4), 1 << (c)); \
+		ectl_clearbit_reg(ECTL_TXEN + (get_coreid() << 4), 1 << (c)); \
+	} while(0)
 
 
-#ifdef CONFIG_SOC_TMS320C6474
-#define __REG_MAC_ADDR 0x2880834
+#define emac_arch_get_int_vector()          emac_get_reg(EMAC_MACINVECTOR)
+#define emac_arch_get_pending_irq(i, f, c)  ((i) & ((f) << (c)))
+#define emac_arch_enable_irq(reg, c)        emac_set_reg(reg, 1 << (c))
+
+#define emac_arch_reset_switch()
+
+#define emac_arch_reset_ectl() do {			   \
+		ectl_set_reg(ECTL_INTCONTROL, 0);	   \
+		ectl_set_reg(ECTL_SOFTRESET, 1);	   \
+		while (ectl_get_reg(ECTL_SOFTRESET) != 0); \
+	} while(0)
+
+#define emac_arch_set_pacing() do {					\
+		ectl_set_reg(ECTL_INTCONTROL, gemac_int_prescaler());	\
+		ectl_setbit_reg(ECTL_INTCONTROL, (0x3 << (get_coreid() << 1)) << 16); \
+		ectl_set_reg(ECTL_RXIMAX + (get_coreid() << 3), 0x10);	\
+		ectl_set_reg(ECTL_TXIMAX + (get_coreid() << 3), 0x10);	\
+	} while(0)
+
+#define emac_arch_clear_mac_addr()		 \
+	for (i = 0; i < 32; i++) {		 \
+		emac_set_reg(EMAC_MACINDEX, i);	 \
+		emac_set_reg(EMAC_MACADDRHI, 0); \
+		emac_set_reg(EMAC_MACADDRLO, 0); \
+	}
+
+#define emac_arch_set_mac_addr_index(i) emac_set_reg(EMAC_MACINDEX, i)
+#define emac_arch_set_mac_addr_high(a)  emac_set_reg(EMAC_MACADDRHI, a)
+#define emac_arch_set_mac_addr_low(a)   emac_set_reg(EMAC_MACADDRLO, a)
+#define emac_arch_get_mac_addr_high(a)  emac_get_reg(EMAC_MACADDRHI)
+#define emac_arch_get_mac_addr_low(a)   emac_get_reg(EMAC_MACADDRLO)
+
+static inline int emac_check_shared_capability(void) 
+{
+#ifdef C6X_SOC_HAS_CORE_REV
+	if (arch_get_silicon_rev() < 0x3)
+		printk(KERN_WARNING "Warning sharing of GEMAC has issues with silicon rev %s!\n",
+		       arch_compute_silicon_rev(arch_get_silicon_rev()));
 #endif
-#ifdef CONFIG_SOC_TMS320C6472
-#define __REG_MAC_ADDR 0x2a80700
-#endif
+	return 1;
+}
+
 #ifdef CONFIG_SOC_TMS320C6457
-#define __REG_MAC_ADDR DSCR_MACID1
+#include <asm/dscr.h>
+#define EFUSE_REG_MAC_ADDR     DSCR_MACID1
+#endif
+#ifdef CONFIG_SOC_TMS320C6474
+#define EFUSE_REG_MAC_ADDR     0x2880834
 #endif
 
-#ifdef __REG_MAC_ADDR
+#define emac_arch_get_mac_addr emac_arch_get_mac_addr_from_efuse 
+
+#define EMAC_HAS_SEPARATE_RXTX_IRQS
 #define EMAC_ARCH_HAS_MAC_ADDR
 
+#elif defined(CONFIG_SOC_TMS320C6472)
+
+/*
+ * TCI6486/C6472 dependent definitions
+ */ 
+#include <asm/dscr.h>
+
+#define EMAC0_REG_BASE           0x02c80000
+#define ECTL0_REG_BASE           0x02c81000
+#define EMAC0_DSC_BASE           0x02c82000
+
+#define EMAC1_REG_BASE           0x02cc0000
+#define ECTL1_REG_BASE           0x02cc1000
+#define EMAC1_DSC_BASE           0x02cc2000
+
+#define EMAC_MAX_INSTANCE        2
+#define PTR_TO_HW(x)             (x)
+#define HW_TO_PTR(x)             (x)
+#define _INTFLAG                 IRQF_DISABLED
+#define get_emac_idx()           (get_coreid())
+
+#define emac_arch_get_hash1()    emac_get_reg(EMAC_MACHASH1)
+#define emac_arch_get_hash2()    emac_get_reg(EMAC_MACHASH2)
+#define emac_arch_get_promisc()  (emac_get_reg(EMAC_RXMBPENABLE) & EMAC_B_RXCAFEN)
+#define emac_arch_get_control()  emac_get_reg(EMAC_MACCONTROL)
+#define emac_arch_set_hash1(a)   emac_set_reg(EMAC_MACHASH1, a)
+#define emac_arch_set_hash2(a)   emac_set_reg(EMAC_MACHASH2, a)
+#define emac_arch_set_promisc(a) if (a) emac_setbit_reg(EMAC_RXMBPENABLE, EMAC_B_RXCAFEN)
+#define emac_arch_set_control(a) if (a) emac_setbit_reg(EMAC_MACCONTROL, a)
+
+#define emac_arch_init_control(pace) do {				\
+		unsigned int dev_stat = dscr_get_reg(DSCR_DEVSTAT);	\
+		unsigned int gigabit = 0, macsel;			\
+		if(dev->dev_id == 0) {					\
+			macsel = (dev_stat & DEVSTAT_B_EMAC0_MACSEL) >>	\
+				DEVSTAT_B_EMAC0_OFFSET;			\
+			if ((macsel == DEVSTAT_MACSEL_GMII) ||		\
+			    (macsel == DEVSTAT_MACSEL_RGMII))		\
+				gigabit = 1;				\
+		}							\
+		if(dev->dev_id == 1) {					\
+			macsel = (dev_stat & DEVSTAT_B_EMAC1_MACSEL) >> \
+				DEVSTAT_B_EMAC1_OFFSET;			\
+			if (macsel == DEVSTAT_MACSEL_GMII)		\
+				gigabit = 1;				\
+		}							\
+		if(gigabit == 1)					\
+			emac_set_reg(EMAC_MACCONTROL, EMAC_B_GIG | EMAC_B_RGMIIEN); \
+		else							\
+			emac_set_reg(EMAC_MACCONTROL, EMAC_B_RMIISPEED); \
+		emac_setbit_reg(EMAC_MACCONTROL, (pace) ?  EMAC_B_GMIIEN | EMAC_B_TXPACE: \
+				EMAC_B_GMIIEN);				\
+	} while(0)
+
+#define ectl_arch_rx_irq_enter(c)
+#define ectl_arch_rx_irq_leave(c)
+#define ectl_arch_tx_irq_enter(c)
+#define ectl_arch_tx_irq_leave(c)
+#define ectl_arch_enable_irq(c, misc)					\
+	if (misc) emac_set_reg(EMAC_EWINTCTL0 + (get_coreid() << 2),	\
+			       EMAC_B_STAT | EMAC_B_HOST |		\
+			       (EMAC_B_TX0 << (c)) | (EMAC_B_RX0 << (c))); \
+	else emac_set_reg(EMAC_EWINTCTL0 + (get_coreid() << 2),		\
+			  (EMAC_B_TX0 << (c)) | (EMAC_B_RX0 << (c)))
+		
+#define ectl_arch_disable_irq(c) \
+	emac_set_reg(EMAC_EWINTCTL0 + (get_coreid() << 2), 0)
+
+/* 
+ * On Tomahawk, MACINVECTOR can be null even if TX/RX int occurs. 
+ * This is probably an hardware bug.
+ */
+#define emac_arch_get_int_vector()          (emac_get_reg(EMAC_MACINVECTOR) \
+					     | ((emac_get_reg(EMAC_RXINTSTATMASKED) & 0xff) << 8) \
+					     | (emac_get_reg(EMAC_TXINTSTATMASKED) & 0xff))
+#define emac_arch_get_pending_irq(i, f, c)  ((i) & ((f) << (c)))
+#define emac_arch_enable_irq(reg, c)        emac_set_reg(reg, (1 << (c + 16)) | (1 << c))
+
+#define emac_arch_reset_switch()
+
+/* Disable EMAC/MDIO interrupts in EMIC */
+#define emac_arch_reset_ectl()    emac_set_reg(EMAC_EWINTCTL0 + (get_coreid() << 2), 0x0)
+
+#define emac_arch_set_pacing() do {					\
+	        emac_set_reg(EMAC_RPCFG0 + (get_coreid() << 2), 0x3);   \
+		emac_set_reg(EMAC_TPCFG0 + (get_coreid() << 2), 0x3);	\
+		emac_set_reg(EMAC_PSCFG, gemac_int_prescaler());	\
+	} while(0)
+
+#define emac_arch_clear_mac_addr()		 \
+	for (i = 0; i < 32; i++) {		 \
+		emac_set_reg(EMAC_MACINDEX, i);	 \
+		emac_set_reg(EMAC_MACADDRHI, 0); \
+		emac_set_reg(EMAC_MACADDRLO, 0); \
+	}
+
+#define emac_arch_set_mac_addr_index(i) emac_set_reg(EMAC_MACINDEX, i)
+#define emac_arch_set_mac_addr_high(a)  emac_set_reg(EMAC_MACADDRHI, a)
+#define emac_arch_set_mac_addr_low(a)   emac_set_reg(EMAC_MACADDRLO, a)
+#define emac_arch_get_mac_addr_high(a)  emac_get_reg(EMAC_MACADDRHI)
+#define emac_arch_get_mac_addr_low(a)   emac_get_reg(EMAC_MACADDRLO)
+
+#define emac_check_shared_capability()  1
+
+#define EFUSE_REG_MAC_ADDR              0x2a80700 
+#define emac_arch_get_mac_addr          emac_arch_get_mac_addr_from_efuse 
+
+#define EMAC_HAS_SEPARATE_RXTX_IRQS
+#define EMAC_ARCH_HAS_MAC_ADDR
+
+#elif defined(CONFIG_SOC_TMS320C6455)
+
+/*
+ * C6455 dependent definitions
+ */ 
+#include <asm/dscr.h>
+
+#define EMAC0_REG_BASE           0x02c80000
+#define ECTL0_REG_BASE           0x02c81000
+#define EMAC0_DSC_BASE           0x02c82000
+
+#define EMAC_MAX_INSTANCE        1
+#define PTR_TO_HW(x)             (x)
+#define HW_TO_PTR(x)             (x)
+#define _INTFLAG                 0
+#define get_emac_idx()           0
+
+#define emac_arch_get_hash1()    emac_get_reg(EMAC_MACHASH1)
+#define emac_arch_get_hash2()    emac_get_reg(EMAC_MACHASH2)
+#define emac_arch_get_promisc()  (emac_get_reg(EMAC_RXMBPENABLE) & EMAC_B_RXCAFEN)
+#define emac_arch_get_control()  (emac_get_reg(EMAC_MACCONTROL) &	\
+				      (EMAC_B_FULLDUPLEX | EMAC_B_RMIIDUPLEXMODE | \
+				       EMAC_B_GIG | EMAC_B_RMIISPEED))
+#define emac_arch_set_hash1(a)   emac_set_reg(EMAC_MACHASH1, a)
+#define emac_arch_set_hash2(a)   emac_set_reg(EMAC_MACHASH2, a)
+#define emac_arch_set_promisc(a) if (a) emac_setbit_reg(EMAC_RXMBPENABLE, EMAC_B_RXCAFEN)
+#define emac_arch_set_control(a) if (a) emac_setbit_reg(EMAC_MACCONTROL, a)
+#define emac_arch_init_control(pace) \
+	emac_setbit_reg(EMAC_MACCONTROL, (pace)? EMAC_B_GMIIEN | EMAC_B_TXPACE : EMAC_B_GMIIEN)
+
+#define ectl_arch_rx_irq_enter(c)
+#define ectl_arch_rx_irq_leave(c)
+#define ectl_arch_tx_irq_enter(c)
+#define ectl_arch_tx_irq_leave(c)
+#define ectl_arch_enable_irq(c, misc)  emac_setbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+#define ectl_arch_disable_irq(c) emac_clearbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+
+#define emac_arch_get_int_vector()          emac_get_reg(EMAC_MACINVECTOR)
+#define emac_arch_get_pending_irq(i, f, c)  ((i) & ((f) << (c)))
+#define emac_arch_enable_irq(reg, c)        emac_set_reg(reg, 1 << (c))
+
+#define emac_arch_reset_switch()
+
+/* Disable EMAC/MDIO interrupts and reset EMAC/MDIO modules */
+#define emac_arch_reset_ectl()    emac_clearbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+
+#define emac_arch_set_pacing() do {					\
+		/* Wait at least 100 cycles */				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		/* Set interrupt timer count (decremented at cpuclk/6) */ \
+		emac_set_reg(EMAC_EWINTTCNT, 15000);			\
+	} while(0)
+
+#define emac_arch_clear_mac_addr()		 \
+	for (i = 0; i < 32; i++) {		 \
+		emac_set_reg(EMAC_MACINDEX, i);	 \
+		emac_set_reg(EMAC_MACADDRHI, 0); \
+		emac_set_reg(EMAC_MACADDRLO, 0); \
+	}
+
+#define emac_arch_set_mac_addr_index(i) emac_set_reg(EMAC_MACINDEX, i)
+#define emac_arch_set_mac_addr_high(a)  emac_set_reg(EMAC_MACADDRHI, a)
+#define emac_arch_set_mac_addr_low(a)   emac_set_reg(EMAC_MACADDRLO, a)
+#define emac_arch_get_mac_addr_high(a)  emac_get_reg(EMAC_MACADDRHI)
+#define emac_arch_get_mac_addr_low(a)   emac_get_reg(EMAC_MACADDRLO)
+
+/* Take RMII out of reset (the following 2 settings apply only to PG 2.0) */
+#define rmii_arch_fix() do {						\
+	if (intfmacsel == DEVSTAT_MACSEL_RMII)				\
+	    dscr_set_reg(dscr_get_reg(DSCR_EMACCFG) |			\
+			 DSCR_B_EMACCFG_RMIIRST, DSCR_EMACCFG);		\
+    } while(0)
+
+#define emac_check_shared_capability()  0
+
+#define EMAC_TIMER_TICK_MDIO
+#define EMAC_DO_INIT_MDIO
+
+#else
+
+/*
+ * Generic definitions
+ */
+
+#define EMAC0_REG_BASE           0x02c80000
+#define ECTL0_REG_BASE           0x02c81000
+#define EMAC0_DSC_BASE           0x02c82000
+
+#define EMAC_MAX_INSTANCE        1
+#define PTR_TO_HW(x)             (x)
+#define HW_TO_PTR(x)             (x)
+#define _INTFLAG                 0
+#define get_emac_idx()           0
+
+#define emac_arch_get_hash1()    emac_get_reg(EMAC_MACHASH1)
+#define emac_arch_get_hash2()    emac_get_reg(EMAC_MACHASH2)
+#define emac_arch_get_promisc()  (emac_get_reg(EMAC_RXMBPENABLE) & EMAC_B_RXCAFEN)
+#define emac_arch_get_control()  (emac_get_reg(EMAC_MACCONTROL) &  \
+				      (EMAC_B_FULLDUPLEX | EMAC_B_RMIIDUPLEXMODE | \
+				      EMAC_B_GIG | EMAC_B_RMIISPEED))
+#define emac_arch_set_hash1(a)   emac_set_reg(EMAC_MACHASH1, a)
+#define emac_arch_set_hash2(a)   emac_set_reg(EMAC_MACHASH2, a)
+#define emac_arch_set_promisc(a) if (a) emac_setbit_reg(EMAC_RXMBPENABLE, EMAC_B_RXCAFEN)
+#define emac_arch_set_control(a) if (a) emac_setbit_reg(EMAC_MACCONTROL, a)
+#define emac_arch_init_control(pace) \
+	emac_setbit_reg(EMAC_MACCONTROL, (pace)? EMAC_B_GMIIEN | EMAC_B_TXPACE : EMAC_B_GMIIEN)
+
+#define ectl_arch_rx_irq_enter(c)
+#define ectl_arch_rx_irq_leave(c)
+#define ectl_arch_tx_irq_enter(c)
+#define ectl_arch_tx_irq_leave(c)
+#define ectl_arch_enable_irq(c, misc)  emac_setbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+#define ectl_arch_disable_irq(c) emac_clearbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+
+#define emac_arch_get_int_vector()          emac_get_reg(EMAC_MACINVECTOR)
+#define emac_arch_get_pending_irq(i, f, c)  ((i) & ((f) << (c)))
+#define emac_arch_enable_irq(reg, c)        emac_set_reg(reg, 1 << (c))
+
+#define emac_arch_reset_switch()
+
+/* Disable EMAC/MDIO interrupts and reset EMAC/MDIO modules */
+#define emac_arch_reset_ectl()    emac_clearbit_reg(EMAC_EWCTL, EMAC_B_INTEN)
+
+#define emac_arch_set_pacing() do {					\
+		/* Wait at least 100 cycles */				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		emac_get_reg(EMAC_EWINTTCNT);				\
+		/* Set interrupt timer count (decremented at cpuclk/6) */ \
+		emac_set_reg(EMAC_EWINTTCNT, 15000);			\
+	} while(0)
+
+#define emac_arch_clear_mac_addr()		 \
+	for (i = 0; i < 32; i++) {		 \
+		emac_set_reg(EMAC_MACINDEX, i);	 \
+		emac_set_reg(EMAC_MACADDRHI, 0); \
+		emac_set_reg(EMAC_MACADDRLO, 0); \
+	}
+
+#define emac_arch_set_mac_addr_index(i) emac_set_reg(EMAC_MACINDEX, i)
+#define emac_arch_set_mac_addr_high(a)  emac_set_reg(EMAC_MACADDRHI, a)
+#define emac_arch_set_mac_addr_low(a)   emac_set_reg(EMAC_MACADDRLO, a)
+#define emac_arch_get_mac_addr_high(a)  emac_get_reg(EMAC_MACADDRHI)
+#define emac_arch_get_mac_addr_low(a)   emac_get_reg(EMAC_MACADDRLO)
+
+#define emac_check_shared_capability()  0
+
+#define rmii_arch_fix() 
+
+#define EMAC_TIMER_TICK_MDIO
+#define EMAC_DO_INIT_MDIO
+
+#endif
+
+#ifdef EFUSE_REG_MAC_ADDR
 /* Read the e-fuse value as 32 bit values to be endian independent */
-static int inline emac_arch_get_mac_addr(char *x)
+static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 {
 	unsigned int addr0, addr1;
 
-	addr1 = __raw_readl(__REG_MAC_ADDR + 4);
-	addr0 = __raw_readl(__REG_MAC_ADDR);
+	addr1 = __raw_readl(EFUSE_REG_MAC_ADDR + 4);
+	addr0 = __raw_readl(EFUSE_REG_MAC_ADDR);
 
 #if defined(CONFIG_SOC_TMS320C6472)
 	x[0] = (addr0 & 0xff000000) >> 24;
@@ -369,39 +728,6 @@ static int inline emac_arch_get_mac_addr(char *x)
 #endif
 	return 0;
 }
-#endif
+#endif /* EFUSE_REG_MAC_ADDR */
 
-#ifdef CONFIG_SOC_TMS320C6472
-#define EMAC_ARCH_HAS_PREOPEN
-
-static int inline emac_arch_preopen(struct net_device *dev)
-{
-	struct emac_private *ep = netdev_priv(dev);
-	unsigned int dev_stat = dscr_get_reg(DSCR_DEVSTAT);
-	unsigned int gigabit = 0, macsel;
-
-	if(dev->dev_id == 0) {
-		macsel = (dev_stat & DEVSTAT_B_EMAC0_MACSEL) >>
-			DEVSTAT_B_EMAC0_OFFSET;
-		if (macsel == DEVSTAT_MACSEL_GMII ||
-		    macsel == DEVSTAT_MACSEL_RGMII)
-			gigabit = 1;
-	}
-
-	if(dev->dev_id == 1) {
-		macsel = (dev_stat & DEVSTAT_B_EMAC1_MACSEL) >>
-			DEVSTAT_B_EMAC1_OFFSET;
-		if (macsel == DEVSTAT_MACSEL_GMII)
-			gigabit = 1;
-	}
-
-	if(gigabit == 1) 
-		emac_set_reg(EMAC_MACCONTROL, EMAC_B_GIG | EMAC_B_RGMIIEN);
-	else 
-		emac_set_reg(EMAC_MACCONTROL, EMAC_B_RMIISPEED);
-
-	return 0;
-}
-#endif
-
-#endif
+#endif /* __MACH_C6X_GEMAC_H */

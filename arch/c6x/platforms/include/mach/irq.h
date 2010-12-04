@@ -46,5 +46,7 @@
 
 #define assert_event(evt) (IC_EVTASRT = (evt))
 
+#define NR_BOARD_IRQS    0 /* Not used */
+
 #endif /* __KERNEL__ */
 #endif /* __MACH_C6X_IRQ_H */

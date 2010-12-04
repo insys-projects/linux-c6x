@@ -1,5 +1,5 @@
 /*
- * Davinci I2C setup for C64X devices
+ * I2C setup for C64X devices
  *
  * Copyright (C) 2010 Texas Instruments.
  * Contributed by: Mark Salter <msalter@redhat.com>
@@ -19,13 +19,13 @@
 #include <mach/i2c.h>
 
 /*
- *  Not much to do here except register the data for the Davinci driver
+ * Not much to do here except register the data for the TI I2C driver 
+ * (based on the DaVinci one)
  */
-
 static struct resource i2c_resources[] = {
 	{
-		.start		= ARCH_DAVINCI_I2C_BASE,
-		.end		= ARCH_DAVINCI_I2C_BASE + 0x40,
+		.start		= ARCH_I2C_BASE,
+		.end		= ARCH_I2C_BASE + 0x40,
 		.flags		= IORESOURCE_MEM,
 	},
 	{
@@ -35,8 +35,8 @@ static struct resource i2c_resources[] = {
 };
 
 static struct davinci_i2c_platform_data i2c_pdata = {
-	.bus_freq	= ARCH_DAVINCI_I2C_FREQ,
-	.bus_delay	= ARCH_DAVINCI_I2C_DELAY,
+	.bus_freq	= ARCH_I2C_FREQ,
+	.bus_delay	= ARCH_I2C_DELAY,
 };
 
 static struct platform_device c6x_i2c_device = {
@@ -49,9 +49,7 @@ static struct platform_device c6x_i2c_device = {
 
 static int __init c6x_init_i2c(void)
 {
-	return platform_device_register(&c6x_i2c_device);
+	return(platform_device_register(&c6x_i2c_device));
 }
 
 core_initcall(c6x_init_i2c);
-
-

@@ -515,8 +515,17 @@ out_unlock:
 	spin_unlock_irqrestore(&map_lock, flags);
 }
 EXPORT_SYMBOL(irq_cic_unmap);
-#endif  /* NR_CIC_COMBINERS > 0 */
 
+/*
+ * Map a CIC source to a give CIC output event for a given core or TPCC
+ */
+void cic_raw_map(unsigned int src, unsigned int dst, int core)
+{
+	__irq_cic_map(core, src, dst);
+}
+EXPORT_SYMBOL(cic_raw_map);
+
+#endif  /* NR_CIC_COMBINERS > 0 */
 
 void __init init_pic_c64xplus(void)
 {

@@ -65,8 +65,6 @@
 #error "No SoC memory address space defines"
 #endif
 
-
-
 /* 
  * VBUS clock Rate in MHz (1-255)
  */
@@ -156,7 +154,6 @@
 #define PSC_MDCTL13                  0x02ae0a34
 #endif  /* CONFIG_SOC_TMS320C6472 */
 
-
 /*
  * TCI648x megamodules misc registers & constants
  */
@@ -164,9 +161,24 @@
 
 #if defined(CONFIG_SOC_TMS320C6474)
 #define CORE_NUM                     3
+#define C6X_SOC_HAS_CORE_REV
+#elif defined(CONFIG_SOC_TMS320C6472)
+#define CORE_NUM                     6
+#else
+#define CORE_NUM                     1
+#endif
+
+/*
+ * Inter-DSP Interrupt Registers
+ */
+#if defined(CONFIG_SOC_TMS320C6474)
+#define IPCGR_BASE                   0x02880900
+#define IPCAR_BASE                   0x02880940
 #endif
 #if defined(CONFIG_SOC_TMS320C6472)
-#define CORE_NUM                     6
+#define NMIGR_BASE                   0x02a80500
+#define IPCGR_BASE                   0x02a80540
+#define IPCAR_BASE                   0x02a80580
 #endif
 
 #if defined(CONFIG_SOC_TMS320C6474)
@@ -175,6 +187,8 @@
  */
 #define MCBSP0_BASE_ADDR             0x028c0000
 #define MCBSP1_BASE_ADDR             0x028d0000
+#define MCBSP0_EDMA_BASE_ADDR        0x30000000
+#define MCBSP1_EDMA_BASE_ADDR        0x34000000
 #endif
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

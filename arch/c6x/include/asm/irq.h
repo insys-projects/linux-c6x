@@ -15,8 +15,8 @@
 
 #include <asm/hardware.h>
 #include <asm/percpu.h>
+
 #include <mach/irq.h>
-#include <mach/board.h>
 
 #define irq_canonicalize(irq)  (irq)
 

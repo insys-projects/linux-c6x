@@ -12,20 +12,31 @@
  */
 #include <asm/gpio.h>
 
-/* I2C UART Bridge (14.7456MHz / 16) */
+/*
+ * Board memory 
+ */
+#define BOARD_RAM_SIZE	0x10000000
+
+/* 
+ * I2C UART Bridge (14.7456MHz / 16)
+ */
 #define BASE_BAUD	921600
 
+/* 
+ * I2C bus specs 
+ */
+#define ARCH_I2C_FREQ   400   /* KHz  */
+#define ARCH_I2C_DELAY    0   /* usec */
 
-/* board memory map */
-#define VECTADDR        0xE0000000
-#define TEXTADDR	0xE0000400
-#define TEXTLEN         0x0FFFFC00
-#define RAMEND		0xF0000000
+/*
+ * Timer definitions
+ */
+#define LINUX_TIMER_SRC (TIMER_0 + get_coreid())
+#define LINUX_TIMER_IRQ IRQ_TINT
 
-/* davinci i2c bus specs */
-#define ARCH_DAVINCI_I2C_FREQ   400   /* KHz  */
-#define ARCH_DAVINCI_I2C_DELAY    0   /* usec */
-
+/*
+ * Led definitions
+ */
 #define LED0_GPIO_PIN   GPIO_PIN12
 #define LED1_GPIO_PIN   GPIO_PIN13
 

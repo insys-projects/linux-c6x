@@ -148,10 +148,10 @@ static loff_t ram_proc_llseek(struct file* file, loff_t off, int whence)
 	case 2:	 new = 1 + off; break;
 	default: return -EINVAL;
 	}
-
+	
 	if (new> (loff_t) data->size)
 		return -EINVAL;
-
+	
 	return (file->f_pos = new);
 }
 
@@ -169,7 +169,7 @@ static ssize_t ram_proc_write(struct file* file,
 
 	dp = PDE(inode);
 	data = (struct ram_private_data *) dp->data;
-
+	
 	if (!size)
 		return 0;
 
@@ -188,7 +188,8 @@ static ssize_t ram_proc_write(struct file* file,
 
 	/* Sync cache for DDR case */
 	if (data->start == RAM_MEMORY_START)
-	    L2_cache_block_writeback(data->start + (u32) *ppos, data->start + (u32) *ppos + count);
+		L2_cache_block_writeback(data->start + (u32) *ppos,
+					 data->start + (u32) *ppos + count);
 
 	*ppos += (u64) count;
 	src_buf += count;
@@ -218,7 +219,7 @@ static ssize_t ram_proc_read(struct file* file,
 	/* Because Faraday doesn't include MMU, user buffer is contiguous */
 	if (copy_to_user(dest_buf, data->start + (u32) *ppos, count))
 		return -EFAULT;
-
+	
 	*ppos += (u64) count;
 	dest_buf += count;
 
@@ -234,7 +235,7 @@ static int ram_proc_mmap (struct file *file, struct vm_area_struct *vma)
 
 	dp = PDE(inode);
 	data = (struct ram_private_data *) dp->data;
-
+	
 	vma->vm_start = data->start;
 	vma->vm_end  += vma->vm_start;
 

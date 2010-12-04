@@ -23,25 +23,19 @@
 #include <asm/bug.h>
 #include <asm/dscr.h>
 
+#include <mach/board.h>
+
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 
 unsigned int timer_clock_divisor;
 
-#ifdef CONFIG_SOC_TMS320C6472
-#define LINUX_TIMER (TIMER_0 + get_coreid())
-#define LINUX_TIMER_IRQ IRQ_TINT
-#else
-#define LINUX_TIMER TIMER_1
-#define LINUX_TIMER_IRQ IRQ_TINT1
-#endif
-
 static int next_event(unsigned long delta,
 		      struct clock_event_device *evt)
 {
-	u32 timer_CNTLO = TIMER_CNTLO_REG(LINUX_TIMER);
-	u32 timer_PRDLO = TIMER_PRDLO_REG(LINUX_TIMER);
-	u32 timer_TCR	= TIMER_TCR_REG(LINUX_TIMER);
-	u32 timer_TGCR	= TIMER_TGCR_REG(LINUX_TIMER);
+	u32 timer_CNTLO = TIMER_CNTLO_REG(LINUX_TIMER_SRC);
+	u32 timer_PRDLO = TIMER_PRDLO_REG(LINUX_TIMER_SRC);
+	u32 timer_TCR	= TIMER_TCR_REG(LINUX_TIMER_SRC);
+	u32 timer_TGCR	= TIMER_TGCR_REG(LINUX_TIMER_SRC);
 
 	TIMER_REG(timer_TCR)  &= ~TIMER_B_TCR_ENAMODELO_MASK;
 	TIMER_REG(timer_PRDLO) = delta - 1;
@@ -55,8 +49,8 @@ static void set_clock_mode(enum clock_event_mode mode,
 			   struct clock_event_device *evt)
 {
 #if 0
-	u32 timer_TCR  = TIMER_TCR_REG(LINUX_TIMER);
-	u32 timer_TGCR = TIMER_TGCR_REG(LINUX_TIMER);
+	u32 timer_TCR  = TIMER_TCR_REG(LINUX_TIMER_SRC);
+	u32 timer_TGCR = TIMER_TGCR_REG(LINUX_TIMER_SRC);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_ONESHOT:
@@ -98,11 +92,11 @@ int __init c6x_arch_init_clockevents(void)
 	u32 shift, timer_TCR, timer_TGCR;
 	u32 timer_PRDLO, timer_CNTLO, timer_EMUMGTCLKSPD;
 
-	timer_TCR	   = TIMER_TCR_REG(LINUX_TIMER);
-	timer_TGCR	   = TIMER_TGCR_REG(LINUX_TIMER);
-	timer_CNTLO	   = TIMER_CNTLO_REG(LINUX_TIMER);
-	timer_PRDLO	   = TIMER_PRDLO_REG(LINUX_TIMER);
-	timer_EMUMGTCLKSPD = TIMER_EMUMGTCLKSPD_REG(LINUX_TIMER);
+	timer_TCR	   = TIMER_TCR_REG(LINUX_TIMER_SRC);
+	timer_TGCR	   = TIMER_TGCR_REG(LINUX_TIMER_SRC);
+	timer_CNTLO	   = TIMER_CNTLO_REG(LINUX_TIMER_SRC);
+	timer_PRDLO	   = TIMER_PRDLO_REG(LINUX_TIMER_SRC);
+	timer_EMUMGTCLKSPD = TIMER_EMUMGTCLKSPD_REG(LINUX_TIMER_SRC);
 
 	/* disable timer, reset count */
 	TIMER_REG(timer_TCR)  &= ~TIMER_B_TCR_ENAMODELO_MASK;

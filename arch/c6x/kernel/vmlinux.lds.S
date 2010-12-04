@@ -34,19 +34,17 @@
         "firmware/built-in.o"(x) \
         "net/built-in.o"(x) \
   	*(x)
-
+	
 MEMORY
 {
-	VECS:	org = VECTADDR len = 0x00000400	/* Interrupt vectors */
-	BMEMe0:	org = TEXTADDR len = TEXTLEN	/* External DDR2     */
-	eBMEMe0:org = RAMEND   len = 0x00000004	/* End of external DDR2 CE0 128MB */
-}		
+	BMEMe0:	org = PAGE_OFFSET_RAW len = KERNEL_TEXT_LEN /* External DDR2 */
+}
 
 SECTIONS
 {
-  .vectors	>	VECS
-
-  GROUP : TEXTADDR {
+  GROUP : PAGE_OFFSET_RAW {
+	
+    .vectors : ALIGN(1024)
     .cmdline : ALIGN(4096)
 
     /* read-only */
@@ -119,10 +117,13 @@ SECTIONS
 	__end_builtin_fw = .;
     }
 
-    .rio_route  : ALIGN(4) {
+    .rio_rops  : ALIGN(4) {
 	__start_rio_route_ops = .;
 	*(.rio_route_ops)
 	__end_rio_route_ops = .;
+	__start_rio_em_ops = .;
+	*(.rio_em_ops)
+	__end_rio_em_ops = .;	
     }
 
     .tracedata : ALIGN(4) {
@@ -349,10 +350,6 @@ SECTIONS
          __ramstart = . ;
     }
   }
-
-  .eram {
-     VMLINUX_SYMBOL(_ramend) = . ;
-  } > eBMEMe0
 }
 
 #else /* CONFIG_TI_C6X_LINKER */

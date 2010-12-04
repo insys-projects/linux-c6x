@@ -14,6 +14,15 @@
 #ifndef _ASM_C6X_PAGE_OFFSET_H
 #define _ASM_C6X_PAGE_OFFSET_H
 #include <mach/hardware.h>
+
 /* This handles the memory map */
-#define PAGE_OFFSET_RAW		RAM_MEMORY_START
+#ifdef CONFIG_PAGE_OFFSET
+#define PAGE_OFFSET_RAW		CONFIG_PAGE_OFFSET
+#else
+#define PAGE_OFFSET_RAW		RAM_DDR2_CE0
 #endif
+
+/* Maximum size for the kernel code */
+#define KERNEL_TEXT_LEN         0x07ffffff
+
+#endif /* _ASM_C6X_PAGE_OFFSET_H */

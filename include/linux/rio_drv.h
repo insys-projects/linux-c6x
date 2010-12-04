@@ -13,6 +13,8 @@
 #ifndef LINUX_RIO_DRV_H
 #define LINUX_RIO_DRV_H
 
+#ifdef __KERNEL__
+
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/list.h>
@@ -413,6 +415,12 @@ void rio_release_regions(struct rio_dev *);
 int rio_request_region(struct rio_dev *, int, char *);
 void rio_release_region(struct rio_dev *, int);
 
+/* Port-Write management */
+extern int rio_request_inb_pwrite(struct rio_dev *,
+			int (*)(struct rio_dev *, union rio_pw_msg*, int));
+extern int rio_release_inb_pwrite(struct rio_dev *);
+extern int rio_inb_pwrite_handler(union rio_pw_msg *pw_msg);
+
 /* LDM support */
 int rio_register_driver(struct rio_driver *);
 void rio_unregister_driver(struct rio_driver *);
@@ -462,4 +470,5 @@ extern struct rio_dev *rio_get_device(u16 vid, u16 did, struct rio_dev *from);
 extern struct rio_dev *rio_get_asm(u16 vid, u16 did, u16 asm_vid, u16 asm_did,
 				   struct rio_dev *from);
 
+#endif				/* __KERNEL__ */
 #endif				/* LINUX_RIO_DRV_H */

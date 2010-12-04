@@ -17,7 +17,10 @@
 #include <asm/irq.h>
 
 #ifndef __ASSEMBLY__
-/* All frequencies are expressed in kHz */
+/* 
+ * This definition must match the davinci i2c driver structure.
+ * All frequencies are expressed in kHz
+ */
 struct davinci_i2c_platform_data {
 	unsigned int	bus_freq;	/* standard bus frequency (kHz) */
 	unsigned int	bus_delay;	/* post-transaction delay (usec) */
@@ -29,12 +32,6 @@ struct davinci_i2c_platform_data {
 /*
  * I2C registers base
  */
-#if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) || \
-    defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
-#define ARCH_DAVINCI_I2C_BASE    0x02B04000
-#else
-#error "No I2C base address"
-#endif
+#define ARCH_I2C_BASE    0x02B04000
 
 #endif  /* __MACH_C6X_I2C_H */
-
