@@ -23,7 +23,7 @@
 #include <asm/byteorder.h>
 
 #if 0
-#define DEBUGP printk
+#define DEBUGP(fmt...) printk(KERN_INFO fmt)
 #else
 #define DEBUGP(fmt...)
 #endif
@@ -116,7 +116,6 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 	u32 *location, opcode, ep;
 	unsigned int i;
 	Elf32_Addr v;
-	int res;
 #ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
@@ -201,10 +200,9 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 {
 	Elf32_Rela *rel = (void *) sechdrs[relsec].sh_addr;
 	Elf_Sym *sym;
-	u32 *location, opcode;
+	u32 *location, opcode, ep;
 	unsigned int i;
 	Elf32_Addr v;
-	int res;
 #ifdef CONFIG_TI_C6X_COMPILER
 	Elf_Addr offset = me->arch.sh_addr[sechdrs[relsec].sh_info];
 #else
@@ -218,6 +216,10 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		/* This is where to make the change */
 		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset - offset;
+
+		/* this is the execution packet start */
+		ep = (u32)location & ~31;
+
 		/* This is the symbol it is referring to.  Note that all
 		   undefined symbols have been resolved.  */
 		sym = (Elf_Sym *)sechdrs[symindex].sh_addr
@@ -231,6 +233,18 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 #endif
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
+		case R_C6000_ABS32:
+			DEBUGP("RELA ABS32: [%p] = 0x%x\n", location, v);
+			*location = v;
+			break;
+		case R_C6000_ABS16:
+			DEBUGP("RELA ABS16: [%p] = 0x%x\n", location, v);
+			*(u16 *)location = v;
+			break;
+		case R_C6000_ABS8:
+			DEBUGP("RELA ABS8: [%p] = 0x%x\n", location, v);
+			*(u8 *)location = v;
+			break;
 		case R_C6000_ABS_L16:
 			opcode = *location;
 			opcode &= ~0x7fff80;
@@ -243,6 +257,27 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			opcode &= ~0x7fff80;
 			opcode |= ((v >> 9) & 0x7fff80);
 			DEBUGP("RELA ABS_H16[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
+			*location = opcode;
+			break;
+		case R_C6000_PCR_S21:
+			opcode = *location;
+			opcode &= ~0x0fffff80;
+			opcode |= ((((v - ep) >> 2) & 0x1fffff) << 7);
+			DEBUGP("RELA PCR_S21[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
+			*location = opcode;
+			break;
+		case R_C6000_PCR_S12:
+			opcode = *location;
+			opcode &= ~0x0fff0000;
+			opcode |= ((((v - ep) >> 2) & 0xfff) << 16);
+			DEBUGP("RELA PCR_S12[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
+			*location = opcode;
+			break;
+		case R_C6000_PCR_S10:
+			opcode = *location;
+			opcode &= ~0x7fe000;
+			opcode |= ((((v - ep) >> 2) & 0x3ff) << 13);
+			DEBUGP("RELA PCR_S10[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
 			*location = opcode;
 			break;
 		default:
