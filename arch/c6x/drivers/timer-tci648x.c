@@ -118,7 +118,7 @@ int __init c6x_arch_init_clockevents(void)
 	/* Calculate the min / max delta */
 	/* Find a shift value */
 	for (shift = 32; shift > 0; shift--) {
-		temp = (u64) ((CONFIG_TMS320C6X_MHZ*1000000)/timer_clock_divisor) << shift;
+		temp = (u64) (c6x_core_freq / timer_clock_divisor) << shift;
 		do_div(temp, NSEC_PER_SEC);
 		if ((temp >> 32) == 0)
 			break;

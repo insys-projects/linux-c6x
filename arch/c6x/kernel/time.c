@@ -63,7 +63,7 @@ void time_init(void)
 
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 
-	sched_clock_multiplier = ((u64)NSEC_PER_SEC << SCHED_CLOCK_SHIFT) / (CONFIG_TMS320C6X_MHZ*1000000);
+	sched_clock_multiplier = ((u64)NSEC_PER_SEC << SCHED_CLOCK_SHIFT) / c6x_core_freq;
 
 	if (mach_setup_timer != NULL)
 		mach_setup_timer();

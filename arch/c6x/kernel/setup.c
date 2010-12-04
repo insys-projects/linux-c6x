@@ -28,6 +28,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/clk.h>
 
 #ifdef CONFIG_MTD_UCLINUX
 #include <linux/mtd/map.h>
@@ -64,9 +65,7 @@ static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG
 static const char *cpu_name, *cpu_voltage, *mmu, *fpu, *soc_rev;
 static char __cpu_rev[5], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
-#ifdef CONFIG_TMS320C64XPLUS
 static unsigned int cpu_num = 0;
-#endif
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 unsigned int c6x_platram_start;
@@ -95,6 +94,12 @@ void (*mach_print_value) (char *, unsigned long) = NULL;
 
 struct tag_header *c6x_tags_pointer __initdata;
 
+unsigned int ticks_per_ns_scaled;
+EXPORT_SYMBOL(ticks_per_ns_scaled);
+
+unsigned int c6x_core_freq;
+EXPORT_SYMBOL(c6x_core_freq);
+
 static unsigned long dummy_gettimeoffset(void)
 {
 	return 0;
@@ -102,9 +107,22 @@ static unsigned long dummy_gettimeoffset(void)
 
 unsigned long (*mach_gettimeoffset)(void) = dummy_gettimeoffset;;
 
-void get_cpuinfo(void)
+static void __init get_cpuinfo(void)
 {
 	unsigned cpu_id, rev_id, csr;
+	struct clk *coreclk = clk_get_sys(NULL, "core");
+	unsigned long core_khz;
+
+	if (!IS_ERR(coreclk))
+		c6x_core_freq = clk_get_rate(coreclk);
+	else {
+		printk(KERN_WARNING "Cannot find core clock frequency. Using 700MHz\n");
+		c6x_core_freq = 700000000;
+	}
+
+	core_khz = c6x_core_freq / 1000;
+
+	ticks_per_ns_scaled = ((uint64_t)core_khz << C6X_NDELAY_SCALE) / 1000000;
 
 	csr = get_creg(CSR);
 	cpu_id = csr >> 24;
@@ -132,7 +150,7 @@ void get_cpuinfo(void)
 		break;
 	case 16:
 		cpu_name = "C64x+";
-		cpu_voltage = "1.2V";
+		cpu_voltage = "1.2";
 		fpu = "none";
 		break;
 	default:
@@ -145,31 +163,31 @@ void get_cpuinfo(void)
 		case 0x1:
 			if (cpu_id > 8) {
 				cpu_rev = "DM640/DM641/DM642/DM643";
-				cpu_voltage = "1.2V - 1.4V";
+				cpu_voltage = "1.2 - 1.4";
 			} else {
 				cpu_rev = "C6201";
-				cpu_voltage = "2.5V";
+				cpu_voltage = "2.5";
 			}
 			break;
 		case 0x2:
 			cpu_rev = "C6201B/C6202/C6211";
-			cpu_voltage = "1.8V";
+			cpu_voltage = "1.8";
 			break;
 		case 0x3:
 			cpu_rev = "C6202B/C6203/C6204/C6205";
-			cpu_voltage = "1.5V";
+			cpu_voltage = "1.5";
 			break;
 		case 0x201:
 			cpu_rev = "C6701 revision 0 (early CPU)";
-			cpu_voltage = "1.8V";
+			cpu_voltage = "1.8";
 			break;
 		case 0x202:
 			cpu_rev = "C6701/C6711/C6712";
-			cpu_voltage = "1.8V";
+			cpu_voltage = "1.8";
 			break;
 		case 0x801:
 			cpu_rev = "C64x";
-			cpu_voltage = "1.5V"; 
+			cpu_voltage = "1.5";
 			break;
 		default:
 			cpu_rev = "unknown";
@@ -179,15 +197,12 @@ void get_cpuinfo(void)
 		snprintf(__cpu_rev, sizeof(__cpu_rev), "0x%x", cpu_id);
 	}
 
-#ifndef CONFIG_TMS320C64XPLUS
-	printk("CPU: %s revision %s core voltage %s\n",
-	       cpu_name, cpu_rev, cpu_voltage);
-#else
-	cpu_num = get_creg(DNUM) & 0xff;
-	printk("CPU: %s revision %s core voltage %s core number %d\n",
-	       cpu_name, cpu_rev, cpu_voltage, cpu_num);
+#ifdef CONFIG_TMS320C64XPLUS
+	cpu_num = get_coreid();
 #endif
-
+	printk(KERN_INFO "CPU%d: %s rev %s, %s volts, %uMHz\n",
+	       cpu_num, cpu_name, cpu_rev,
+	       cpu_voltage, c6x_core_freq / 1000000);
 #ifdef C6X_SOC_HAS_CORE_REV
 	soc_rev = arch_compute_silicon_rev(arch_get_silicon_rev());
 #else
@@ -500,23 +515,6 @@ void __init setup_arch(char **cmdline_p)
 
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
-	unsigned long clock_freq = ((loops_per_jiffy<<1)+(500000/HZ))
-		/((500000<<1)/HZ);
-#ifndef CONFIG_TMS320C64XPLUS
-	seq_printf(m, 
-		   "CPU:\t\t%s\n"
-		   "Core revision:\t%s\n"
-		   "Core voltage:\t%s\n"
-		   "MMU:\t\t%s\n"
-		   "FPU:\t\t%s\n"
-		   "Clocking:\t%luMHz\n"
-		   "BogoMips:\t%lu.%02lu\n"
-		   "Calibration:\t%lu loops\n",
-		   cpu_name, cpu_rev, cpu_voltage, mmu, fpu,
-		   clock_freq,
-		   (loops_per_jiffy/(500000/HZ)),(loops_per_jiffy/(5000/HZ))%100,
-		   loops_per_jiffy);
-#else
 	seq_printf(m, 
 		   "CPU:\t\t%s\n"
 		   "Core revision:\t%s\n"
@@ -525,14 +523,15 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
 		   "Silicon rev:\t%s\n"
-		   "Clocking:\t%luMHz\n"
+		   "Clocking:\t%uMHz\n"
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
 		   cpu_name, cpu_rev, cpu_voltage, cpu_num, mmu, fpu,
-		   soc_rev, clock_freq,
-		   (loops_per_jiffy/(500000/HZ)),(loops_per_jiffy/(5000/HZ))%100,
+		   soc_rev, (c6x_core_freq + 500000) / 1000000,
+		   (loops_per_jiffy/(500000/HZ)),
+		   (loops_per_jiffy/(5000/HZ))%100,
 		   loops_per_jiffy);
-#endif
+
 	return 0;
 }
 

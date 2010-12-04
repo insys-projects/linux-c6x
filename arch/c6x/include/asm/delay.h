@@ -18,54 +18,52 @@
 
 extern asmlinkage void _c6x_delay(unsigned long);
 
+extern unsigned int ticks_per_ns_scaled;
+
 static inline void __delay(unsigned long loop)
 {
 	_c6x_delay(loop / 3); /* Because a loop takes 6 cycles on C6x instead
 				 of 2 on Intel and others */
 }
 
-/*
- * Nanosecond delay for variable. Do not use division, only one multiplication 
- */
-#define NSEC_FACTOR_SHIFT  6
-#define NSEC_FACTOR_MULT   ((CONFIG_TMS320C6X_MHZ << NSEC_FACTOR_SHIFT) / (1000 * 6))
-#define NSEC_CEIL          ((1 << NSEC_FACTOR_SHIFT) / NSEC_FACTOR_MULT)
-
-static inline void __ndelay(unsigned long nsec)
+#ifdef CONFIG_TI_C6X_COMPILER
+extern asmlinkage void _c6x_tickdelay(unsigned int);
+#else
+static inline void _c6x_tickdelay(unsigned int x)
 {
-	if (nsec > NSEC_CEIL)
-		_c6x_delay((nsec * NSEC_FACTOR_MULT) >> NSEC_FACTOR_SHIFT);
+	uint32_t cnt, endcnt;
+	asm volatile (" mvc .s2 TSCL,%0\n"
+		      " add .s2x %0,%1,%2\n"
+		      " || mvk .l2 1,B0\n"
+		      "0: [B0] b .s2 0b\n"
+		      " mvc .s2 TSCL,%0\n"
+		      " sub .s2 %0,%2,%0\n"
+		      " cmpgt .l2 0,%0,B0\n"
+		      " nop\n"
+		      " nop\n"
+		      : "=b"(cnt), "+a"(x), "=b"(endcnt) : : "B0");
+}
+#endif
+
+/* use scaled math to avoid slow division */
+#define C6X_NDELAY_SCALE 10
+
+static inline void _ndelay(unsigned int n)
+{
+	_c6x_tickdelay((ticks_per_ns_scaled * n) >> C6X_NDELAY_SCALE);
 }
 
-
-/*
- * Nanosecond delay for small delays. Of course, it needs to be used with constant for small values.
- */
-#define ndelay(n)            (__builtin_constant_p(n) ?			\
-			      (n) <= NSEC_CEIL ? :			\
-			      _c6x_delay(((n) * CONFIG_TMS320C6X_MHZ) / (1000 * 6)) : \
-	                      __ndelay(n))
-
-/*
- * Microsecond delay for variable. Do not use division, only one multiplication 
- */
-#define USEC_FACTOR_SHIFT  2
-#define USEC_FACTOR_MULT   ((CONFIG_TMS320C6X_MHZ << USEC_FACTOR_SHIFT) / 6)
-
-static inline void __udelay(unsigned long usec)
+static inline void _udelay(unsigned int n)
 {
-	_c6x_delay((usec * USEC_FACTOR_MULT) >> USEC_FACTOR_SHIFT);
+	while (n >= 10) {
+		_ndelay(10000);
+		n -= 10;
+	}
+	while (n-- > 0)
+		_ndelay(1000);
 }
 
-/*
- * Use only for very small delays ( < 1 msec).  Should probably use a
- * lookup table, really, as the multiplications take much too long with
- * short delays.  This is a "reasonable" implementation, though (and the
- * first constant multiplications gets optimized away if the delay is
- * a constant)  
- */
-#define udelay(n)            (__builtin_constant_p(n) ?			\
-			      _c6x_delay(((n) * CONFIG_TMS320C6X_MHZ) / 6) : \
-			      __udelay(n))
+#define udelay(x) _udelay((unsigned int)(x))
+#define ndelay(x) _ndelay((unsigned int)(x))
 
 #endif /* __ASM_C6X_DELAY_H */

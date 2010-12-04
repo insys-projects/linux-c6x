@@ -15,12 +15,10 @@
 #ifndef __ASM_C6X_TIMEX_H
 #define __ASM_C6X_TIMEX_H
 
-
-#ifdef CONFIG_TMS320C645X
-#define CLOCK_TICK_RATE ((CONFIG_TMS320C6X_MHZ * 1000000UL) / 6)
-#else
-#define CLOCK_TICK_RATE ((CONFIG_TMS320C6X_MHZ * 1000000UL) / 8)
-#endif
+/*
+ * This should be close enough...
+ */
+#define CLOCK_TICK_RATE ((1000 * 1000000UL) / 6)
 
 #ifdef CONFIG_TMS320C64XPLUS
 /* 64-bit timestamp */

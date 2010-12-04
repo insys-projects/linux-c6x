@@ -302,4 +302,6 @@ static inline unsigned int __xchg(unsigned int x, volatile void * ptr, int size)
 	return tmp;
 }
 
+extern unsigned int c6x_core_freq;
+
 #endif /* __ASM_C6X_SYSTEM_H */

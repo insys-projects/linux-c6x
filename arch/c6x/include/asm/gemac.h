@@ -136,7 +136,7 @@ struct emac_config {
 
 /* Value for interrupt pacing: (CPUCLK/6) / 250000 (1/4us) = 0x29a on 1GHz DSP */
 #define gemac_int_prescaler()					\
-        (((CONFIG_TMS320C6X_MHZ * (1000000 / 6)) / 250000))
+	((c6x_core_freq / 6) / 250000)
 
 #endif /* defined(CONFIG_SOC_TMS320C6457) || defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
 
