@@ -325,6 +325,7 @@
 #define DEVICE_REG32_W(x, y)              *(volatile unsigned int *)(x) = (y)
 #define DEVICE_REG32_R(x)                (*(volatile unsigned int *)(x))
 
+extern struct rio_dbell *rio_retrieve_dbell(u32 dbell_num);
 #endif /* __KERNEL__*/
 
 #endif /* _MACH_RIO_TCI648X_H */

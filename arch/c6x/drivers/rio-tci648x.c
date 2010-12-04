@@ -132,6 +132,11 @@ static struct tci648x_serdes_config _tci648x_serdes_config[4] = {
 
 static void dbell_handler(struct tci648x_rio_data *p_rio);
 static void tci648x_rio_port_write_handler(struct tci648x_rio_data *p_rio);
+static int tci648x_rio_port_write_init(struct tci648x_rio_data *p_rio);
+static void tci648x_rio_interrupt_setup(void);
+static void tci648x_rio_interrupt_release(void);
+static int tci648x_rio_edma_setup(void);
+static int tci648x_rio_edma_release(void);
 static void cppi_tx_handler(u32 queue);
 static void cppi_rx_handler(u32 queue);
 
@@ -909,6 +914,7 @@ retry_transfer:
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		res = -EAGAIN;
 	default:
+		break;
 	}
 
 	/* 
@@ -1111,6 +1117,7 @@ retry_transfer:
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		res = -EAGAIN;
 	default:
+		break;
 	}
 
 	/* 
@@ -1399,6 +1406,7 @@ static int tci648x_rio_dbell_send(struct rio_mport *mport,
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		return -EAGAIN;
 	default:
+		break;
 	}
 
 	DPRINTK("Doorbell sent\n");
@@ -1488,6 +1496,7 @@ static inline int maint_request(struct rio_mport *mport,
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		return -EAGAIN;
 	default:
+		break;
 	}
 
 	return 0;

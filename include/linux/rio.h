@@ -415,6 +415,9 @@ union rio_pw_msg {
 };
 
 /* Architecture and hardware-specific functions */
+extern int rio_dev_init(void);
+extern void rio_dev_exit(void);
+extern int rio_dev_add(struct rio_dev *rdev);
 extern int rio_init_mports(void);
 extern void rio_register_mport(struct rio_mport *);
 extern int rio_hw_add_outb_message(struct rio_mport *, struct rio_dev *, int,

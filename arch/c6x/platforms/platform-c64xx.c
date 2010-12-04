@@ -211,7 +211,8 @@ unsigned int arch_get_silicon_rev(void)
 
 	return silicon_rev;	
 }
-char* arch_compute_silicon_rev(u32 silicon_rev)
+
+char *arch_compute_silicon_rev(u32 silicon_rev)
 {
 	char *str;
 	switch(silicon_rev) {

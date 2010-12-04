@@ -97,6 +97,7 @@ extern void irq_map(unsigned int irq_src, unsigned int irq_dst);
 extern void irq_unmap(unsigned int irq_src);
 extern void irq_cic_map(unsigned int irq_src, unsigned int irq_dst);
 extern void irq_cic_unmap(unsigned int irq_src);
+extern void cic_raw_map(unsigned int src, unsigned int dst, int core);
 
 extern void __init init_pic_c64xplus(void);
 #endif

@@ -34,7 +34,7 @@
         "firmware/built-in.o"(x) \
         "net/built-in.o"(x) \
   	*(x)
-	
+
 MEMORY
 {
 	BMEMe0:	org = PAGE_OFFSET_RAW len = KERNEL_TEXT_LEN /* External DDR2 */
@@ -356,8 +356,6 @@ SECTIONS
 
 ENTRY(_c_int00)
 
-_ramend = RAMEND;
-
 #ifdef CONFIG_CPU_BIG_ENDIAN
 jiffies = jiffies_64 + 4;
 #else
@@ -366,10 +364,10 @@ jiffies = jiffies_64;
 
 SECTIONS
 {
-  . = VECTADDR;
+  . = PAGE_OFFSET_RAW;
   .vectors : { *(.vectors) }
 
-  . = TEXTADDR;
+  . = PAGE_OFFSET_RAW + 0x400;
   . = ALIGN(0x1000);
   .cmdline : { *(.cmdline) }
 
@@ -387,7 +385,6 @@ SECTIONS
   }
 
   _etext = .;
-
 
   EXCEPTION_TABLE(16)
   NOTES

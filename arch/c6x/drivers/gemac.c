@@ -44,6 +44,13 @@
 static int emac_open(struct net_device *dev);
 static int emac_close(struct net_device *dev);
 static int emac_reset(struct net_device *dev, int reset_mode);
+static void emac_set_modes(struct net_device *dev);
+static void emac_fixup_modes(struct net_device *dev);
+static void emac_reset_filter(struct net_device *dev,
+			      int channel,
+			      int reset_mode);
+static void emac_set_filter(struct net_device *dev, int channel);
+static int emac_reconfigure_device(struct net_device *dev);
 
 extern int mdio_init(unsigned int txid_version);
 

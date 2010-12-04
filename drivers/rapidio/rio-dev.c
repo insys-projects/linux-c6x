@@ -264,11 +264,11 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg)
 {
 	struct rio_dev	        *rdev   = filp->private_data;
-	int                      status = 0;
+	int                     doorbell_info, dbnum, mode, status = 0;
+	u32			base;
 
 	switch (cmd) {
 	case RIO_DIO_BASE_SET:
-		u32 base;
 		if (get_user(base, (u32 *) arg)) {
                         status = -EFAULT;
 			break;
@@ -278,7 +278,7 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 
 
 	case RIO_DIO_BASE_GET:
-		u32 base = rdev->dio.base_offset;
+		base = rdev->dio.base_offset;
 		if (put_user(base, (u32 *) arg)) {
                         status = -EFAULT;
 			break;
@@ -286,7 +286,6 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case RIO_DIO_MODE_SET:
-		int mode;
 		if (get_user(mode, (int *) arg)) {
                         status = -EFAULT;
 			break;
@@ -308,7 +307,7 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case RIO_DIO_MODE_GET:
-		int mode = rdev->dio.write_mode;
+		mode = rdev->dio.write_mode;
 		if (put_user(mode, (u32 *) arg)) {
                         status = -EFAULT;
 			break;
@@ -316,7 +315,6 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case RIO_DBELL_TX:
-		int dbnum;
 		if (get_user(dbnum, (int *) arg)) {
                         status = -EFAULT;
 			break;
@@ -332,7 +330,6 @@ static int rio_dev_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case RIO_DBELL_RX:
-		int doorbell_info;
 		if (get_user(doorbell_info, (int *) arg)) {
                         status = -EFAULT;
 			break;

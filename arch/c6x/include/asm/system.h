@@ -159,8 +159,8 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 			       " NOP 5	      \n")
 
 /* Set/get IST */
-#define set_IST(x)               set_creg(ISTP,x)
-#define get_IST()                get_creg(ISTP)
+#define set_ist(x)               set_creg(ISTP,x)
+#define get_ist()                get_creg(ISTP)
 
 #ifdef __TMS320C6XPLUS__
 #define __dint()                 asm volatile (" DINT\n")

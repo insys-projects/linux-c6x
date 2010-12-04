@@ -239,7 +239,6 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			 * that size. mem=number can be used to
 			 * trim the existing memory map.
 			 */
-			unsigned long mem_size;
 			
 			mem_size = (unsigned long) memparse(from + 4, &from);
 			memory_end = PAGE_ALIGN(REGION_START(&_stext) + mem_size);
