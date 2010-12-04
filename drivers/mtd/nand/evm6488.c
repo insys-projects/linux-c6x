@@ -1,459 +1,362 @@
 /*
  *  drivers/mtd/nand/evm6488.c
  *
- *  NAND flash bit-bang driver for EVM6488 using GPIO
+ *  NAND driver for EVM6488 using GPIO
  *
- *  Copyright (C) 2009, 2010 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
+ *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Mark Salter <msalter@redhat.com>
+ *
+ *  Based on gpio.c:
+ *
+ * Updated, and converted to generic GPIO based driver by Russell King.
+ *
+ * Written by Ben Dooks <ben@simtec.co.uk>
+ *   Based on 2.4 version by Mark Whittaker
+ *
+ * © 2004 Simtec Electronics
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
 
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/gpio.h>
+#include <linux/io.h>
+#include <linux/delay.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
-#include <linux/delay.h>
-#include <asm/io.h>
-#include <asm/gpio.h>
+#include <linux/mtd/nand-evm6488.h>
 
-#undef NAND_DEBUG
-#ifdef NAND_DEBUG
-#define DPRINTK(ARGS...)                do { \
-		                                printk(KERN_DEBUG "<%s>: ",__FUNCTION__);printk(ARGS);	\
-	                                } while (0)
-#else
-#define DPRINTK( x... )
-#endif
+#define GPIO_NAND_CLE	8
+#define GPIO_NAND_ALE	9
+#define GPIO_NAND_NWE	10
+#define GPIO_NAND_RDY	11
+#define GPIO_NAND_NRE	12
+#define GPIO_NAND_NCE	13
+#define GPIO_NAND_NWP	14
 
-/* see datasheets (tR) */
-#define NAND_BIG_DELAY_US		20
-#define NAND_SMALL_DELAY_US		10
-#define NAND_SMALL_SIZE                 0x02000000
+#define xdelay() ndelay(12)
 
-#define USE_READY_BUSY_PIN
+struct gpiomtd {
+	struct mtd_info		mtd_info;
+	struct nand_chip	nand_chip;
+	struct gpio_nand_platdata plat;
+	struct gpio_controller *__iomem g;
+};
 
-/* DSP GPIO pins used to drive NAND chip  */
-#define NAND_CLE_GPIO_PIN 		(GPIO_PIN8)
-#define NAND_ALE_GPIO_PIN 		(GPIO_PIN9)
-#define NAND_NRE_GPIO_PIN 		(GPIO_PIN12)
-#define NAND_NWE_GPIO_PIN 		(GPIO_PIN10)
-#undef  NAND_NWP_GPIO_PIN               /* we do not use WP */
-#define NAND_RNB_GPIO_PIN               (GPIO_PIN11)
-#define NAND_NCE_GPIO_PIN               (GPIO_PIN13)
-
-#define NAND_SETNCE()                   gpio_pin_clear(NAND_NCE_GPIO_PIN)   /* nCE low */
-#define NAND_CLRNCE()                   gpio_pin_set(NAND_NCE_GPIO_PIN)     /* nCE high */
-
-//#define GPIO_MASK                       0x00003FFF /* we do not use GPIO 14 and 15 pins */
-#define GPIO_MASK                       0x00007FFF
-#define GPIO_OUTPORTCONF                0x00000800
-#define GPIO_INPORTCONF                 0x000008FF
-
-#define GPIO_DATAMASK                   GPIO_INPORTCONF
+#define gpio_nand_getpriv(x) container_of(x, struct gpiomtd, mtd_info)
 
 /*
- * MTD structure for EVM6488
+ * The generic GPIO interface doesn't provide an efficient way to
+ * read/write groups of GPIO lines as is needed for NAND data. The
+ * routines to do this are very specific to the C6X GPIO controller...
  */
-static struct mtd_info  *evm6488_mtd = NULL;
-
-#ifdef CONFIG_MTD_PARTITIONS
-/*
- * Define static partitions for flash devices
- */
-#if defined(CONFIG_ARCH_EVM6488)
-static struct mtd_partition partition_info_evm6488[] = {
-	{ name: "EVM6488 Nand Flash",
-	  offset: 0,
-	  size: 32*1024*1024 }
-};
-#elif defined(CONFIG_ARCH_BOARD_EVM6457) || defined(CONFIG_ARCH_BOARD_EVM6472) || defined(CONFIG_ARCH_BOARD_EVM6474L)
-static struct mtd_partition partition_info_evm6488[] = {
-	{ name: "EVM NAND Flash",
-	  offset: 0,
-	  size: 128 * 1024 * 1024 }
-};
-#endif
-
-#define NUM_PARTITIONS	1
-
-extern int parse_cmdline_partitions(struct mtd_info *master,
-				    struct mtd_partition **pparts,
-				    const char *mtd_id);
-#endif
-
-#ifdef NAND_DEBUG
-#define get_hrt() (get_cycles() & 0xffffffff)
-
-static inline void nand_dump(void)
+static inline u_char gpio_nand_read_data(struct gpiomtd *gpiomtd)
 {
-	u16 val = gpio_get_reg(GPIO_GPOUTDATA);
-	char cle, nce, nwe, ale, nre, nwp;
-	static unsigned long time_off = 0;
-	unsigned long delta;
-
-	if (val & (1 << NAND_CLE_GPIO_PIN))
-		cle = '1';
-	else
-		cle = '0';
-
-	if (val & (1 << NAND_NCE_GPIO_PIN))
-		nce = '1';
-	else
-		nce = '0';
-
-	if (val & (1 << NAND_ALE_GPIO_PIN))
-		ale = '1';
-	else
-		ale = '0';
-
-	if (val & (1 << NAND_NRE_GPIO_PIN))
-		nre = '1';
-	else
-		nre = '0';
-
-	if (val & (1 << NAND_NWE_GPIO_PIN))
-		nwe = '1';
-	else
-		nwe = '0';
-
-#ifdef NAND_NWP_GPIO_PIN
-	if (val & (1 << NAND_NWP_GPIO_PIN))
-		nwp = '1';
-	else
-		nwp = '0';
-#else
-	nwp = 'x';
-#endif
-	delta = get_hrt() - time_off;
-	time_off = get_hrt();
-
-	printk("NAND status (0x%x): ", val);
-	printk("CLE %c nCE %c nWE %c ALE %c nRE %c nWP %c data 0x%x time = 0x%lx\n",
-	       cle, nce, nwe, ale, nre, nwp, val & GPIO_DATAMASK, delta);
-}
-#else
-#define nand_dump()
-#endif
-
-/**
- * Write a 8bit data through GPIO
- */
-static inline void nand_write_data(u8 data)
-{
-        unsigned long flags;
-
-	local_irq_save(flags);
-
-	gpio_pin_clear(NAND_NWE_GPIO_PIN);
-
-	ndelay(12);
-
-	gpio_clear(GPIO_DATAMASK);
-	gpio_set(data);
-
-	ndelay(12);
-
-	gpio_pin_set(NAND_NWE_GPIO_PIN);
-
-	ndelay(12);
-
-	local_irq_restore(flags);
+	struct gpio_controller *__iomem g = gpiomtd->g;
+	return __raw_readl(&g->in_data);
 }
 
-/**
- * Read a 8bit data through GPIO
- */
-static inline u8 nand_read_data(void)
+static inline void gpio_nand_write_data(struct gpiomtd *gpiomtd, u_char val)
 {
-        unsigned long flags;
-	u8 val;
+	struct gpio_controller *__iomem g = gpiomtd->g;
+	__raw_writel(0xff, &g->clr_data);
+	__raw_writel(val, &g->set_data);
+}
 
-	local_irq_save(flags);
+static inline void gpio_nand_direction_out(struct gpiomtd *gpiomtd)
+{
+	struct gpio_controller *__iomem g = gpiomtd->g;
 
-	gpio_direction_set(GPIO_INPORTCONF, GPIO_MASK);
+	__dint();
+	__raw_writel(__raw_readl(&g->dir) & ~0xff, &g->dir);
+	__rint();
+}
 
-	gpio_pin_clear(NAND_NRE_GPIO_PIN);
+static inline void gpio_nand_direction_in(struct gpiomtd *gpiomtd)
+{
+	struct gpio_controller *__iomem g = gpiomtd->g;
 
-	ndelay(12);
+	__dint();
+	__raw_writel(__raw_readl(&g->dir) | 0xff, &g->dir);
+	__rint();
+}
 
-	val = (u8) (gpio_input() & GPIO_DATAMASK);
-	gpio_pin_set(NAND_NRE_GPIO_PIN);
+static inline u_char gpio_nand_read(struct gpiomtd *gpiomtd)
+{
+	u_char val;
 
-	ndelay(12);
-
-	gpio_direction_set(GPIO_OUTPORTCONF, GPIO_MASK);
-
-	ndelay(12);
-
-	local_irq_restore(flags);
+	gpio_set_value(GPIO_NAND_NRE, 0);
+	xdelay();
+	val = gpio_nand_read_data(gpiomtd);
+	gpio_set_value(GPIO_NAND_NRE, 1);
+	xdelay();
 
 	return val;
 }
 
-/**
- * nand_read_byte -  read one byte from the chip
- * @mtd:	MTD device structure
- *
- *  read function for 8bit buswith
- */
-static u_char nand_read_byte(struct mtd_info *mtd)
+static inline void gpio_nand_write(struct gpiomtd *gpiomtd, u_char val)
 {
-	u_char ret = 0;
 
-	ret = nand_read_data();
-
-	return ret;
+	gpio_set_value(GPIO_NAND_NWE, 0);
+	gpio_nand_write_data(gpiomtd, val);
+	xdelay();
+	gpio_set_value(GPIO_NAND_NWE, 1);
+	xdelay();
 }
 
-/**
- * nand_read_word -  read one word from the chip
- * @mtd:	MTD device structure
- *
- * read function for 16bit buswith without
- * endianess conversion
- */
-static u16 nand_read_word(struct mtd_info *mtd)
+static void gpio_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 {
-	u16 ret = 0;
-	u8  val1, val2;
+	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
 
-	val1 = nand_read_data();
-	val2 = nand_read_data();
-	ret = (val1 << 16) | (val2 & 0xff);
-
-	DPRINTK("val = 0x%x\n", ret);
-
-	return ret;
-}
-
-/**
- * nand_write_buf -  write buffer to chip
- * @mtd:	MTD device structure
- * @buf:	data buffer
- * @len:	number of bytes to write
- *
- *  write function for 8bit buswith
- */
-static void nand_write_buf(struct mtd_info *mtd, const u_char *buf, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-		nand_write_data(buf[i]);
-}
-
-/**
- * nand_read_buf -  read chip data into buffer
- * @mtd:	MTD device structure
- * @buf:	buffer to store date
- * @len:	number of bytes to read
- *
- *  read function for 8bit buswith
- */
-static void nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-		buf[i] = nand_read_data();
-}
-
-/**
- * nand_verify_buf -  Verify chip data against buffer
- * @mtd:	MTD device structure
- * @buf:	buffer containing the data to compare
- * @len:	number of bytes to compare
- *
- *  verify function for 8bit buswith
- */
-static int nand_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++)
-	        if (buf[i] != nand_read_data())
-		        return -EFAULT;
-
-	return 0;
-}
-
-/*
- *	hardware specific access to control-lines
- */
-static void evm6488_hwcontrol(struct mtd_info *mtdinfo, int cmd, unsigned int ctrl)
-{
 	if (ctrl & NAND_CTRL_CHANGE) {
-		if (ctrl & NAND_NCE)
-			gpio_pin_clear(NAND_NCE_GPIO_PIN);
-		else
-			gpio_pin_set(NAND_NCE_GPIO_PIN);
+		gpio_set_value(GPIO_NAND_NCE, !(ctrl & NAND_NCE));
+		gpio_set_value(GPIO_NAND_CLE, !!(ctrl & NAND_CLE));
+		gpio_set_value(GPIO_NAND_ALE, !!(ctrl & NAND_ALE));
+	}
+	if (cmd == NAND_CMD_NONE)
+		return;
 
-	        if (ctrl & NAND_CLE)
-			gpio_pin_set(NAND_CLE_GPIO_PIN);
-		else
-			gpio_pin_clear(NAND_CLE_GPIO_PIN);
+	gpio_nand_write(gpiomtd, cmd);
+}
 
-	        if (ctrl & NAND_ALE)
-			gpio_pin_set(NAND_ALE_GPIO_PIN);
-		else
-			gpio_pin_clear(NAND_ALE_GPIO_PIN);
+static void gpio_nand_writebuf(struct mtd_info *mtd, const u_char *buf, int len)
+{
+	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
+
+	while (len-- > 0) {
+		gpio_set_value(GPIO_NAND_NWE, 0);
+		gpio_nand_write_data(gpiomtd, *buf++);
+		xdelay();
+		gpio_set_value(GPIO_NAND_NWE, 1);
+		xdelay();
+	}
+}
+
+static void gpio_nand_readbuf(struct mtd_info *mtd, u_char *buf, int len)
+{
+	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
+
+	gpio_nand_direction_in(gpiomtd);
+
+	while (len-- > 0)
+		*buf++ = gpio_nand_read(gpiomtd);
+
+	gpio_nand_direction_out(gpiomtd);
+}
+
+static uint8_t gpio_nand_read_byte(struct mtd_info *mtd)
+{
+	uint8_t val;
+
+	gpio_nand_readbuf(mtd, &val, 1);
+
+	return val;
+}
+
+static int gpio_nand_verifybuf(struct mtd_info *mtd, const u_char *buf, int len)
+{
+	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
+	unsigned char read, *p = (unsigned char *) buf;
+	int i, err = 0;
+
+	gpio_nand_direction_in(gpiomtd);
+
+	for (i = 0; i < len; i++) {
+		read = gpio_nand_read(gpiomtd);
+		if (read != p[i]) {
+			pr_debug("%s: err at %d (read %04x vs %04x)\n",
+			       __func__, i, read, p[i]);
+			err = -EFAULT;
+		}
 	}
 
-	if (cmd != NAND_CMD_NONE)
-		nand_write_data(cmd);
+	gpio_nand_direction_out(gpiomtd);
+
+	return err;
 }
 
-#ifdef USE_READY_BUSY_PIN
-/*
- * Read device ready pin
- */
-static int evm6488_device_ready(struct mtd_info *minfo)
+static int gpio_nand_devready(struct mtd_info *mtd)
 {
-	if (gpio_input() & (1 << NAND_RNB_GPIO_PIN))
-		return 1;
+	return gpio_get_value(GPIO_NAND_RDY);
+}
+
+static int __devexit gpio_nand_remove(struct platform_device *dev)
+{
+	struct gpiomtd *gpiomtd = platform_get_drvdata(dev);
+	int i;
+
+	nand_release(&gpiomtd->mtd_info);
+
+	gpio_set_value(GPIO_NAND_NCE, 1);
+
+	gpio_free(GPIO_NAND_CLE);
+	gpio_free(GPIO_NAND_ALE);
+	gpio_free(GPIO_NAND_NCE);
+	gpio_free(GPIO_NAND_RDY);
+	gpio_free(GPIO_NAND_NWE);
+	gpio_free(GPIO_NAND_NRE);
+	gpio_free(GPIO_NAND_NWP);
+
+	/* NAND data lines */
+	for (i = 0; i < 8; i++)
+		gpio_free(i);
+
+	kfree(gpiomtd);
+
 	return 0;
 }
 
-#endif
-
-#ifdef CONFIG_MTD_PARTITIONS
-const char *part_probes[] = { "cmdlinepart", NULL };
-#endif
-
-/*
- * Main initialization routine
- */
-static int __init evm6488_nand_init (void)
+static int __devinit gpio_nand_probe(struct platform_device *dev)
 {
-	struct nand_chip     *this;
-	const char           *part_type = 0;
-	int                   mtd_parts_nb = 0;
-	struct mtd_partition *mtd_parts = 0;
-        unsigned long         flags;
+	struct gpiomtd *gpiomtd;
+	struct nand_chip *this;
+	int i, ret;
 
-	DPRINTK("starting init\n");
+	if (!dev->dev.platform_data)
+		return -EINVAL;
 
-	/* Allocate memory for MTD device structure and private data */
-	evm6488_mtd = kmalloc(sizeof(struct mtd_info) +
-			      sizeof(struct nand_chip), GFP_KERNEL);
-	if (!evm6488_mtd) {
-		printk("Unable to allocate EVM6488 NAND MTD device structure.\n");
+	gpiomtd = kzalloc(sizeof(*gpiomtd), GFP_KERNEL);
+	if (gpiomtd == NULL) {
+		dev_err(&dev->dev, "failed to create NAND MTD\n");
 		return -ENOMEM;
 	}
 
-	/* Get pointer to private data */
-	this = (struct nand_chip *) (&evm6488_mtd[1]);
+	memcpy(&gpiomtd->plat, dev->dev.platform_data, sizeof(gpiomtd->plat));
+	this = &gpiomtd->nand_chip;
 
-	/* Initialize structures */
-	memset((char *) evm6488_mtd, 0, sizeof(struct mtd_info));
-	memset((char *) this, 0, sizeof(struct nand_chip));
+	gpiomtd->g = __gpio_to_controller(0);
 
-	/* Link the private data with the MTD structure */
-	evm6488_mtd->priv = this;
+	ret = gpio_request(GPIO_NAND_NWP, "NAND MISC");
+	if (ret)
+		goto err_nwp;
+	gpio_direction_output(GPIO_NAND_NWP, 1);
 
-	printk("EVM6488 NAND Controller\n");
+	ret = gpio_request(GPIO_NAND_NCE, "NAND NCE");
+	if (ret)
+		goto err_nce;
+	gpio_direction_output(GPIO_NAND_NCE, 1);
 
-	/* Init GPIO pins */
-	local_irq_save(flags);
+	ret = gpio_request(GPIO_NAND_ALE, "NAND ALE");
+	if (ret)
+		goto err_ale;
+	gpio_direction_output(GPIO_NAND_ALE, 0);
 
-	gpio_direction_set(GPIO_OUTPORTCONF, GPIO_MASK);
-	gpio_pin_set(GPIO_PIN14);
-	gpio_pin_clear(NAND_CLE_GPIO_PIN);   /* CLE low */
-	NAND_CLRNCE();                       /* nCE high */
-	gpio_pin_set(NAND_NWE_GPIO_PIN);     /* nWE high */
-	gpio_pin_clear(NAND_ALE_GPIO_PIN);   /* ALE low */
-	gpio_pin_set(NAND_NRE_GPIO_PIN);     /* nRE high */
+	ret = gpio_request(GPIO_NAND_CLE, "NAND CLE");
+	if (ret)
+		goto err_cle;
+	gpio_direction_output(GPIO_NAND_CLE, 0);
 
-	nand_dump();
+	ret = gpio_request(GPIO_NAND_RDY, "NAND RDY");
+	if (ret)
+		goto err_rdy;
+	gpio_direction_input(GPIO_NAND_RDY);
 
-	local_irq_restore(flags);
+	ret = gpio_request(GPIO_NAND_NWE, "NAND NWE");
+	if (ret)
+		goto err_nwe;
+	gpio_direction_output(GPIO_NAND_NWE, 1);
 
-#ifdef NAND_NWP_GPIO_PIN
-	gpio_pin_set(NAND_NWP_GPIO_PIN);     /* nWP high */
-#endif
-	nand_dump();
+	ret = gpio_request(GPIO_NAND_NRE, "NAND NRE");
+	if (ret)
+		goto err_nre;
+	gpio_direction_output(GPIO_NAND_NRE, 1);
 
-	/* No mapped I/O, use GPIO instead  */
-	this->IO_ADDR_R  = NULL;
-	this->IO_ADDR_W  = NULL;
+	for (i = 0; i < 8; i++) {
+		ret = gpio_request(i, "NAND Data");
+		if (ret) {
+			while (--i > 0)
+				gpio_free(i);
+			goto err_wp;
+		}
+	}
+	for (i = 0; i < 8; i++)
+		gpio_direction_output(i, 0);
 
-	/* Insert callbacks */
-	this->cmd_ctrl   = evm6488_hwcontrol;
-#ifdef USE_READY_BUSY_PIN
-	this->dev_ready  = evm6488_device_ready;
-#endif
-	this->chip_delay = NAND_BIG_DELAY_US;
-	this->ecc.mode   = NAND_ECC_SOFT;	/* ECC mode */
-	this->read_byte  = nand_read_byte;
-//	this->write_byte = nand_write_byte;
-//	this->write_word = nand_write_word;
-	this->read_word  = nand_read_word;
-	this->write_buf  = nand_write_buf;
-	this->read_buf   = nand_read_buf;
-	this->verify_buf = nand_verify_buf;
-	this->options   |= NAND_COPYBACK;
+	this->ecc.mode   = NAND_ECC_SOFT;
+	this->options    = gpiomtd->plat.options;
+	this->chip_delay = gpiomtd->plat.chip_delay;
 
-	DPRINTK("scanning\n");
+	/* install our routines */
+	this->cmd_ctrl   = gpio_nand_cmd_ctrl;
+	this->dev_ready  = gpio_nand_devready;
 
-	/* Scan to find existence of the device (it could not be mounted) */
-	if (nand_scan(evm6488_mtd, 1)) {
-		kfree(evm6488_mtd);
-		return -ENXIO;
+	this->read_buf   = gpio_nand_readbuf;
+	this->read_byte  = gpio_nand_read_byte;
+	this->write_buf  = gpio_nand_writebuf;
+	this->verify_buf = gpio_nand_verifybuf;
+
+	/* set the mtd private data for the nand driver */
+	gpiomtd->mtd_info.priv = this;
+	gpiomtd->mtd_info.owner = THIS_MODULE;
+
+	if (nand_scan(&gpiomtd->mtd_info, 1)) {
+		dev_err(&dev->dev, "no nand chips found?\n");
+		ret = -ENXIO;
+		goto err_data;
 	}
 
-	evm6488_mtd->owner = THIS_MODULE;
+	if (gpiomtd->plat.adjust_parts)
+		gpiomtd->plat.adjust_parts(&gpiomtd->plat,
+					   gpiomtd->mtd_info.size);
 
-	DPRINTK("scanning finished\n");
+	add_mtd_partitions(&gpiomtd->mtd_info, gpiomtd->plat.parts,
+			   gpiomtd->plat.num_parts);
+	platform_set_drvdata(dev, gpiomtd);
 
-#ifndef USE_READY_BUSY_PIN
-	/* Adjust delay if necessary */
-	if (evm6488_mtd->size == NAND_SMALL_SIZE)
-		this->chip_delay = NAND_SMALL_DELAY_US;
-#endif
-
-#ifdef CONFIG_MTD_PARTITIONS
-	evm6488_mtd->name = "EVM-NAND";
-	mtd_parts_nb = parse_mtd_partitions(evm6488_mtd, part_probes, &mtd_parts, 0);
-	if (mtd_parts_nb > 0)
-		part_type = "command line";
-	else
-		mtd_parts_nb = 0;
-
-	if (mtd_parts_nb == 0)
-	{
-		mtd_parts    = partition_info_evm6488;
-		mtd_parts_nb = NUM_PARTITIONS;
-		part_type    = "static";
-	}
-
-	/* Register the partitions */
-	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
-	if (add_mtd_partitions(evm6488_mtd, mtd_parts, mtd_parts_nb)) {
-		printk(KERN_ERR "can't register partitions\n");
-	}
-#endif
 	return 0;
-}
-module_init(evm6488_nand_init);
 
-/*
- * Clean up routine
- */
-static void __exit evm6488_nand_cleanup (void)
+err_data:
+	for (i = 0; i < 8; i++)
+		gpio_free(i);
+err_wp:
+	gpio_free(GPIO_NAND_NRE);
+err_nre:
+	gpio_free(GPIO_NAND_NWE);
+err_nwe:
+	gpio_free(GPIO_NAND_RDY);
+err_rdy:
+	gpio_free(GPIO_NAND_CLE);
+err_cle:
+	gpio_free(GPIO_NAND_ALE);
+err_ale:
+	gpio_free(GPIO_NAND_NCE);
+err_nce:
+	gpio_free(GPIO_NAND_NWP);
+err_nwp:
+	kfree(gpiomtd);
+	return ret;
+}
+
+static struct platform_driver gpio_nand_driver = {
+	.probe		= gpio_nand_probe,
+	.remove		= gpio_nand_remove,
+	.driver		= {
+		.name	= "nand-evm6488",
+	},
+};
+
+static int __init gpio_nand_init(void)
 {
-	/* Release resources, unregister device(s) */
-	nand_release(evm6488_mtd);
+	printk(KERN_INFO "GPIO NAND driver for EVM6488\n");
 
-	/* Free the MTD device structure */
-	kfree (evm6488_mtd);
+	return platform_driver_register(&gpio_nand_driver);
 }
-module_exit(evm6488_nand_cleanup);
+
+static void __exit gpio_nand_exit(void)
+{
+	platform_driver_unregister(&gpio_nand_driver);
+}
+
+module_init(gpio_nand_init);
+module_exit(gpio_nand_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Aurelien Jacquiot <aurelien.jacquiot@vlx.com>");
-MODULE_DESCRIPTION("MTD map driver for EVM6488 board");
+MODULE_AUTHOR("Mark Salter <msalter@redhat.com>");
+MODULE_DESCRIPTION("GPIO NAND Driver for EVM6488");
