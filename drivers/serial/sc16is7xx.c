@@ -31,6 +31,7 @@
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/delay.h>
+#include <linux/kfifo.h>
 
 #include <asm/serial.h>
 
@@ -38,30 +39,45 @@
 #define TX_LOADSZ	64
 #define PASS_LIMIT	256
 #define BOTH_EMPTY 	(UART_LSR_TEMT | UART_LSR_THRE)
+#define MAX_WRITE_CHARS 4096
 
 static struct workqueue_struct *wq;
 
 struct uart_sc16_port {
 	struct uart_port	port;
 	struct timer_list	timer;
-	struct mutex		xfer_lock;
 	struct work_struct	work;
 	struct work_struct	backup_work;
 	unsigned char		ier;
 	unsigned char		lcr;
+	unsigned char		fcr;
+	unsigned char		efr;
 	unsigned char		mcr;
+	unsigned char		msr;
+	unsigned short		quot;  /* baudrate quotient */
 	/*
 	 * Some bits in registers are cleared on a read, so they must
 	 * be saved whenever the register is read but the bits will not
 	 * be immediately processed.
 	 */
-#define LSR_SAVE_FLAGS UART_LSR_BRK_ERROR_BITS
-	unsigned char		lsr_saved_flags;
 #define MSR_SAVE_FLAGS UART_MSR_ANY_DELTA
 	unsigned char		msr_saved_flags;
 
 	unsigned char		mcr_mask;	/* mask of user bits */
 	unsigned char		mcr_force;	/* mask of forced bits */
+	unsigned int		started:1;
+	unsigned int		mcr_changed:1;
+	unsigned int		set_termios:1;
+	unsigned int		msi_on:1;
+	unsigned int		tx_empty:1;
+	unsigned int		tx_stop_toggle:1;
+	unsigned int		tx_stopped:1;
+	unsigned int		rx_stop:1;
+	unsigned int		irq_in_progress : 1;
+	unsigned int		setbreak:1;
+	unsigned int		clrbreak:1;
+	spinlock_t		wrlock;
+	struct kfifo		write_fifo;
 };
 
 static const struct i2c_device_id sc16_ids[] = {
@@ -86,7 +102,9 @@ static inline int i2c_write_reg(struct i2c_client *client, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf[] = { reg, data };
-	struct i2c_msg msg = { .addr = client->addr, .flags = 0, .buf = buf, .len = 2 };
+	struct i2c_msg msg = {
+		.addr = client->addr, .flags = 0, .buf = buf, .len = 2
+	};
 
 	ret = i2c_transfer(client->adapter, &msg, 1);
 	if (ret != 1)
@@ -103,8 +121,14 @@ static inline int i2c_read_reg(struct i2c_client *client, u8 reg, u8 *p_data)
 	u8 b0[] = { reg };
 	u8 b1[] = { 0 };
 	struct i2c_msg msg[] = {
-		{ .addr = client->addr, .flags = 0, .buf = b0, .len = 1 },
-		{ .addr = client->addr, .flags = I2C_M_RD, .buf = b1, .len = 1 },
+		{
+			.addr = client->addr, .flags = 0,
+			.buf = b0, .len = 1
+		},
+		{
+			.addr = client->addr, .flags = I2C_M_RD,
+			.buf = b1, .len = 1
+		},
 	};
 
 	ret = i2c_transfer(client->adapter, msg, 2);
@@ -122,9 +146,11 @@ static unsigned int sc16_serial_in(struct uart_port *port, int reg)
 {
 	struct sc16_chip *chip = port->private_data;
 	int ret;
-	u8 val;
+	u8 val, addr;
 
-	ret = i2c_read_reg(chip->client, (reg << 3) | (port->iobase << 1), &val);
+	addr = (reg << 3) | (port->iobase << 1);
+
+	ret = i2c_read_reg(chip->client, addr, &val);
 	if (ret == 0)
 		return val;
 
@@ -136,8 +162,9 @@ static void sc16_serial_out(struct uart_port *port, int reg, int val)
 {
 	struct sc16_chip *chip = port->private_data;
 	int ret;
+	u8 addr = (reg << 3) | (port->iobase << 1);
 
-	ret = i2c_write_reg(chip->client, (reg << 3) | (port->iobase << 1), val);
+	ret = i2c_write_reg(chip->client, addr, val);
 	if (ret)
 		printk(KERN_DEBUG "sc16_serial_out: i2c_write_reg failed!\n");
 }
@@ -192,9 +219,6 @@ static int __devinit sc16_probe(struct i2c_client *client,
 	}
 
 	return 0;
-
-	kfree(chip);
-	return ret;
 }
 
 static int sc16_remove(struct i2c_client *client)
@@ -242,167 +266,369 @@ static void serialsc16_clear_fifos(struct uart_sc16_port *p)
  */
 static void serialsc16_set_sleep(struct uart_sc16_port *p, int sleep)
 {
+#if 0
 	serial_out(p, UART_EFR, UART_EFR_ECB);
 	serial_out(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
 	serial_out(p, UART_EFR, 0);
-}
-
-static inline void __stop_tx(struct uart_sc16_port *p)
-{
-	if (p->ier & UART_IER_THRI) {
-		p->ier &= ~UART_IER_THRI;
-		serial_out(p, UART_IER, p->ier);
-	}
+#endif
 }
 
 static void serialsc16_stop_tx(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 
-	__stop_tx(up);
+	if (up->tx_stopped) {
+		/* already stopped. don't let that change */
+		up->tx_stop_toggle = 0;
+	} else {
+		up->tx_stop_toggle = 1;
+		queue_work(wq, &up->work);
+	}
+}
+
+static void handle_xmit_circ_buffer(struct uart_sc16_port *up)
+{
+	struct circ_buf *xmit = &up->port.state->xmit;
+	unsigned int avail;
+	unsigned long flags;
+
+	spin_lock_irqsave(&up->wrlock, flags);
+	avail = kfifo_avail(&up->write_fifo);
+	if (avail == 0) {
+		spin_unlock_irqrestore(&up->wrlock, flags);
+		up->tx_empty = 0;
+		return;
+	}
+
+	if (up->port.x_char) {
+		kfifo_in(&up->write_fifo, &up->port.x_char, 1);
+		spin_unlock_irqrestore(&up->wrlock, flags);
+		up->tx_empty = (avail - 1) > 0;
+		up->port.icount.tx++;
+		up->port.x_char = 0;
+		return;
+	}
+
+	while (!uart_circ_empty(xmit) &&
+	       kfifo_in(&up->write_fifo, &xmit->buf[xmit->tail], 1)) {
+		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+		up->port.icount.tx++;
+	}
+
+	up->tx_empty = kfifo_avail(&up->write_fifo) != 0;
+	spin_unlock_irqrestore(&up->wrlock, flags);
 }
 
 static void serialsc16_start_tx(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 
-	if (!(up->ier & UART_IER_THRI)) {
-		up->ier |= UART_IER_THRI;
-		serial_out(up, UART_IER, up->ier);
-	}
+	handle_xmit_circ_buffer(up);
+
+	if (up->tx_stopped) {
+		up->tx_stop_toggle = 1;
+		queue_work(wq, &up->work);
+	} else
+		up->tx_stop_toggle = 0;
 }
 
 static void serialsc16_stop_rx(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 
-	up->ier &= ~UART_IER_RLSI;
-	up->port.read_status_mask &= ~UART_LSR_DR;
-	serial_out(up, UART_IER, up->ier);
+	up->rx_stop = 1;
+	queue_work(wq, &up->work);
 }
 
 static void serialsc16_enable_ms(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 
-	up->ier |= UART_IER_MSI;
-	serial_out(up, UART_IER, up->ier);
+	up->msi_on = 1;
+	queue_work(wq, &up->work);
 }
 
-static void
-receive_chars(struct uart_sc16_port *up, unsigned int *status)
+static unsigned int sc16_set_mctrl(struct uart_sc16_port *up, unsigned mctrl)
+{
+	unsigned char mcr = 0;
+
+	if (mctrl & TIOCM_RTS)
+		mcr |= UART_MCR_RTS;
+	if (mctrl & TIOCM_DTR)
+		mcr |= UART_MCR_DTR;
+	if (mctrl & TIOCM_OUT1)
+		mcr |= UART_MCR_OUT1;
+	if (mctrl & TIOCM_OUT2)
+		mcr |= UART_MCR_OUT2;
+	if (mctrl & TIOCM_LOOP)
+		mcr |= UART_MCR_LOOP;
+
+	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
+
+	return mcr;
+}
+
+static void receive_chars(struct uart_sc16_port *up, unsigned int *status)
 {
 	struct tty_struct *tty = up->port.state->port.tty;
 	unsigned char ch, lsr = *status;
+	unsigned long flags;
 	int max_count = 256;
 	char flag;
 
+	spin_lock_irqsave(&up->port.lock, flags);
 	do {
-		if (likely(lsr & UART_LSR_DR))
-			ch = serial_in(up, UART_RX);
-		else
-			/*
-			 * Intel 82571 has a Serial Over Lan device that will
-			 * set UART_LSR_BI without setting UART_LSR_DR when
-			 * it receives a break. To avoid reading from the
-			 * receive buffer without UART_LSR_DR bit set, we
-			 * just force the read character to be 0
-			 */
-			ch = 0;
+		spin_unlock_irqrestore(&up->port.lock, flags);
+		ch = serial_in(up, UART_RX);
+		spin_lock_irqsave(&up->port.lock, flags);
 
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
-		lsr |= up->lsr_saved_flags;
-		up->lsr_saved_flags = 0;
-
 		if (uart_handle_sysrq_char(&up->port, ch))
 			goto ignore_char;
+
+		if (unlikely(lsr & (UART_LSR_BI | UART_LSR_PE |
+				       UART_LSR_FE | UART_LSR_OE))) {
+			/*
+			 * For statistics only
+			 */
+			if (lsr & UART_LSR_BI) {
+				lsr &= ~(UART_LSR_FE | UART_LSR_PE);
+				up->port.icount.brk++;
+				/*
+				 * We do the SysRQ and SAK checking
+				 * here because otherwise the break
+				 * may get masked by ignore_status_mask
+				 * or read_status_mask.
+				 */
+				if (uart_handle_break(&up->port))
+					goto ignore_char;
+			} else if (lsr & UART_LSR_PE)
+				up->port.icount.parity++;
+			else if (lsr & UART_LSR_FE)
+				up->port.icount.frame++;
+			if (lsr & UART_LSR_OE)
+				up->port.icount.overrun++;
+
+			/*
+			 * Mask off conditions which should be ignored.
+			 */
+			lsr &= up->port.read_status_mask;
+
+			if (lsr & UART_LSR_BI)
+				flag = TTY_BREAK;
+			else if (lsr & UART_LSR_PE)
+				flag = TTY_PARITY;
+			else if (lsr & UART_LSR_FE)
+				flag = TTY_FRAME;
+		}
 
 		uart_insert_char(&up->port, lsr, UART_LSR_OE, ch, flag);
 
 ignore_char:
+		spin_unlock_irqrestore(&up->port.lock, flags);
 		lsr = serial_in(up, UART_LSR);
-	} while ((lsr & (UART_LSR_DR | UART_LSR_BI)) && (max_count-- > 0));
+		spin_lock_irqsave(&up->port.lock, flags);
+	} while ((lsr & UART_LSR_DR) && (max_count-- > 0));
 	tty_flip_buffer_push(tty);
 	*status = lsr;
+	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-static void transmit_chars(struct uart_sc16_port *up)
+static void sc16_wakeup_tty(struct uart_sc16_port *up)
 {
-	struct circ_buf *xmit = &up->port.state->xmit;
-	int count;
-
-	if (up->port.x_char) {
-		serial_out(up, UART_TX, up->port.x_char);
-		up->port.icount.tx++;
-		up->port.x_char = 0;
-		return;
-	}
-	if (uart_tx_stopped(&up->port)) {
-		serialsc16_stop_tx(&up->port);
-		return;
-	}
-	if (uart_circ_empty(xmit)) {
-		__stop_tx(up);
-		return;
-	}
-
-	count = TX_LOADSZ;
-	do {
-		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
-		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-		up->port.icount.tx++;
-		if (uart_circ_empty(xmit))
-			break;
-	} while (--count > 0);
-
-	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_write_wakeup(&up->port);
-
-	if (uart_circ_empty(xmit))
-		__stop_tx(up);
+	struct tty_struct *tty = tty_port_tty_get(&up->port.state->port);
+	if (tty)
+		tty_wakeup(tty);
+	tty_kref_put(tty);
 }
 
-static unsigned int check_modem_status(struct uart_sc16_port *up)
+static void transmit_chars(struct uart_sc16_port *up, unsigned int *status)
 {
-	unsigned int status = serial_in(up, UART_MSR);
+	unsigned char ch, lsr = *status;
+	int sent = 0;
 
-	status |= up->msr_saved_flags;
+	while ((lsr & UART_LSR_THRE) &&
+	       kfifo_out_locked(&up->write_fifo, &ch, 1, &up->wrlock)) {
+		serial_out(up, UART_TX, ch);
+		lsr = serial_in(up, UART_LSR);
+		sent = 1;
+	}
+	*status = lsr;
+
+	if (sent)
+		sc16_wakeup_tty(up);
+}
+
+static unsigned int check_modem_status(struct uart_sc16_port *up, unsigned msr)
+{
+	msr |= up->msr_saved_flags;
 	up->msr_saved_flags = 0;
-	if (status & UART_MSR_ANY_DELTA && up->ier & UART_IER_MSI &&
+	if (msr & UART_MSR_ANY_DELTA && up->ier & UART_IER_MSI &&
 	    up->port.state != NULL) {
-		if (status & UART_MSR_TERI)
+		if (msr & UART_MSR_TERI)
 			up->port.icount.rng++;
-		if (status & UART_MSR_DDSR)
+		if (msr & UART_MSR_DDSR)
 			up->port.icount.dsr++;
-		if (status & UART_MSR_DDCD)
-			uart_handle_dcd_change(&up->port, status & UART_MSR_DCD);
-		if (status & UART_MSR_DCTS)
-			uart_handle_cts_change(&up->port, status & UART_MSR_CTS);
+		if (msr & UART_MSR_DDCD)
+			uart_handle_dcd_change(&up->port, msr & UART_MSR_DCD);
+		if (msr & UART_MSR_DCTS)
+			uart_handle_cts_change(&up->port, msr & UART_MSR_CTS);
 
 		wake_up_interruptible(&up->port.state->port.delta_msr_wait);
 	}
 
-	return status;
+	return msr;
+}
+
+static int write_fifo_is_empty(struct uart_sc16_port *up)
+{
+	unsigned long flags;
+	int is_empty;
+
+	spin_lock_irqsave(&up->wrlock, flags);
+	is_empty = kfifo_is_empty(&up->write_fifo);
+	spin_unlock_irqrestore(&up->wrlock, flags);
+
+	return is_empty;
 }
 
 
+/*
+ * This is the worker thread.
+ *
+ * All access to/from the I2C-connected UART is done from here since the I2C
+ * bus interfaces can and will sleep.
+ */
 static void sc16_do_work(struct uart_sc16_port *up)
 {
 	unsigned int status;
+	unsigned long flags;
+	unsigned char ch, iir;
+	struct circ_buf *xmit = &up->port.state->xmit;
 
-	mutex_lock(&up->xfer_lock);
+	spin_lock_irqsave(&up->port.lock, flags);
+	if (!up->started) {
+		up->msr_saved_flags = 0;
 
-	status = serial_in(up, UART_LSR);
+		spin_unlock_irqrestore(&up->port.lock, flags);
+		serialsc16_clear_fifos(up);
+		(void) serial_in(up, UART_LSR);
+		(void) serial_in(up, UART_RX);
+		(void) serial_in(up, UART_IIR);
+		(void) serial_in(up, UART_MSR);
+		serial_out(up, UART_LCR, UART_LCR_WLEN8);
+		serial_out(up, UART_IER, up->ier);
+		spin_lock_irqsave(&up->port.lock, flags);
+		up->started = 1;
+	}
 
-	if (status & (UART_LSR_DR | UART_LSR_BI))
-		receive_chars(up, &status);
-	check_modem_status(up);
-	if (status & UART_LSR_THRE)
-		transmit_chars(up);
+	do {
+		if (up->set_termios) {
+			unsigned char mcr, efr, fcr, lcr, ier;
+			unsigned short quot;
 
-	mutex_unlock(&up->xfer_lock);
+			efr = up->efr;
+			lcr = up->lcr;
+			fcr = up->fcr;
+			ier = up->ier;
+			quot = up->quot;
+			mcr = up->mcr = sc16_set_mctrl(up, up->port.mctrl);
+			up->set_termios = 0;
+
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			serial_out(up, UART_LCR, 0xBF);
+			serial_out(up, UART_EFR, efr);
+			serial_out(up, UART_LCR, up->lcr | UART_LCR_DLAB);
+			serial_dl_write(up, quot);
+			serial_out(up, UART_LCR, up->lcr);
+			if (fcr & UART_FCR_ENABLE_FIFO)
+				serial_out(up, UART_FCR, UART_FCR_ENABLE_FIFO);
+			udelay(100);
+			serial_out(up, UART_FCR, fcr);
+			udelay(100);
+			serial_out(up, UART_MCR, mcr);
+			serial_out(up, UART_IER, ier);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		if (up->mcr_changed) {
+			up->mcr_changed = 0;
+			ch = up->mcr;
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			serial_out(up, UART_MCR, ch);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		if (up->rx_stop && (up->ier & (UART_IER_RLSI | UART_IER_RDI))) {
+			up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+			ch = up->ier;
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			serial_out(up, UART_IER, ch);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		if (up->tx_stop_toggle) {
+			/* changing state */
+			if (up->tx_stopped) {
+				up->ier |= UART_IER_THRI;
+				up->tx_stopped = 0;
+			} else {
+				up->ier &= ~UART_IER_THRI;
+				up->tx_stopped = 1;
+			}
+			up->tx_stop_toggle = 0;
+			ch = up->ier;
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			serial_out(up, UART_IER, ch);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		spin_unlock_irqrestore(&up->port.lock, flags);
+		status = serial_in(up, UART_LSR);
+		spin_lock_irqsave(&up->port.lock, flags);
+
+		if (status & UART_LSR_DR) {
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			receive_chars(up, &status);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		if (status & UART_LSR_THRE) {
+			handle_xmit_circ_buffer(up);
+			spin_unlock_irqrestore(&up->port.lock, flags);
+			transmit_chars(up, &status);
+			spin_lock_irqsave(&up->port.lock, flags);
+		}
+
+		handle_xmit_circ_buffer(up);
+
+		if ((write_fifo_is_empty(up)
+		     && uart_circ_empty(&up->port.state->xmit)) ||
+		    uart_tx_stopped(&up->port)) {
+			up->tx_stop_toggle = 0;
+			if (!up->tx_stopped) {
+				up->tx_stopped = 1;
+				up->ier &= ~UART_IER_THRI;
+				ch = up->ier;
+				spin_unlock_irqrestore(&up->port.lock, flags);
+				serial_out(up, UART_IER, ch);
+				spin_lock_irqsave(&up->port.lock, flags);
+			}
+		}
+
+		spin_unlock_irqrestore(&up->port.lock, flags);
+		iir = serial_in(up, UART_IIR);
+		spin_lock_irqsave(&up->port.lock, flags);
+	} while ((iir & UART_IIR_NO_INT) == 0);
+
+	spin_unlock_irqrestore(&up->port.lock, flags);
+	status = serial_in(up, UART_MSR);
+	spin_lock_irqsave(&up->port.lock, flags);
+
+	up->msr = check_modem_status(up, status);
+	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 /*
@@ -410,15 +636,24 @@ static void sc16_do_work(struct uart_sc16_port *up)
  */
 static void sc16_work(struct work_struct *work)
 {
-	struct uart_sc16_port *up = container_of(work, struct uart_sc16_port, work);
+	struct uart_sc16_port *up = container_of(work, struct uart_sc16_port,
+						 work);
+	unsigned long flags;
 
 	sc16_do_work(up);
-	enable_irq(up->port.irq);
+
+	spin_lock_irqsave(&up->port.lock, flags);
+	if (up->irq_in_progress) {
+		enable_irq(up->port.irq);
+		up->irq_in_progress = 0;
+	}
+	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static void sc16_backup_work(struct work_struct *work)
 {
-	struct uart_sc16_port *up = container_of(work, struct uart_sc16_port, backup_work);
+	struct uart_sc16_port *up = container_of(work, struct uart_sc16_port,
+						 backup_work);
 
 	sc16_do_work(up);
 }
@@ -426,12 +661,16 @@ static void sc16_backup_work(struct work_struct *work)
 /*
  * Just start the workqueue thread to handle the interrupt
  */
-static irqreturn_t serialsc16_interrupt(int irq, void *dev_id)
+irqreturn_t serialsc16_interrupt(int irq, void *dev_id)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)dev_id;
 
 	/* Acknowledge, clear *AND* mask the interrupt... */
+	spin_lock(&up->port.lock);
 	disable_irq_nosync(irq);
+	up->irq_in_progress = 1;
+	spin_unlock(&up->port.lock);
+
 	queue_work(wq, &up->work);
 	return IRQ_HANDLED;
 }
@@ -441,7 +680,6 @@ static inline int poll_timeout(int timeout)
 {
 	return timeout > 6 ? (timeout / 2 - 2) : 1;
 }
-
 
 static void serialsc16_backup_timeout(unsigned long data)
 {
@@ -457,14 +695,8 @@ static void serialsc16_backup_timeout(unsigned long data)
 static unsigned int serialsc16_tx_empty(struct uart_port *port)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned int lsr;
 
-	mutex_lock(&up->xfer_lock);
-	lsr = serial_in(up, UART_LSR);
-	up->lsr_saved_flags |= lsr & LSR_SAVE_FLAGS;
-	mutex_unlock(&up->xfer_lock);
-
-	return (lsr & BOTH_EMPTY) == BOTH_EMPTY ? TIOCSER_TEMT : 0;
+	return up->tx_empty ? TIOCSER_TEMT : 0;
 }
 
 static unsigned int serialsc16_get_mctrl(struct uart_port *port)
@@ -473,7 +705,7 @@ static unsigned int serialsc16_get_mctrl(struct uart_port *port)
 	unsigned int status;
 	unsigned int ret;
 
-	status = check_modem_status(up);
+	status = up->msr;
 
 	ret = 0;
 	if (status & UART_MSR_DCD)
@@ -490,54 +722,24 @@ static unsigned int serialsc16_get_mctrl(struct uart_port *port)
 static void serialsc16_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned char mcr = 0;
+	unsigned char mcr = sc16_set_mctrl(up, mctrl);
 
-	if (mctrl & TIOCM_RTS)
-		mcr |= UART_MCR_RTS;
-	if (mctrl & TIOCM_DTR)
-		mcr |= UART_MCR_DTR;
-	if (mctrl & TIOCM_OUT1)
-		mcr |= UART_MCR_OUT1;
-	if (mctrl & TIOCM_OUT2)
-		mcr |= UART_MCR_OUT2;
-	if (mctrl & TIOCM_LOOP)
-		mcr |= UART_MCR_LOOP;
-
-	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
-
-	serial_out(up, UART_MCR, mcr);
+	if (mcr != up->mcr) {
+		up->mcr = mcr;
+		up->mcr_changed = 1;
+		queue_work(wq, &up->work);
+	}
 }
 
 static void serialsc16_break_ctl(struct uart_port *port, int break_state)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 
-	mutex_lock(&up->xfer_lock);
 	if (break_state == -1)
-		up->lcr |= UART_LCR_SBC;
+		up->setbreak = 1;
 	else
-		up->lcr &= ~UART_LCR_SBC;
-	serial_out(up, UART_LCR, up->lcr);
-	mutex_unlock(&up->xfer_lock);
-}
-
-/*
- *	Wait for transmitter & holding register to empty
- */
-static void wait_for_xmitr(struct uart_sc16_port *up, int bits)
-{
-	unsigned int status, tmout = 10000;
-
-	/* Wait up to 10ms for the character(s) to be sent. */
-	do {
-		status = serial_in(up, UART_LSR);
-
-		up->lsr_saved_flags |= status & LSR_SAVE_FLAGS;
-
-		if (--tmout == 0)
-			break;
-		udelay(1);
-	} while ((status & bits) != bits);
+		up->clrbreak = 1;
+	queue_work(wq, &up->work);
 }
 
 static int serialsc16_startup(struct uart_port *port)
@@ -545,21 +747,7 @@ static int serialsc16_startup(struct uart_port *port)
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
 	int retval;
 
-	up->mcr = 0;
-
-	/*
-	 * Clear the FIFO buffers and disable them.
-	 * (they will be reenabled in set_termios())
-	 */
-	serialsc16_clear_fifos(up);
-
-	/*
-	 * Clear the interrupt registers.
-	 */
-	(void) serial_in(up, UART_LSR);
-	(void) serial_in(up, UART_RX);
-	(void) serial_in(up, UART_IIR);
-	(void) serial_in(up, UART_MSR);
+	up->ier = UART_IER_RLSI | UART_IER_RDI;
 
 	/*
 	 * Setup a backup timer
@@ -574,35 +762,6 @@ static int serialsc16_startup(struct uart_port *port)
 	if (retval < 0)
 		return retval;
 
-	/*
-	 * Now, initialize the UART
-	 */
-	serial_out(up, UART_LCR, UART_LCR_WLEN8);
-
-	mutex_lock(&up->xfer_lock);
-	serialsc16_set_mctrl(&up->port, up->port.mctrl);
-	mutex_unlock(&up->xfer_lock);
-
-	/*
-	 * Clear the interrupt registers again for luck, and clear the
-	 * saved flags to avoid getting false values from polling
-	 * routines or the previous session.
-	 */
-	serial_in(up, UART_LSR);
-	serial_in(up, UART_RX);
-	serial_in(up, UART_IIR);
-	serial_in(up, UART_MSR);
-	up->lsr_saved_flags = 0;
-	up->msr_saved_flags = 0;
-
-	/*
-	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via set_termios(), which will be occurring imminently
-	 * anyway, so we don't enable them here.
-	 */
-	up->ier = UART_IER_RLSI | UART_IER_RDI;
-	serial_out(up, UART_IER, up->ier);
-
 	return 0;
 }
 
@@ -616,9 +775,7 @@ static void serialsc16_shutdown(struct uart_port *port)
 	up->ier = 0;
 	serial_out(up, UART_IER, 0);
 
-	mutex_lock(&up->xfer_lock);
 	serialsc16_set_mctrl(&up->port, up->port.mctrl);
-	mutex_unlock(&up->xfer_lock);
 
 	/*
 	 * Disable break condition and FIFOs
@@ -640,31 +797,36 @@ serialsc16_set_termios(struct uart_port *port, struct ktermios *termios,
 		       struct ktermios *old)
 {
 	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-	unsigned char cval, fcr = 0, efr = 0;;
-	unsigned int baud, quot;
+	unsigned long flags;
+	unsigned int baud;
+
+	spin_lock_irqsave(&up->port.lock, flags);
+
+	up->efr = 0;
+	up->fcr = 0;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
-		cval = UART_LCR_WLEN5;
+		up->lcr = UART_LCR_WLEN5;
 		break;
 	case CS6:
-		cval = UART_LCR_WLEN6;
+		up->lcr = UART_LCR_WLEN6;
 		break;
 	case CS7:
-		cval = UART_LCR_WLEN7;
+		up->lcr = UART_LCR_WLEN7;
 		break;
 	default:
 	case CS8:
-		cval = UART_LCR_WLEN8;
+		up->lcr = UART_LCR_WLEN8;
 		break;
 	}
 
 	if (termios->c_cflag & CSTOPB)
-		cval |= UART_LCR_STOP;
+		up->lcr |= UART_LCR_STOP;
 	if (termios->c_cflag & PARENB)
-		cval |= UART_LCR_PARITY;
+		up->lcr |= UART_LCR_PARITY;
 	if (!(termios->c_cflag & PARODD))
-		cval |= UART_LCR_EPAR;
+		up->lcr |= UART_LCR_EPAR;
 
 	/*
 	 * Ask the core to calculate the divisor for us.
@@ -672,17 +834,13 @@ serialsc16_set_termios(struct uart_port *port, struct ktermios *termios,
 	baud = uart_get_baud_rate(port, termios, old,
 				  port->uartclk / 16 / 0xffff,
 				  port->uartclk / 16);
-	quot = uart_get_divisor(port, baud);
+	up->quot = uart_get_divisor(port, baud);
 
 	if (baud < 2400)
-		fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
+		up->fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 	else
-		fcr = UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_00 | UART_FCR_R_TRIG_10;
-
-	/*
-	 * Ok, we're now changing the port state.
-	 */
-	mutex_lock(&up->xfer_lock);
+		up->fcr = UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_00 |
+			UART_FCR_R_TRIG_10;
 
 	/*
 	 * Update the per-port timeout.
@@ -724,36 +882,18 @@ serialsc16_set_termios(struct uart_port *port, struct ktermios *termios,
 	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
 		up->ier |= UART_IER_MSI;
 
-	serial_out(up, UART_IER, up->ier);
-
 	/*
-	 * Hardware flow control.  FIXME:
-	 * - TI16C752 requires control thresholds to be set.
-	 * - UART_MCR_RTS is ineffective if auto-RTS mode is enabled.
+	 * Hardware flow control.
 	 */
 	if (termios->c_cflag & CRTSCTS)
-		efr |= UART_EFR_CTS;
+		up->efr |= UART_EFR_CTS;
 
-	serial_out(up, UART_LCR, 0xBF);
-	serial_out(up, UART_EFR, efr);
-	serial_out(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
-
-	serial_dl_write(up, quot);
-
-	serial_out(up, UART_LCR, cval);		/* reset DLAB */
-	up->lcr = cval;					/* Save LCR */
-	if (fcr & UART_FCR_ENABLE_FIFO)
-		serial_out(up, UART_FCR, UART_FCR_ENABLE_FIFO);
-	serial_out(up, UART_FCR, fcr);		/* set fcr */
-	serialsc16_set_mctrl(&up->port, up->port.mctrl);
-	mutex_unlock(&up->xfer_lock);
-	/* Don't rewrite B0 */
-	if (tty_termios_baud_rate(termios))
-		tty_termios_encode_baud_rate(termios, baud, baud);
+	up->set_termios = 1;
+	spin_unlock_irqrestore(&up->port.lock, flags);
+	queue_work(wq, &up->work);
 }
 
-static void
-serialsc16_set_ldisc(struct uart_port *port)
+static void serialsc16_set_ldisc(struct uart_port *port)
 {
 	int line = port->line;
 
@@ -767,9 +907,8 @@ serialsc16_set_ldisc(struct uart_port *port)
 		port->flags &= ~UPF_HARDPPS_CD;
 }
 
-static void
-serialsc16_pm(struct uart_port *port, unsigned int state,
-	      unsigned int oldstate)
+static void serialsc16_pm(struct uart_port *port, unsigned int state,
+			  unsigned int oldstate)
 {
 	struct uart_sc16_port *p = (struct uart_sc16_port *)port;
 
@@ -789,8 +928,8 @@ static void serialsc16_config_port(struct uart_port *port, int flags)
 {
 }
 
-static int
-serialsc16_verify_port(struct uart_port *port, struct serial_struct *ser)
+static int serialsc16_verify_port(struct uart_port *port,
+				  struct serial_struct *ser)
 {
 	if (ser->irq >= nr_irqs || ser->irq < 0 ||
 	    ser->baud_base < 9600 || ser->type < PORT_UNKNOWN)
@@ -798,8 +937,7 @@ serialsc16_verify_port(struct uart_port *port, struct serial_struct *ser)
 	return 0;
 }
 
-static const char *
-serialsc16_type(struct uart_port *port)
+static const char *serialsc16_type(struct uart_port *port)
 {
 	return "NXP16IS7xx";
 }
@@ -829,62 +967,29 @@ static struct uart_sc16_port serialsc16_ports[UART_NR];
 
 #ifdef CONFIG_SERIAL_SC16IS7XX_CONSOLE
 
-static void serialsc16_console_putchar(struct uart_port *port, int ch)
-{
-	struct uart_sc16_port *up = (struct uart_sc16_port *)port;
-
-	wait_for_xmitr(up, UART_LSR_THRE);
-	serial_out(up, UART_TX, ch);
-}
-
 /*
  *	Print a string to the serial port trying not to disturb
  *	any possible real use of the port...
  *
  *	The console_lock must be held when we get here.
  */
-void
-serialsc16_console_write(struct console *co, const char *s, unsigned int count)
+void serialsc16_console_write(struct console *co, const char *s,
+			      unsigned int count)
 {
 	struct uart_sc16_port *up = &serialsc16_ports[co->index];
-	unsigned int ier;
-	int locked = 1;
+	unsigned long flags;
+	char cr = '\r';
+	int i;
 
-	if (up->port.sysrq) {
-		/* serialsc16_handle_port() already took the lock */
-		locked = 0;
-	} else if (oops_in_progress) {
-		locked = mutex_trylock(&up->xfer_lock);
-	} else
-		mutex_lock(&up->xfer_lock);
+	if (count == 0)
+		return;
 
-	/*
-	 *	First save the IER then disable the interrupts
-	 */
-	ier = serial_in(up, UART_IER);
-	serial_out(up, UART_IER, 0);
-
-	uart_console_write(&up->port, s, count, serialsc16_console_putchar);
-
-	/*
-	 *	Finally, wait for transmitter to become empty
-	 *	and restore the IER
-	 */
-	wait_for_xmitr(up, BOTH_EMPTY);
-	serial_out(up, UART_IER, ier);
-
-	/*
-	 *	The receive handling will happen properly because the
-	 *	receive ready bit will still be set; it is not cleared
-	 *	on read.  However, modem control will not, we must
-	 *	call it if we have saved something in the saved flags
-	 *	while processing with interrupts off.
-	 */
-	if (up->msr_saved_flags)
-		check_modem_status(up);
-
-	if (locked)
-		mutex_unlock(&up->xfer_lock);
+	for (i = 0; i < count; i++, s++) {
+		if (*s == '\n')
+			kfifo_in_locked(&up->write_fifo, &cr, 1, &up->wrlock);
+		kfifo_in_locked(&up->write_fifo, s, 1, &up->wrlock);
+	}
+	queue_work(wq, &up->work);
 }
 
 static int __init serialsc16_console_setup(struct console *co, char *options)
@@ -949,15 +1054,6 @@ static int __init serialsc16_console_init(void)
 		struct uart_sc16_port *up = &serialsc16_ports[i];
 
 		up->port.line = i;
-		spin_lock_init(&up->port.lock);
-		mutex_init(&up->xfer_lock);
-
-		init_timer(&up->timer);
-		up->timer.function = serialsc16_backup_timeout;
-
-		INIT_WORK(&up->work, sc16_work);
-		INIT_WORK(&up->backup_work, sc16_backup_work);
-
 		up->port.ops = &serialsc16_pops;
 	}
 
@@ -1001,9 +1097,17 @@ static int serialsc16_register_port(struct uart_port *port)
 			uart = &serialsc16_ports[i];
 
 	if (uart) {
+		uart->msi_on = 0;
+		uart->tx_stopped = 1;
+		uart->tx_stop_toggle = 0;
+		uart->tx_empty = 1;
+		uart->irq_in_progress = 0;
 
-		mutex_init(&uart->xfer_lock);
 		init_timer(&uart->timer);
+		uart->timer.function = serialsc16_backup_timeout;
+
+		spin_lock_init(&uart->port.lock);
+		spin_lock_init(&uart->wrlock);
 
 		uart->port.ops		= &serialsc16_pops;
 		uart->port.type         = port->type;
@@ -1070,6 +1174,10 @@ static int __init sc16_init(void)
 {
 	int ret;
 	
+	if (kfifo_alloc(&serialsc16_ports[0].write_fifo, MAX_WRITE_CHARS,
+			GFP_KERNEL))
+		return -ENOMEM;
+
 	ret = uart_register_driver(&serialsc16_reg);
 	if (ret)
 		return ret;
