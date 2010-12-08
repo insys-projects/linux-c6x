@@ -19,10 +19,12 @@
 #define __SYSREGA(ADDR, TYPE) ((volatile TYPE*)(ADDR))
 
 #ifndef __ASSEMBLY__
+#ifdef __KERNEL__
 extern void c6x_soc_setup_arch(void);
 extern void c6x_board_setup_arch(void);
 extern char *arch_compute_silicon_rev(u32 silicon_rev);
 extern unsigned int arch_get_silicon_rev(void);
+#endif
 #endif
 
 #endif /* __ASM_C6X_HARDWARE_H_ */

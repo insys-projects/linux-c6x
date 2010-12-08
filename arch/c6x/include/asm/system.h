@@ -16,6 +16,7 @@
 #include <linux/linkage.h>
 #include <asm/segment.h>
 
+#ifdef __KERNEL__ 
 /*
  * switch_to() saves the extra registers, that are not saved
  * automatically by SAVE_SWITCH_STACK in resume().
@@ -34,7 +35,7 @@ asmlinkage void * resume(void *prev, void *next, int thread, char shared);
   register char _shared   = ((prev)->mm == (next)->mm); \
   (last) = resume(_prev, _next, _threadoff, _shared); \
 }
-
+#endif
 /* Reset the board */
 #define HARD_RESET_NOW()
 
