@@ -41,17 +41,12 @@
 
 /* Find the stack offset for a register */
 #define PT_REG(reg)	  ((int)&((struct pt_regs *)0)->reg)
-#define SW_REG(reg)	  ((int)&((struct switch_stack *)0)->reg \
-			   - sizeof(struct switch_stack))
-
-#define PT_REG_SIZE       (sizeof(struct pt_regs) + sizeof(struct switch_stack))
+#define PT_REG_SIZE       (sizeof(struct pt_regs))
 
 #ifdef _BIG_ENDIAN
 #define PT_REGPAIR(odd,even) PT_REG(odd), PT_REG(even)
-#define SW_REGPAIR(odd,even) SW_REG(odd), SW_REG(even)
 #else
 #define PT_REGPAIR(odd,even) PT_REG(even), PT_REG(odd)
-#define SW_REGPAIR(odd,even) SW_REG(even), SW_REG(odd)
 #endif
 
 /* Mapping from PT_xxx to the stack offset at which the register is
@@ -61,41 +56,52 @@
 static int regoff[] = {
 #if defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__)
 	PT_REGPAIR(tsr,orig_a4),
+	PT_REGPAIR(rilc,ilc),
 #else
 	PT_REGPAIR(stkadj,orig_a4),
 #endif
 	PT_REGPAIR(pc,csr),
 
 #if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
-	PT_REGPAIR(b17,b16), PT_REGPAIR(b19,b18), PT_REGPAIR(b21,b20), PT_REGPAIR(b23,b22),
-	PT_REGPAIR(b25,b24), PT_REGPAIR(b27,b26), PT_REGPAIR(b29,b28), PT_REGPAIR(b31,b30),
+	PT_REGPAIR(b17,b16),
+	PT_REGPAIR(b19,b18),
+	PT_REGPAIR(b21,b20),
+	PT_REGPAIR(b23,b22),
+	PT_REGPAIR(b25,b24),
+	PT_REGPAIR(b27,b26),
+	PT_REGPAIR(b29,b28),
+	PT_REGPAIR(b31,b30),
 #endif
-	PT_REGPAIR(b1,b0), PT_REGPAIR(b3,b2), PT_REGPAIR(b5,b4), PT_REGPAIR(b7,b6),
+
+	PT_REGPAIR(b1,b0),
+	PT_REGPAIR(b3,b2),
+	PT_REGPAIR(b5,b4),
+	PT_REGPAIR(b7,b6),
+	PT_REGPAIR(b9,b8),
+	PT_REGPAIR(b11,b10),
+	PT_REGPAIR(b13,b12),
 
 #if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
-	PT_REGPAIR(a17,a16), PT_REGPAIR(a19,a18), PT_REGPAIR(a21,a20), PT_REGPAIR(a23,a22),
-	PT_REGPAIR(a25,a24), PT_REGPAIR(a27,a26), PT_REGPAIR(a29,a28), PT_REGPAIR(a31,a30),
+	PT_REGPAIR(a17,a16),
+	PT_REGPAIR(a19,a18),
+	PT_REGPAIR(a21,a20),
+	PT_REGPAIR(a23,a22),
+	PT_REGPAIR(a25,a24),
+	PT_REGPAIR(a27,a26),
+	PT_REGPAIR(a29,a28),
+	PT_REGPAIR(a31,a30),
 #endif
-	PT_REGPAIR(a1,a0), PT_REGPAIR(a3,a2), PT_REGPAIR(a5,a4), PT_REGPAIR(a7,a6),
+	PT_REGPAIR(a1,a0),
+	PT_REGPAIR(a3,a2),
+	PT_REGPAIR(a5,a4),
+	PT_REGPAIR(a7,a6),
+	PT_REGPAIR(a9,a8),
+	PT_REGPAIR(a11,a10),
+	PT_REGPAIR(a13,a12),
 
-	PT_REGPAIR(b9,b8), PT_REGPAIR(a9,a8),
+	PT_REGPAIR(a15,a14),
 	PT_REGPAIR(sp,dp),
-
-#ifdef CONFIG_TMS320C64XPLUS
-	SW_REGPAIR(ilc,rilc),
-#endif
-	SW_REGPAIR(a11,a10),
-	SW_REGPAIR(a13,a12),
-	SW_REGPAIR(a15,a14),
-	SW_REGPAIR(b11,b10),
-	SW_REGPAIR(b13,b12)
 };
-
-#define START_CODE_OFFSET  ((int)&((struct user *)0)->start_code)
-#define START_STACK_OFFSET ((int)&((struct user *)0)->start_stack)
-#define START_DATA_OFFSET  ((int)&((struct user *)0)->start_data)
-#define END_CODE_OFFSET    ((int)&((struct user *)0)->end_code)
-#define END_DATA_OFFSET    ((int)&((struct user *)0)->end_data)
 
 #ifndef CONFIG_TMS320C64XPLUS
 static struct timer_list   bkpt_timer;
@@ -107,11 +113,11 @@ static atomic_t            bkpt_timer_refc = 0;
  */
 static inline long get_reg(struct task_struct *task, int regno)
 {
-	unsigned long *addr;
+	unsigned long  *addr;
 	struct pt_regs *regs = task_pt_regs(task);
 
 	if (regno < sizeof(regoff)/sizeof(regoff[0]))
-		addr = (unsigned long *)regs + regoff[regno];
+		addr = (unsigned long *) ((unsigned long) regs + regoff[regno]);
 	else
 		return 0;
 	return *addr;
@@ -151,7 +157,7 @@ static inline int put_reg(struct task_struct *task,
 	struct pt_regs *regs = task_pt_regs(task);
 
 	if (regno < sizeof(regoff)/sizeof(regoff[0]))
-		addr = (unsigned long *)regs + regoff[regno];
+		addr = (unsigned long *)((unsigned long) regs + regoff[regno]);
 	else
 		return -1;
 	*addr = data;
@@ -222,6 +228,35 @@ void ptrace_disable(struct task_struct *child)
 }
 
 /*
+ * Read the word at offset "off" into the "struct user".  We
+ * actually access the pt_regs stored on the kernel stack.
+ */
+static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+                            unsigned long __user *ret)
+{
+        unsigned long tmp;
+	unsigned long index = off/sizeof(unsigned long);
+
+        if (off & 3)
+                return -EIO;
+
+
+        tmp = 0;
+        if (index == PT_TEXT_ADDR)
+                tmp = tsk->mm->start_code;
+        else if (index == PT_DATA_ADDR)
+                tmp = tsk->mm->start_data;
+        else if (index == PT_TEXT_END_ADDR)
+                tmp = tsk->mm->end_code;
+        else if (off < PT_REG_SIZE)
+                tmp = get_reg(tsk, index);
+	else if (off >= sizeof(struct user))
+		return -EIO;
+
+        return put_user(tmp, ret);
+}
+
+/*
  * Perform ptrace request
  */
 long arch_ptrace(struct task_struct *child, long request, long addr, long data)
@@ -245,25 +280,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		 * read the word at location "addr" in the user registers.
 		 */
 	case PTRACE_PEEKUSR:
-		ret = -EIO;
-		if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
-			break;
-		
-		tmp = 0;  /* Default return condition */
-		if (addr < PT_REG_SIZE) {
-			tmp = get_reg(child, (int)addr >> 2);
-		} else if (addr == START_CODE_OFFSET) {
-			tmp = child->mm->start_code;
-		} else if (addr == START_STACK_OFFSET) {
-			tmp = child->mm->start_stack;
-		} else if (addr == START_DATA_OFFSET) {
-			tmp = child->mm->start_data;
-		} else if (addr == END_CODE_OFFSET) {
-			tmp = child->mm->end_code;
-		} else if (addr == END_DATA_OFFSET) {
-			tmp = child->mm->end_data;
-		}
-		ret = put_user(tmp, (unsigned long *)data);
+		ret = ptrace_read_user(child, addr, (unsigned long *) data);
 		break;
 
 		/*
