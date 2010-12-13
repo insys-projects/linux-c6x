@@ -27,7 +27,15 @@
 #define L2_CACHE_ALIGN_UP(x)  (((x) + (L2_CACHE_BYTES - 1)) & ~(L2_CACHE_BYTES - 1))
 #define L2_CACHE_ALIGN_CNT(x) (((x) + (sizeof(int) - 1)) & ~(sizeof(int) - 1))
 
-#define NET_SKB_PAD           L2_CACHE_BYTES
+/*
+ * Some drivers use DMA to access kmalloc'd buffers.
+ */
+#define ARCH_KMALLOC_MINALIGN L2_CACHE_BYTES
+
+/*
+ * We want 8-byte alignment for the slab caches.
+ */
+#define ARCH_SLAB_MINALIGN 8
 
 /*
  * Align an address on the beginning of a MAR region

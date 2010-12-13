@@ -194,17 +194,5 @@ static inline void memcpy_tofs(void * to, const void * from, unsigned long n)
 	memcpy(to, from, n);
 }
 
-/* If gcc inlines memset, it will use st.q instructions.  Therefore, we need
-   kmalloc allocations to be 8-byte aligned.  Without this, the alignment
-   becomes BYTE_PER_WORD i.e. only 4 (since sizeof(long)==sizeof(void*)==4 on
-   sh64 at the moment). */
-#define ARCH_KMALLOC_MINALIGN 8
-
-/*
- * We want 8-byte alignment for the slab caches as well, otherwise we have
- * the same BYTES_PER_WORD (sizeof(void *)) min align in kmem_cache_create().
- */
-#define ARCH_SLAB_MINALIGN 8
-
 #endif /* __ASM_C6X_UACCESS_H_ */
 
