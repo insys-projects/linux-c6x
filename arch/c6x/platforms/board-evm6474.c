@@ -222,8 +222,13 @@ static struct clk i2c_clk = {
 	.parent = &pll1_sysclk10,
 };
 
-static struct clk mcbsp_clk = {
-	.name = "mcbsp",
+static struct clk mcbsp1_clk = {
+	.name = "mcbsp1",
+	.parent = &pll1_sysclk10,
+};
+
+static struct clk mcbsp2_clk = {
+	.name = "mcbsp2",
 	.parent = &pll1_sysclk10,
 };
 
@@ -241,8 +246,8 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
 	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
-	CLK("mcbsp.1", NULL, &mcbsp_clk),
-	CLK("mcbsp.2", NULL, &mcbsp_clk),
+	CLK("mcbsp.1", NULL, &mcbsp1_clk),
+	CLK("mcbsp.2", NULL, &mcbsp2_clk),
 	CLK(NULL, "core", &core_clk),
 	CLK("", NULL, NULL)
 };
