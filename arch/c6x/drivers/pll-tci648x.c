@@ -169,8 +169,6 @@ int clk_register(struct clk *clk)
 		 clk->name, clk->parent->name))
 		return -EINVAL;
 
-	INIT_LIST_HEAD(&clk->children);
-
 	mutex_lock(&clocks_mutex);
 	list_add_tail(&clk->node, &clocks);
 	if (clk->parent)
@@ -321,6 +319,10 @@ int __init c6x_clk_init(struct clk_lookup *clocks)
 
 	for (c = clocks; c->clk; c++) {
 		clk = c->clk;
+
+		INIT_LIST_HEAD(&clk->node);
+		INIT_LIST_HEAD(&clk->children);
+		INIT_LIST_HEAD(&clk->childnode);
 
 		if (!clk->recalc) {
 

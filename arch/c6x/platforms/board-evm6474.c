@@ -163,6 +163,9 @@ static struct clk clkin1 = {
 	.name = "clkin1",
 //	.rate = 61440000, This is when using SYSCLK (SW5 CORE_CLOK_SEL to ON)
 	.rate = 50000000, /* default one is 50MHz clock */
+	.node = LIST_HEAD_INIT(clkin1.node),
+	.children = LIST_HEAD_INIT(clkin1.children),
+	.childnode = LIST_HEAD_INIT(clkin1.childnode),
 };
 
 static struct clk pll1_clk = {

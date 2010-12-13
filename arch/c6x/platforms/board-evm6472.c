@@ -172,16 +172,9 @@ static struct pll_data pll3_data = {
 static struct clk clkin1 = {
 	.name = "clkin1",
 	.rate = 25000000,
-};
-
-static struct clk clkin2 = {
-	.name = "clkin2",
-	.rate = 25000000,
-};
-
-static struct clk clkin3 = {
-	.name = "clkin3",
-	.rate = 26660000,
+	.node = LIST_HEAD_INIT(clkin1.node),
+	.children = LIST_HEAD_INIT(clkin1.children),
+	.childnode = LIST_HEAD_INIT(clkin1.childnode),
 };
 
 static struct clk pll1_clk = {
