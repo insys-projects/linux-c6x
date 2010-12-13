@@ -324,8 +324,6 @@ int mcbsp_xmit_buffer(unsigned int id, dma_addr_t buffer,
 int mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer,
 		      unsigned int length);
 
-void mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data);
-void mcbsp_rx_dma_callback(int lch, u16 ch_status, void *data);
 
 /* SPI specific API */
 void mcbsp_set_spi_mode(unsigned int id,
