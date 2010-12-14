@@ -1208,7 +1208,7 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	elf_dyn *dyn;
 	unsigned long mapped_addr, bss_len, dseg_offset = 0, offset;
 	unsigned long top_vaddr,  top_offset;
-	int loop, ret, flags, ndseg;
+	int loop, ret, flags, ndseg, prot;
 
 	phdr = params->phdrs;
 	ndseg = 0;
@@ -1322,10 +1322,12 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	if (params->flags & ELF_DSBT_FLAG_EXECUTABLE)
 		flags |= MAP_EXECUTABLE;
 
-	dyn = find_dynamic_tag(params, DT_PLTGOT);
+	prot = PROT_READ | PROT_EXEC;
+	if (find_dynamic_tag(params, DT_TEXTREL) != NULL)
+		prot |= PROT_WRITE;
 
-	mapped_addr = elf_dsbt_map(file, params->code_seg.p_vaddr, &params->code_seg,
-				   (dyn == NULL ? PROT_WRITE : 0) | PROT_READ | PROT_EXEC, flags);
+	mapped_addr = elf_dsbt_map(file, params->code_seg.p_vaddr,
+				   &params->code_seg, prot, flags);
 	if (BAD_ADDR(mapped_addr))
 		return (int) mapped_addr;
 
