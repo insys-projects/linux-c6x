@@ -50,7 +50,7 @@ int _access_ok(unsigned long addr, unsigned long size)
 	if (segment_eq(get_fs(), KERNEL_DS))
 		return 1;
 
-	if (memory_start <= addr && (addr + size) < memory_end)
+	if (memory_start <= addr && (addr + size - 1) < memory_end)
 		return 1;
 
 _bad_access:
