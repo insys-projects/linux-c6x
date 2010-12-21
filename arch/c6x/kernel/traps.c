@@ -254,9 +254,10 @@ void do_trap(struct exception_info *except_info, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
-	printk("TRAP: %s PC[0x%lx] signo[%d] code[%d]\n",
-	       except_info->kernel_str, regs->pc,
-	       except_info->signo, except_info->code);
+	if (except_info->code != TRAP_BRKPT)
+		printk(KERN_DEBUG "TRAP: %s PC[0x%lx] signo[%d] code[%d]\n",
+		       except_info->kernel_str, regs->pc,
+		       except_info->signo, except_info->code);
 
 	die_if_kernel(except_info->kernel_str, regs, addr);
 
@@ -306,7 +307,7 @@ static int process_iexcept(struct pt_regs *regs)
 			return 1;
 		}
 #endif
-		if ((current->ptrace & PT_PTRACED) && (*(unsigned int *)regs->pc == BKPT_OPCODE)) {
+		if (*(unsigned int *)regs->pc == BKPT_OPCODE) {
 			/* This is a breakpoint */
 			struct exception_info bkpt_exception = { "Oops - undefined instruction", SIGTRAP, TRAP_BRKPT };
 			do_trap(&bkpt_exception, regs);
