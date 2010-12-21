@@ -99,6 +99,8 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #define save_global_flags(x)     x = CSR
 #define restore_global_flags(x)  CSR = x
 
+unsigned int _extu(unsigned int, unsigned int, unsigned int);
+
 #else /* CONFIG_TI_C6X_COMPILER */
 
 #if 0
@@ -204,6 +206,12 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 
 #define save_global_flags(x)     (x) = get_creg(CSR)
 #define restore_global_flags(x)  set_creg(CSR, (x))
+
+#define _extu(x, s, e)							\
+	({      unsigned int __x;					\
+		asm volatile (" extu .S2 %3,%1,%2,%0\n" :		\
+			      "=b"(__x) : "n"(s), "n"(e), "b"(x));	\
+	       __x; })
 
 #endif  /* CONFIG_TI_C6X_COMPILER */
 

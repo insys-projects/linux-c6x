@@ -118,19 +118,20 @@ void paging_init(void)
 			(memory_end - zone_dma_size) & ~(IMCR_MAR_SIZE - 1);
 
 		zone_dma_size  = (memory_end - zone_dma_start);
-		printk(KERN_INFO "Zone DMA start=0x%x size=0x%x\n", zone_dma_start,
-		       zone_dma_size);
-
-		disable_caching(zone_dma_start, (unsigned int *) 
-				(zone_dma_start + 
-				 (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
-				  & ~(IMCR_MAR_SIZE - 1))) - 1);
-
+		printk(KERN_INFO "Zone DMA start=0x%x size=0x%x\n", 
+		       (unsigned int) zone_dma_start,
+		       (unsigned int) zone_dma_size);
+		
+		disable_caching((unsigned int *) zone_dma_start,
+				(unsigned int *) (zone_dma_start + 
+						  (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
+						   & ~(IMCR_MAR_SIZE - 1))) - 1);
+		
 		printk(KERN_INFO "disabling caching for 0x%x to 0x%x\n",
-		       zone_dma_start,
-		       zone_dma_start + (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
-					 & ~(IMCR_MAR_SIZE - 1)) - 1);
-	}
+		       (unsigned int) zone_dma_start,
+		       (unsigned int) (zone_dma_start + (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
+							 & ~(IMCR_MAR_SIZE - 1)) - 1));
+		       }
 
 	zones_size[ZONE_DMA]     = zone_dma_size >> PAGE_SHIFT;
 	zones_size[ZONE_NORMAL]  = 

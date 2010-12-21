@@ -35,7 +35,6 @@ static int next_event(unsigned long delta,
 	u32 timer_CNTLO = TIMER_CNTLO_REG(LINUX_TIMER_SRC);
 	u32 timer_PRDLO = TIMER_PRDLO_REG(LINUX_TIMER_SRC);
 	u32 timer_TCR	= TIMER_TCR_REG(LINUX_TIMER_SRC);
-	u32 timer_TGCR	= TIMER_TGCR_REG(LINUX_TIMER_SRC);
 
 	TIMER_REG(timer_TCR)  &= ~TIMER_B_TCR_ENAMODELO_MASK;
 	TIMER_REG(timer_PRDLO) = delta - 1;
@@ -78,7 +77,6 @@ static struct clock_event_device t64_clockevent_device;
 static irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *cd = &t64_clockevent_device;
-	volatile unsigned long nl, nh;
 
 	cd->event_handler(cd);
 

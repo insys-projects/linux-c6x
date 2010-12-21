@@ -43,16 +43,13 @@
 #define DPRINTK( x... )
 #endif
 
-unsigned int*             mcbsp_tx_buff[MAX_PORT]    = NULL;
-unsigned int*             mcbsp_rx_buff[MAX_PORT][2] = NULL;
+unsigned int*             mcbsp_tx_buff[MAX_PORT];
+unsigned int*             mcbsp_rx_buff[MAX_PORT][2];
 edmacc_paramentry_regs    dma_tx_params[MAX_PORT];
-
-unsigned int              _extu(unsigned int, unsigned int, unsigned int);
 
 static struct uart_driver serialmcbsp_serial_reg;
 
 extern unsigned int       c6x_early_uart_cons;
-static struct tty_driver  serialmcbsp_driver;
 
 static DEFINE_MUTEX(mcbsp_tx_mutex);
 static DEFINE_MUTEX(mcbsp_mutex);
@@ -85,13 +82,15 @@ static struct mcbsp_reg_cfg initial_config = {
 	.pcr0  = CLKRP | FSXP | FSRP | FSXM | CLKXM | CLKRM,
 };
 
+static inline void mcbsp_get_char(struct serialmcbsp_port *port);
+
 void mcbsp_edma_tx_callback(int lch, u16 ch_status, void *data)
 {
         struct serialmcbsp_port *port = (struct serialmcbsp_port *) (data);
 	struct mcbsp            *mcbsp_dma = (struct mcbsp *) port->mcbsp;
 
 	/* Wait transmit to be physically finished */
-	while ((MCBSP_READ(mcbsp_ptr[port->id]->io_base, SPCR2) & XEMPTY));
+	while ((MCBSP_READ((int)mcbsp_ptr[port->id]->io_base, SPCR2) & XEMPTY));
 
 	complete(&mcbsp_dma->tx_dma_completion);
 }
@@ -211,11 +210,6 @@ static void mcbsp_edma_down(int id)
 	mcbsp_ptr[id]->dma_rx_lch = -1;
 }
 
-static int mcbsp_poll(struct serialmcbsp_port *port, int *c)
-{
-        return 0;
-}
-
 static inline void mcbsp_get_char(struct serialmcbsp_port *port)
 {
         unsigned int       bit_idx;
@@ -230,7 +224,6 @@ static inline void mcbsp_get_char(struct serialmcbsp_port *port)
 	/* Retrieve the 8 bits of the incomming character */
 	for (bit_idx = 1, c = 0; bit_idx <= 8; bit_idx++)
 	        c |= _extu(mcbsp_rx_buff[id][port->rx_buff][bit_idx], 16, 31) << (bit_idx - 1);
-	
 	/* Reset load parameters */
       	set_edma_transfer_params(mcbsp_ptr[id]->dma_rx_lch_reload, 
 				 4, MCBSP_MAX_RX_BAUD_BITS, 
@@ -262,7 +255,7 @@ static inline void mcbsp_write(unsigned int id, const char* buf, unsigned int si
         int           i, len;
 	unsigned int *p_bit, bit_idx;
 	char          mask, c;
-	char         *b = buf;
+	char         *b = (char *) buf;
 	unsigned int  length;
 
 	while(size > 0) {
@@ -819,8 +812,6 @@ static struct console serialmcbsp_serial_cons = {
 
 static int __init serialmcbsp_console_init(void)
 {
-       int res;
-
        register_console(&serialmcbsp_serial_cons);
 
        return 0;

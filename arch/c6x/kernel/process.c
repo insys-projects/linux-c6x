@@ -267,7 +267,7 @@ void exit_thread(void)
  */
 asmlinkage int c6x_fork(struct pt_regs *regs)
 {
-#if CONFIG_NO_FORK
+#ifdef CONFIG_NO_FORK
 	/* fork almost works, enough to trick you into looking elsewhere :-( */
 	return(-EINVAL);
 #else
