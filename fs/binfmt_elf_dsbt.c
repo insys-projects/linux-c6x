@@ -1494,11 +1494,15 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 			(params->hdr.e_entry - params->code_seg.p_vaddr) + params->code_seg.addr;
 
 	if (mm) {
-		mm->start_code = params->code_seg.addr;
-		mm->end_code = params->code_seg.addr + params->code_seg.p_memsz;
+		if (!mm->start_code) {
+			mm->start_code = params->code_seg.addr;
+			mm->end_code = params->code_seg.addr + params->code_seg.p_memsz;
+		}
 
-		mm->start_data = params->data_seg.addr;
-		mm->end_data = params->data_seg.addr + params->data_seg.p_memsz;
+		if (!mm->start_data) {
+			mm->start_data = params->data_seg.addr;
+			mm->end_data = params->data_seg.addr + params->data_seg.p_memsz;
+		}
 	}
 
 	kdebug("Mapped Object [%s]:", what);
