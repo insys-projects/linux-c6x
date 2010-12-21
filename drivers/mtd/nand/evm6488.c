@@ -41,7 +41,7 @@
 #define GPIO_NAND_NCE	13
 #define GPIO_NAND_NWP	14
 
-#define xdelay() ndelay(12)
+#define xdelay() ndelay(15)
 
 struct gpiomtd {
 	struct mtd_info		mtd_info;

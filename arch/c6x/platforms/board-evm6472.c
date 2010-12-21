@@ -125,11 +125,24 @@ static void __init evm_setup_i2c(void)
 
 #if defined(CONFIG_MTD_NAND_EVM6488) || defined(CONFIG_MTD_NAND_EVM6488_MODULE)
 static struct mtd_partition evm_nand_parts[] = {
-	[0] = {
-		.name	= "evm-nand",
-		.size	= MTDPART_SIZ_FULL,
-		.offset	= 0,
+	{
+		.name		= "bootloader",
+		.offset		= 0,
+		.size		= 0x00200000,
+		.mask_flags	= MTD_WRITEABLE,
 	},
+	{
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x01000000,
+		.mask_flags	= 0,
+	},
+	{
+		.name		= "filesystem",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.mask_flags	= 0,
+	}
 };
 
 static struct gpio_nand_platdata evm_nand_platdata = {
