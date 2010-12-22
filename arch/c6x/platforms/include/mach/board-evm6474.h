@@ -24,6 +24,11 @@
 #define ARCH_I2C_DELAY    0   /* usec */
 
 /*
+ * CAN interrupt for SPI CAN driver
+ */
+#define SPI_CAN_GPIO    14 /* LM3S CAN interrupt */
+
+/*
  * Timer definitions
  */
 #define LINUX_TIMER_SRC (TIMER_5 - get_coreid())

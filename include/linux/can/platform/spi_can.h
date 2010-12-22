@@ -104,13 +104,14 @@ struct spi_can_priv {
 	struct spi_can_queue      tx_q;
 	struct spi_can_queue      rx_q;
 
-	struct semaphore          lock;
-
+	struct mutex              lock;
+        int                       irq;
 };
 
 struct spi_can_message {
 	struct list_head          queue;
 	struct can_frame          cf;
 };
+extern int can_get_bittiming(struct net_device *dev, struct can_bittiming *bt);
 
 #endif /*__ASM_SPI_CAN_H__ */
