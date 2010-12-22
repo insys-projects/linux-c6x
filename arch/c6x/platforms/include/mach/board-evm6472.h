@@ -37,8 +37,8 @@
 /*
  * Led definitions
  */
-#define LED0_GPIO_PIN   GPIO_PIN12
-#define LED1_GPIO_PIN   GPIO_PIN13
+#define LED0_GPIO_PIN   12
+#define LED1_GPIO_PIN   13
 
 #ifdef CONFIG_IDLE_LED
 #ifndef __ASSEMBLY__
