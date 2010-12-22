@@ -227,7 +227,6 @@ static int spi_can_probe(struct spi_device *spi)
 	int                   i;
 	struct net_device    *ndev;
 	struct spi_can_priv  *priv;
-	unsigned short       *pdata;
 	struct device        *dev = &spi->dev;
  
 	DPRINTK("%s: SPI %d probe\n", __FUNCTION__, spi->chip_select);
@@ -280,12 +279,12 @@ static int spi_can_probe(struct spi_device *spi)
 	}
 	
 	/* Allocate SPI tx/rx buffers */
-	priv->tx_buf   = (u16 *) kzalloc(max(sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
-	priv->rx_buf   = (u16 *) kzalloc(max(sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
-	priv->tx_ack   = (u16 *) kzalloc(max(sizeof(u16), L1_CACHE_BYTES), GFP_KERNEL);
-	priv->rx_ack   = (u16 *) kzalloc(max(sizeof(u16), L1_CACHE_BYTES), GFP_KERNEL);
-	priv->tx_dummy = (u16 *) kzalloc(max(sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
-	priv->rx_dummy = (u16 *) kzalloc(max(sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->tx_buf   = (struct spi_can_frame*) kzalloc(max((int) sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->rx_buf   = (struct spi_can_frame*) kzalloc(max((int) sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->tx_dummy = (struct spi_can_frame*) kzalloc(max((int) sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->rx_dummy = (struct spi_can_frame*) kzalloc(max((int)sizeof(struct spi_can_frame), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->tx_ack   = (u16*) kzalloc(max((int) sizeof(u16), L1_CACHE_BYTES), GFP_KERNEL);
+	priv->rx_ack   = (u16*) kzalloc(max((int) sizeof(u16), L1_CACHE_BYTES), GFP_KERNEL);
 
 	for (i = 0; i < 5; i++) {
 		priv->tx_dummy->cmd = SPI_CAN_CMD_DUMMY;
@@ -304,7 +303,7 @@ static int spi_can_remove(struct spi_device *spi)
 {
 	struct device         *dev  = &spi->dev;
 	struct net_device     *ndev = dev_get_drvdata(dev);
-	struct spi_can_priv   *priv = netdev_priv(dev);
+	struct spi_can_priv   *priv = netdev_priv(ndev);
 	int                    res;
 
 	DPRINTK("%s: SPI %d remove\n", __FUNCTION__, spi->chip_select);
@@ -345,45 +344,45 @@ static struct spi_driver spi_can = {
 	.remove =	__devexit_p(spi_can_remove),
 };
 
-static void spi_can_interrupt_handler(int irq, void *data, struct pt_regs *regs)
+static irqreturn_t spi_can_interrupt_handler(int irq, void *data)
 {
 	struct spi_can_priv *can  = (struct spi_can_priv *) data;
 
 	if (can->ndev->flags & IFF_UP)
 		spi_can_rx(can);
+
+	return IRQ_HANDLED;
 }
 
 static void spi_can_interrupt_setup(struct spi_can_priv *can)
 {
-	unsigned long flags;
-	unsigned long status;
+	int status;
 
-	/* Set handler for LM3S CAN INT (GPIO14) */
-	request_irq(IRQ_GPIO14, 
+	/* Request an GPIO interrupt */
+	status = gpio_request(SPI_CAN_GPIO, "SPI-CAN IRQ");
+	if (status < 0)
+		printk(KERN_ERR "Cannot get GPIO for SPI CAN: %d\n", status);
+	else {
+		gpio_direction_input(SPI_CAN_GPIO);
+		can->irq = gpio_to_irq(SPI_CAN_GPIO);
+		if (can->irq < 0)
+			printk(KERN_ERR "GPIO for SPI CAN has no IRQ: %d\n", can->irq);
+		else
+			set_irq_type(can->irq, IRQ_TYPE_EDGE_RISING);
+	}
+
+	/* Set handler for CAN interrupt */
+	request_irq(can->irq, 
 		    spi_can_interrupt_handler,
 		    IRQF_DISABLED,
 		    "SPI-CAN",
-		    can);
-
-	gpio_bank_int_disable();
-
-	/* Configure GPIO pins */
-	local_irq_save(flags);
-	gpio_direction_set(0xffff, (1 << GPIO_PIN14));  /* input pin */
-	local_irq_restore(flags);
-
-	/* Configure the GPIO interrupts */
-	gpio_int_edge_detection_set(GPIO_PIN14, GPIO_CLEAR_EDGE);
-	gpio_int_edge_detection_set(GPIO_PIN14, GPIO_RISING_EDGE);
-
-	gpio_bank_int_enable(); /* Enable GPIO interrupt */
+		    (void *) can);
 }
 
 static void spi_can_interrupt_clear(struct spi_can_priv *can)
 {
-	gpio_int_edge_detection_set(GPIO_PIN14, GPIO_CLEAR_EDGE);
-
-	free_irq(IRQ_GPIO14, can);
+	gpio_free(SPI_CAN_GPIO);
+	free_irq(can->irq, (void *) can);
 }
 
 static int spi_can_setup(struct net_device *ndev, struct spi_can_priv *priv)
@@ -417,7 +416,6 @@ static int spi_can_send_frame(struct spi_can_priv *can, struct can_frame *cf)
 {
 	int                      res;
 	int                      timeout = TIMEOUT_SPI_LOOP;
-	struct net_device_stats *stats = &can->stats;
 
 	/* Send CAN transmit command (2 half words + can frame) */
 	can->tx_buf->cmd  = SPI_CAN_CMD_CAN_TX;
@@ -638,8 +636,8 @@ retry:
 
 static void spi_can_receive_messages(struct work_struct *work)
 {
-	struct spi_can_priv     *can = container_of(work, struct spi_can_priv, rx_q.work);
-	int                      res;
+	struct spi_can_priv *can = container_of(work, struct spi_can_priv, rx_q.work);
+	int                  res;
 
 	/* Retrieve and process all CAN messages */
 	mutex_lock(&can->lock);
@@ -650,9 +648,7 @@ static void spi_can_receive_messages(struct work_struct *work)
 
 static void spi_can_transmit_messages(struct work_struct *work)
 {
-	struct spi_can_priv    *can = container_of(work, struct spi_can_priv, tx_q.work);
-	unsigned long           flags;
-	int                     res;
+	struct spi_can_priv *can = container_of(work, struct spi_can_priv, tx_q.work);
 
 	if (can->tx_q.run == QUEUE_STOPPED)
 		return;
@@ -707,7 +703,6 @@ static inline int spi_can_start_queue(struct spi_can_priv *can)
 
 static inline int spi_can_stop_queue(struct spi_can_priv *can)
 {
-	unsigned long flags;
 	unsigned      limit = 500;
 	int           status = 0;
 
@@ -842,8 +837,6 @@ static void spi_can_rx(struct spi_can_priv *can)
 static int spi_can_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	struct spi_can_priv    *can = netdev_priv(ndev);
-	unsigned long           flags;
-	struct spi_can_message *msg;
 
 	if (can->tx_q.skb) {
 		dev_warn(CAN_TO_DEV(can), "%s called while tx busy\n", __FUNCTION__);

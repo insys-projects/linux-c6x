@@ -433,7 +433,6 @@ static irqreturn_t emac_rx_interrupt(int irq, void * netdev_id)
 	struct emac_private *ep = netdev_priv(dev);
 	struct emac_desc *desc;
 	unsigned long irq_flags;
-	unsigned long status;
 
 	ectl_arch_rx_irq_enter(IDX_TO_CHAN(emac_idx));
 
@@ -472,7 +471,6 @@ static irqreturn_t emac_tx_interrupt(int irq, void * netdev_id)
 	struct emac_private *ep  = netdev_priv(dev);
 	struct emac_desc    *desc;
 	unsigned long irq_flags;
-	unsigned long status;
 
 	ectl_arch_tx_irq_enter(IDX_TO_CHAN(emac_idx));
 
@@ -1011,28 +1009,6 @@ static void emac_timeout(struct net_device *dev)
 		netif_wake_queue(dev);
 }
 
-/*
- * Set the MAC address
- */
-static int emac_set_mac_address(struct net_device *dev, void *p)
-{
-	struct emac_private *ep   = netdev_priv(dev);
-	struct sockaddr     *addr = (struct sockaddr *) p;
-	int i;
-	
-	/* Get new MAC address */
-	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
-	for (i = 0; i <= 5; i++)
-		config.enetaddr[i] = dev->dev_addr[i] & 0xff;
-	
-	printk("%s: changing MAC address to ", dev->name);
-	for (i = 0; i < 5; i++)
-		printk("%02x:", dev->dev_addr[i]);
-	printk("%02x\n", dev->dev_addr[5]);
-
-	return emac_reconfigure_device(dev);
-}
-
 /* 
  * Set or clear the multicast filter for this adaptor.
  */
@@ -1426,7 +1402,6 @@ static int __init emac_probe(struct platform_device *pdev)
 	struct emac_private    *ep;
 	int                     res = -EINVAL;
 	int                     i;
-	int                     err;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	char                    hw_emac_addr[6];
 #endif

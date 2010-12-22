@@ -354,12 +354,13 @@ void __init c6x_mtd_early_init(void)
 
 #endif /* CONFIG_MTD_UCLINUX */
 
+static char tmp_command_line[COMMAND_LINE_SIZE];
+
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned int memory_size;
 	int bootmap_size;
 	struct tag_cmdline *tcmd;
-	char tmp_command_line[COMMAND_LINE_SIZE];
 #if defined(CONFIG_MTD_UCLINUX)
 	unsigned long romfs_size;
 #endif

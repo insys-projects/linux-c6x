@@ -82,7 +82,7 @@ void MCBSP_WRITE(int base, int reg, unsigned short val)
 	}
 }
 
-static void mcbsp_dump_reg(u8 id)
+void mcbsp_dump_reg(u8 id)
 {
 	DBG("**** MCBSP%d regs ****\n", mcbsp_ptr[id]->id - 1);
 
@@ -138,7 +138,7 @@ static void mcbsp_rx_dma_callback(int lch, u16 ch_status, void *data)
 void mcbsp_config(unsigned int id,
 		  const struct mcbsp_reg_cfg *config)
 {
-	u32 io_base = mcbsp_ptr[id]->io_base;
+	u32 io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	DBG("McBSP: McBSP%d  io_base: 0x%08x\n", id, io_base);
 
@@ -219,7 +219,7 @@ void mcbsp_start(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	mcbsp_ptr[id]->rx_word_length =
 	    ((MCBSP_READ(io_base, RCR1) >> 5) & 0x7);
@@ -257,7 +257,7 @@ void mcbsp_stop(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	local_irq_save(flags);
 
@@ -291,7 +291,7 @@ void mcbsp_start_raw(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	mcbsp_ptr[id]->rx_word_length =
 	    ((MCBSP_READ(io_base, RCR1) >> 5) & 0x7);
@@ -329,7 +329,7 @@ void mcbsp_start_tx(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	local_irq_save(flags);
 
@@ -351,7 +351,7 @@ void mcbsp_stop_tx(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	local_irq_save(flags);
 
@@ -372,7 +372,7 @@ void mcbsp_start_rx(unsigned int id)
 
 	if (mcbsp_check(id) < 0)
 		return;
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	local_irq_save(flags);
 
@@ -394,7 +394,7 @@ void mcbsp_stop_rx(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	local_irq_save(flags);
 
@@ -419,7 +419,7 @@ void mcbsp_xmit_word(unsigned int id, u32 word)
 	if (mcbsp_check(id) < 0)
 		return;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	DBG(" io_base = 0x%x\n", io_base);
 	if (word_length > MCBSP_WORD_16) {
@@ -442,7 +442,7 @@ u32 mcbsp_recv_word(unsigned int id)
 	if (mcbsp_check(id) < 0)
 		return -EINVAL;
 
-	io_base = mcbsp_ptr[id]->io_base;
+	io_base = (u32) mcbsp_ptr[id]->io_base;
 
 	if (word_length > MCBSP_WORD_16)
 		word_msb = MCBSP_READ(io_base, DRR2);

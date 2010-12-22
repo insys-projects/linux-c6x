@@ -160,8 +160,7 @@ static ssize_t ram_proc_write(struct file* file,
 			      size_t       size,
 			      loff_t*      ppos)
 {
-	int res;
-	char * src_buf = buf;
+	char *src_buf = (char *) buf;
 	size_t count = size;
 	struct proc_dir_entry * dp;
 	struct inode * inode = file->f_dentry->d_inode;
@@ -202,7 +201,6 @@ static ssize_t ram_proc_read(struct file* file,
 			     size_t       size,
 			     loff_t*      ppos)
 {
-	int res;
 	char * dest_buf = buf;
 	size_t count = size;
 	struct proc_dir_entry * dp;
@@ -229,7 +227,6 @@ static ssize_t ram_proc_read(struct file* file,
 static int ram_proc_mmap (struct file *file, struct vm_area_struct *vma)
 {
 	struct inode * inode = file->f_dentry->d_inode;
-	unsigned int core_id;
 	struct proc_dir_entry * dp;
 	struct ram_private_data * data;
 
@@ -264,7 +261,7 @@ static int ram_proc_create(struct proc_dir_entry   *parent,
 
 	fops->get_unmapped_area = get_fb_unmapped_area;
 
-	file->data      = (u32) data;
+	file->data      = (void*) data;
 	file->size      = 0;
 	file->proc_fops = fops;
 
@@ -305,14 +302,13 @@ static int mcore_init(void)
 			return -EBUSY;
 		
 		/* Disable caching for the L2 regions */
-		disable_caching(data->start, data->start + data->size - 1);
+		disable_caching((unsigned int *) data->start,
+				(unsigned int *) (data->start + data->size - 1));
 
 		printk(KERN_INFO "MCORE: create SRAM, core=%d, start=0x%x size=0x%x\n",
 		       data->core_id, data->start, data->size);
 
 		if (n != get_coreid()) {
-			unsigned int start;
-
 			data = (struct ram_private_data *) 
 				kmalloc(sizeof(struct ram_private_data), GFP_KERNEL);
 

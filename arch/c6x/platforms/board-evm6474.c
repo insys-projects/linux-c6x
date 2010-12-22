@@ -57,9 +57,9 @@ static struct platform_device evm6474_rio_device = {
 	.dev		= { .platform_data = &evm6474_rio_controller },
 };
 
-static void __init evm_init_rio(void)
+static int __init evm_init_rio(void)
 {
-	platform_device_register(&evm6474_rio_device);
+	return platform_device_register(&evm6474_rio_device);
 }
 
 core_initcall(evm_init_rio);
@@ -90,19 +90,21 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 static struct platform_device evm6474_mcbsp_device0 = {
 	.name           = "mcbsp",
 	.id             = 1,
-	.dev		= { .platform_data = &evm6474_mcbsp_info[0] },
+	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[0] },
 };
 
 static struct platform_device evm6474_mcbsp_device1 = {
 	.name           = "mcbsp",
 	.id             = 2,
-	.dev		= { .platform_data = &evm6474_mcbsp_info[1] },
+	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[1] },
 };
 
-static void __init evm_init_mcbsp(void)
+static int __init evm_init_mcbsp(void)
 {
 	platform_device_register(&evm6474_mcbsp_device0); /* McBSP0 */
 	platform_device_register(&evm6474_mcbsp_device1); /* McBSP1 */
+
+	return 0;
 }
 
 core_initcall(evm_init_mcbsp);
@@ -112,19 +114,20 @@ core_initcall(evm_init_mcbsp);
 #include <asm/mcbsp-uart.h>
 
 static const struct mcbsp_uart_info evm6474_mcbsp_uart_info = {
-    .mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
-    .mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+	.mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
+	.mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+
 };
 
 static struct platform_device evm6474_mcbsp_uart_device = {
 	.name           = "mcbsp_serial",
 	.id             = 1,
-	.dev		= { .platform_data = &evm6474_mcbsp_uart_info },
+	.dev		= { .platform_data = (void*) &evm6474_mcbsp_uart_info },
 };
 
-static void __init evm_init_mcbsp_uart(void)
+static int __init evm_init_mcbsp_uart(void)
 {
-	platform_device_register(&evm6474_mcbsp_uart_device);
+	return platform_device_register(&evm6474_mcbsp_uart_device);
 }
 
 core_initcall(evm_init_mcbsp_uart);
@@ -147,8 +150,8 @@ static struct i2c_board_info evm_i2c_info[] = {
 
 static void __init board_setup_i2c(void)
 {
-       i2c_register_board_info(1, evm_i2c_info,
-                               ARRAY_SIZE(evm_i2c_info));
+	i2c_register_board_info(1, evm_i2c_info,
+				ARRAY_SIZE(evm_i2c_info));
 }
 #else
 #define board_setup_i2c()
@@ -258,8 +261,6 @@ static void dummy_progress(unsigned int step, char *s) {}
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
-	int i, ret;
-
 	printk("Designed for the EVM6474 board, Texas Instruments.\n");
 
 	mach_progress      = dummy_progress;
@@ -270,9 +271,11 @@ void c6x_board_setup_arch(void)
 	mach_progress(1, "End of EVM6474 specific initialization");
 }
 
-__init void evm_init(void)
+__init int evm_init(void)
 {
 	board_setup_i2c();
+
+	return 0;
 }
 
 arch_initcall(evm_init);

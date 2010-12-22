@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/interrupt.h>
 #include <linux/err.h>
+#include <linux/clk.h>
 #include <linux/spi/spi.h>
 
 #include <asm/edma.h>
@@ -153,8 +154,8 @@ static void spi_mcbsp_giveback(struct spi_message *message, struct spi_mcbsp *sp
         u16 w;
 
 	/* shutdown CS */
-	w = MCBSP_READ(spi_mcbsp->mcbsp->io_base, PCR0);
-	MCBSP_WRITE(spi_mcbsp->mcbsp->io_base, PCR0, (w & ~FSXM));
+	w = MCBSP_READ((int) spi_mcbsp->mcbsp->io_base, PCR0);
+	MCBSP_WRITE((int)spi_mcbsp->mcbsp->io_base, PCR0, (w & ~FSXM));
 
 	/* Stop SPI */
 	mcbsp_stop(spi_mcbsp->mcbsp_id);
@@ -194,11 +195,10 @@ static void *spi_mcbsp_next_transfer(struct spi_mcbsp *spi_mcbsp)
 static void spi_mcbsp_edma_tx_callback(int lch, u16 ch_status, void *data)
 {
         struct spi_mcbsp   *spi_mcbsp = (struct spi_mcbsp *) (data);
-	struct mcbsp       *mcbsp     = (struct mcbsp *) spi_mcbsp->mcbsp;
 	struct spi_message *msg       = spi_mcbsp->cur_msg;
 
 	/* Wait transmit to be physically finished */
-	while ((MCBSP_READ(spi_mcbsp->mcbsp->io_base, SPCR2) & XEMPTY));
+	while ((MCBSP_READ((int) spi_mcbsp->mcbsp->io_base, SPCR2) & XEMPTY));
 
 	if ((spi_mcbsp->tx_len) && (!spi_mcbsp->rx_len)) {
 
@@ -216,11 +216,10 @@ static void spi_mcbsp_edma_tx_callback(int lch, u16 ch_status, void *data)
 static void spi_mcbsp_edma_rx_callback(int lch, u16 ch_status, void *data)
 {
         struct spi_mcbsp   *spi_mcbsp = (struct spi_mcbsp *) (data);
-	struct mcbsp       *mcbsp     = (struct mcbsp *) spi_mcbsp->mcbsp;
 	struct spi_message *msg       = spi_mcbsp->cur_msg;
 
 	/* Wait receive to be physically finished */
-	while ((MCBSP_READ(spi_mcbsp->mcbsp->io_base, SPCR1) & RRDY));
+	while ((MCBSP_READ((int)spi_mcbsp->mcbsp->io_base, SPCR1) & RRDY));
 
 	if (spi_mcbsp->rx_len) {
 
@@ -245,9 +244,7 @@ static void spi_mcbsp_pump_transfers(unsigned long data)
 	struct spi_transfer *transfer  = NULL;
 	struct spi_transfer *previous  = NULL;
 	struct mcbsp        *mcbsp;
-	u32 tranf_success = 1;
 	u32 mcbsp_id;
-	int status = 0;
 	u32 len;
 	u32 width;
 
@@ -358,7 +355,7 @@ static void spi_mcbsp_pump_transfers(unsigned long data)
 
 	        if (spi_mcbsp->tx == NULL) {
 		        /* Fake write */
-		        set_edma_src_params(mcbsp->dma_tx_lch, &zero, 0, 0);
+			set_edma_src_params(mcbsp->dma_tx_lch, (int)&zero, 0, 0);
 			set_edma_src_index(mcbsp->dma_tx_lch, 0, 0); /* do no increment src */
 		}
 
@@ -486,7 +483,6 @@ static int spi_mcbsp_setup(struct spi_device *spi)
 	int                  tcc       = -1;
         int                  dma_tx_ch;
         int                  dma_rx_ch;
-	int                  res;
 
 	/* Zero (the default) here means 8 bits */
 	if (!spi->bits_per_word)
@@ -545,9 +541,6 @@ static int spi_mcbsp_setup(struct spi_device *spi)
 		dev_dbg(&spi->dev, "McBSP0 set to SPI\n");
 	}
 #endif
-
-skip_gpio_cs:
-
 	/* Allocate the TX EDMA channel */
 	if (request_edma(mcbsp->dma_tx_sync, "McBSP TX", spi_mcbsp_edma_tx_callback,
 			 spi_mcbsp, &dma_tx_ch, &tcc, EVENTQ_3)) {
@@ -717,7 +710,7 @@ static int spi_mcbsp_probe(struct platform_device *pdev)
 	/* the spi->mode bits understood by this driver: */
 	master->mode_bits      = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
 	master->bus_num        = pdev->id;              /* McBSP instance */
-	master->num_chipselect = (unsigned short) dev->platform_data;
+	master->num_chipselect = (unsigned int) dev->platform_data;
 	master->setup          = spi_mcbsp_setup;
 	master->cleanup        = spi_mcbsp_cleanup;
 	master->transfer       = spi_mcbsp_transfer;
@@ -822,9 +815,13 @@ static struct platform_driver spi_mcbsp_driver = {
 
 static int __init spi_mcbsp_init(void)
 {
+	int res;
+
 	printk("SPI over McBSP driver version 0.1\n");
 
-	return platform_driver_register(&spi_mcbsp_driver);
+	res = platform_driver_register(&spi_mcbsp_driver);
+
+	return res;
 }
 
 static void __exit spi_mcbsp_exit(void)

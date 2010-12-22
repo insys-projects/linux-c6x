@@ -72,7 +72,7 @@ struct port_write_msg {
  */
 struct tci648x_rio_data {
 	struct completion      lsu_completion;
-	struct semaphore       lsu_lock;
+	struct mutex           lsu_lock;
 #ifdef CONFIG_EDMA3
 	int	               lsu_edma_ch;   /* LSU load EDMA channel */
 	int	               iccr_edma_ch;  /* ICCR load EDMA channel */
@@ -389,7 +389,6 @@ static int tci648x_rio_port_status(int port)
  */
 static int tci648x_rio_port_init(u32 port, u32 mode)
 {
-	u32 dummy;
 	u32 idx = (port << 2);
 
 	if (port >= TCI648X_RIO_MAX_PORT)
@@ -583,7 +582,7 @@ static int tci648x_rio_edma_release(void)
 
 static irqreturn_t lsu_interrupt_handler(int irq, void *data)
 {
-	struct tci648x_rio_data *p_rio = (struct tci648x_data *) data;
+	struct tci648x_rio_data *p_rio = (struct tci648x_rio_data *) data;
 	u32 pending_lsu_int            =
 		DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU_ICSR);
 
@@ -1021,7 +1020,7 @@ static inline int tci648x_rio_dio_edma_transfer(struct rio_mport *mport,
 retry_transfer:
 	/* Setup transfers */
 	set_edma_params(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
-	set_edma_src_params(_tci648x_rio.lsu_edma_ch, current_lsu_reg_queue, 0, 0);
+	set_edma_src_params(_tci648x_rio.lsu_edma_ch, (u32) current_lsu_reg_queue, 0, 0);
 	set_edma_dest_params(_tci648x_rio.lsu_edma_ch,
 			     TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG0,
 			     0, 0);
@@ -1033,7 +1032,7 @@ retry_transfer:
 				 ASYNC);
 	
 	set_edma_params(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
-	set_edma_src_params(_tci648x_rio.iccr_edma_ch, p_iccr_val, 0, 0);
+	set_edma_src_params(_tci648x_rio.iccr_edma_ch, (u32) p_iccr_val, 0, 0);
 	set_edma_transfer_params(_tci648x_rio.iccr_edma_ch, 
 				 4,         /* ACNT */
 				 count,     /* BCNT */
@@ -1042,7 +1041,7 @@ retry_transfer:
 				 ASYNC);
 
 	set_edma_params(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
-	set_edma_src_params(_tci648x_rio.rate_edma_ch, p_rate_val, 0, 0);
+	set_edma_src_params(_tci648x_rio.rate_edma_ch, (u32) p_rate_val, 0, 0);
 	set_edma_transfer_params(_tci648x_rio.rate_edma_ch, 
 				 4,         /* ACNT */
 				 count,     /* BCNT */
@@ -1130,7 +1129,7 @@ retry_transfer:
 		__delay(1000);
 		/* Restart from previous LSU reg data */
 		get_edma_params(_tci648x_rio.lsu_edma_ch, &edma_params);
-		if (edma_params.opt == NULL) {
+		if (edma_params.opt == 0) {
 			/* transfer is finished */
 			current_lsu_reg_queue = lsu_reg_queue + (real_count - 1);
 			count                 = 1;
@@ -1171,7 +1170,7 @@ static int tci648x_rio_dio_transfer(struct rio_mport *mport,
 {
 	int count = size_bytes;
 	int length;
-	int res;
+	int res = 0;
 
 #ifdef CONFIG_TMS320C6X_CACHES_ON
 	/* Flush caches if needed */
@@ -1294,7 +1293,6 @@ static int tci648x_rio_dbell_wait(struct rio_mport *mport, u16 data)
 
 	spin_lock_irqsave(&_tci648x_rio.dbell_i_lock, flags);
 
-wait_dbell:
 	add_wait_queue(&_tci648x_rio.dbell_waitq[dbnum], &wait);
 
 	current->state = TASK_INTERRUPTIBLE;
@@ -1981,7 +1979,7 @@ void rio_close_inb_mbox(struct rio_mport *mport, int mbox)
 			       1 << queue);
 
 		if (DEVICE_REG32_R(TCI648X_RIO_REG_BASE +  TCI648X_RIO_TXDMA_HDP0 
-				   + (queue << 2)) != NULL) {
+				   + (queue << 2)) != 0) {
 
 			for (tmp = 0; tmp != 0xfffffffc;
 			     tmp = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_RXDMA_CP0
@@ -2112,7 +2110,7 @@ void rio_close_outb_mbox(struct rio_mport *mport, int mbox)
 			       1 << queue);
 
 		if (DEVICE_REG32_R(TCI648X_RIO_REG_BASE +  TCI648X_RIO_TXDMA_HDP0 
-				   + (queue << 2)) != NULL) {
+				   + (queue << 2)) != 0) {
 
 			for (tmp = 0; tmp != 0xfffffffc;
 			     tmp = DEVICE_REG32_R(TCI648X_RIO_REG_BASE + TCI648X_RIO_TXDMA_CP0
@@ -2171,7 +2169,7 @@ int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 
 	spin_lock_irqsave(&tx_ring->lock, flags);
 
-	desc->pbuff = virt_to_phys(buffer);            /* buffer */
+	desc->pbuff = (void*) virt_to_phys((u32) buffer);      /* buffer */
 	desc->next  = NULL;
 	desc->opt1  = (mbox & (TCI648X_MAX_MBOX - 1))  /* mbox */
 		| (TCI648X_RIO_MSG_SSIZE << 6)         /* ssize (32 dword) */
@@ -2234,7 +2232,6 @@ int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 static void cppi_tx_handler(u32 queue)
 {
 	struct rio_msg_desc         *desc_next = NULL;
-	unsigned long                flags;
 	struct tci648x_rio_msg_ring *tx_ring   = &msg_tx_ring[queue];
 	struct rio_mport            *port      = tx_ring->port;
 	struct rio_msg_desc         *desc      = tx_ring->dirty;
@@ -2263,7 +2260,7 @@ static void cppi_tx_handler(u32 queue)
 		ASSERT(tx_ring->count > 0);
 
 	        /* Cleanup the desc */
-		atomic_sub(1, &tx_ring->count);
+		atomic_sub(1, (atomic_t*) &tx_ring->count);
 
 		/* Check teardown case */
 		if (desc->opt2 & TCI648X_RIO_DESC_FLAG_TEARDOWN)
@@ -2273,7 +2270,7 @@ static void cppi_tx_handler(u32 queue)
 		cc = (desc->opt2 & TCI648X_RIO_DESC_FLAG_CC) >> 9;
 		if (cc) {
 			DPRINTK("Tx ack error cc = 0x%x, desc = 0x%x\n", cc, desc);
-			desc->opt2 & ~TCI648X_RIO_DESC_FLAG_CC;
+			desc->opt2 &= ~TCI648X_RIO_DESC_FLAG_CC;
 			tx_ring->error++;
 		}
 
@@ -2324,7 +2321,7 @@ static void cppi_tx_handler(u32 queue)
 
 	/* ACK the last good desc */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_TXDMA_CP0
-		       + (queue << 2), desc);
+		       + (queue << 2), (u32) desc);
 }
 
 /**
@@ -2347,7 +2344,7 @@ int rio_hw_add_inb_buffer(struct rio_mport *mport, int mbox, void *buffer)
 	ASSERT(dirty->pbuff == NULL);
 
 	/* Descriptor is now available */
-	dirty->pbuff    = virt_to_phys(buffer);
+	dirty->pbuff    = (void*) virt_to_phys((u32) buffer);
 	dirty->next     = NULL;
 	
 	dirty->opt1  = 0;
@@ -2396,7 +2393,6 @@ void *rio_hw_get_inb_message(struct rio_mport *mport, int mbox)
 {
 	u32                          queue     = mport->id + TCI648X_RIO_MSG_RX_QUEUE_FIRST;
 	struct tci648x_rio_msg_ring *rx_ring   = &msg_rx_ring[queue];
-	int                          slot      = rx_ring->slot;
 	struct rio_msg_desc         *desc      = get_cur_desc(rx_ring);
 	u32                          pkt_flags = desc->opt2;
 	u16                          pkt_len   = ((pkt_flags & 0xff) ?
@@ -2427,7 +2423,7 @@ void *rio_hw_get_inb_message(struct rio_mport *mport, int mbox)
 	cc = (desc->opt2 & TCI648X_RIO_DESC_FLAG_CC) >> 9;
 	if (cc) {	     
 		DPRINTK("Rx error cc = 0x%x, desc = 0x%x\n", cc, desc);
-		desc->opt2 & ~TCI648X_RIO_DESC_FLAG_CC;
+		desc->opt2 &= ~TCI648X_RIO_DESC_FLAG_CC;
 		rx_ring->error++;
 	}
 	
@@ -2478,7 +2474,7 @@ retry:
 	
 	/* ACK the last managed desc */
 	DEVICE_REG32_W(TCI648X_RIO_REG_BASE + TCI648X_RIO_RXDMA_CP0
-		       + (queue << 2), prev_desc);
+		       + (queue << 2), (u32) prev_desc);
 
 	/*
 	 *  When writing the CP, there is a small race condition
@@ -2487,7 +2483,7 @@ retry:
 	 *  ownership bit.  If it is still the ports, do nothing.
 	 *  If it is the hosts, process the packet as normal.
 	 */
-	if ((desc->opt2 & TCI648X_RIO_DESC_FLAG_OWNER == 0) ||
+	if (((desc->opt2 & TCI648X_RIO_DESC_FLAG_OWNER) == 0) ||
 	    (desc->opt2 & TCI648X_RIO_DESC_FLAG_EOQ))
 		goto retry;
 }
@@ -2634,7 +2630,6 @@ int tci648x_rio_register_mport(u32 port_id, u32 hostid, u32 init)
 {
 	struct rio_ops   *ops;
 	struct rio_mport *port;
-        int               res;
 
 	ops = kzalloc(sizeof(struct rio_ops), GFP_KERNEL);
 
@@ -2733,7 +2728,6 @@ out:
 static int __init tci648x_rio_probe(struct platform_device *pdev)	
 {
 	int res;
-	int port;
 
 	/* sRIO main driver hw initialization (global setup, PSC, interrupts) */
 	res = tci648x_rio_init();

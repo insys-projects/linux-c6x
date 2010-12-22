@@ -249,7 +249,7 @@ static unsigned int mdio_init_phy_1(volatile unsigned int phy_addr)
 
 static unsigned int mdio_init_phy_2(volatile unsigned int phy_addr)
 {
-	unsigned short   val,val2, valgig;
+	unsigned short   val, val2, valgig = 0;
 
 	mdios.phy_addr    = phy_addr;
 

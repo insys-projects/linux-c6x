@@ -30,7 +30,7 @@ int sgmii_reset(void)
 
 int sgmii_config(struct sgmii_config_s *config)
 {
-	unsigned int i, val1 = 0, val2 = 0;
+	unsigned int val1 = 0, val2 = 0;
 
 	if (!config)
 		return -1;

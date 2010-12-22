@@ -87,7 +87,7 @@ static ssize_t rio_dev_write(struct file *filp, const char __user *buf, size_t s
 	size_t                   write_sz;
 	char                    *src_buf;
 	char                    *p;
-	int                      copy;
+	int                      copy = 0;
 	int                      write_pos = 0;
 
 	if (!size)
@@ -121,7 +121,7 @@ static ssize_t rio_dev_write(struct file *filp, const char __user *buf, size_t s
 		DPRINTK("Allocating write buffer, p = 0x%x, size = %d\n", p, L1_CACHE_ALIGN(size));
 
 	} else {
-		p    = src_buf = buf; /* zero-copy case */
+		p    = src_buf = (char *) buf; /* zero-copy case */
 		copy = 0;
 	}
 
@@ -176,7 +176,7 @@ static ssize_t rio_dev_read(struct file *filp, char __user *buf, size_t size, lo
 	size_t                   read_sz;
 	char                    *dest_buf;
 	char                    *p;
-	int                      copy;
+	int                      copy = 0;
 	int                      read_pos = 0;
 
 	if (!rdev->net->hport->ops->transfer)
