@@ -31,8 +31,6 @@
 
 #include <mach/board.h>
 
-#define DEBUG
-
 #ifdef DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG fmt, ## args)
 #else
