@@ -325,6 +325,8 @@ int mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer,
 		      unsigned int length);
 
 extern unsigned short MCBSP_READ(int base, int reg);
+extern void MCBSP_WRITE(int base, int reg, unsigned short val);
+
 extern struct clk * mcbsp_get_clock(unsigned int id);
 
 /* SPI specific API */

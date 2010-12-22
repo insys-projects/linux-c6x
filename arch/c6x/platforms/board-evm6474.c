@@ -114,8 +114,9 @@ core_initcall(evm_init_mcbsp);
 #include <asm/mcbsp-uart.h>
 
 static const struct mcbsp_uart_info evm6474_mcbsp_uart_info = {
-    .mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
-    .mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+	.mcbsp_id   = 0, /* first McBSP (McBSP0) used for UART */
+	.mcbsp_num  = 2, /* use two McBSP (McBSP0, McBSP1) */
+
 };
 
 static struct platform_device evm6474_mcbsp_uart_device = {
