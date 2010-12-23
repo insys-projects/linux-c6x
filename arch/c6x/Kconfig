@@ -107,6 +107,10 @@ config CPU_BIG_ENDIAN
 	  port must properly enable any big-endian related features
 	  of your chipset/board/processor.
 
+config FORCE_MAX_ZONEORDER
+	int
+	default "14"
+
 menu "Processor type and features"
 
 config TMS320C64X
