@@ -15,7 +15,7 @@
 #ifndef __ASM_C6X_PTRACE_H
 #define __ASM_C6X_PTRACE_H
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
 #define BKPT_OPCODE        0x56454314       /* illegal opcode */
 #else
 #define BKPT_OPCODE        0x0000a122       /* BNOP .S2 0,5 */
@@ -29,7 +29,7 @@
 #define PT_HI(odd,even)  odd
 #endif
 
-#if defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
 
 #define PT_A4_ORG  PT_LO(1,0)
 #define PT_TSR     PT_HI(1,0)
@@ -102,13 +102,13 @@
 #define PT_B14     PT_LO(69,68)
 #define PT_B15     PT_HI(69,68)
 
-#else /* defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__) */
+#else /* defined(__TMS320C6XPLUS__) */
 
 #define PT_A4_ORG  PT_LO(1,0)
 #define PT_STKADJ  PT_HI(1,0)
 #define PT_CSR	   PT_LO(3,2)
 #define PT_PC      PT_HI(3,2)
-#if defined(CONFIG_TMS320C64X) || defined(_TMS320C6400)
+#if defined(_TMS320C6400)
 #define PT_B16     PT_LO(5,4)
 #define PT_B17     PT_HI(5,4)
 #define PT_B18     PT_LO(7,6)
@@ -125,7 +125,7 @@
 #define PT_B29     PT_HI(17,16)
 #define PT_B30     PT_LO(19,18)
 #define PT_B31     PT_HI(19,18)
-#endif /* defined(CONFIG_TMS320C64X) || defined(_TMS320C6400) */
+#endif /* defined(_TMS320C6400) */
 #define PT_B0      PT_LO(21,20)
 #define PT_B1      PT_HI(21,20)
 #define PT_B2      PT_LO(23,22)
@@ -140,7 +140,7 @@
 #define PT_B11     PT_HI(31,30)
 #define PT_B12     PT_LO(33,32)
 #define PT_B13     PT_HI(33,32)
-#if defined(CONFIG_TMS320C64X) || defined(_TMS320C6400)
+#if defined(_TMS320C6400)
 #define PT_A16     PT_LO(35,34)
 #define PT_A17     PT_HI(35,34)
 #define PT_A18     PT_LO(37,36)
@@ -157,7 +157,7 @@
 #define PT_A29     PT_HI(47,46)
 #define PT_A30     PT_LO(49,48)
 #define PT_A31     PT_HI(49,48)
-#endif /* defined(CONFIG_TMS320C64X) || defined(_TMS320C6400) */
+#endif /* defined(_TMS320C6400) */
 #define PT_A0      PT_LO(51,50)
 #define PT_A1      PT_HI(51,50)
 #define PT_A2      PT_LO(53,52)
@@ -177,7 +177,7 @@
 #define PT_B14     PT_LO(67,66)
 #define PT_B15     PT_HI(67,66)
 
-#endif /* defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__) */
+#endif /* defined(__TMS320C6XPLUS__) */
 
 #define PT_DP	   PT_B14  /* Data Segment Pointer (B14) */
 #define PT_SP	   PT_B15  /* Stack Pointer (B15)  */
@@ -197,7 +197,7 @@
  * which means the word ordering of the pair depends on endianess.
  */
 struct pt_regs {
-#if defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
 	REG_PAIR(tsr,orig_a4);
 	REG_PAIR(rilc,ilc);
 #else
@@ -205,7 +205,7 @@ struct pt_regs {
 #endif
 	REG_PAIR(pc,csr);
 
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(_TMS320C6400)
+#if defined(_TMS320C6400)
 	REG_PAIR(b17,b16);
 	REG_PAIR(b19,b18);
 	REG_PAIR(b21,b20);
@@ -214,7 +214,7 @@ struct pt_regs {
 	REG_PAIR(b27,b26);
 	REG_PAIR(b29,b28);
 	REG_PAIR(b31,b30);
-#endif /* defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(_TMS320C6400) */
+#endif /* defined(_TMS320C6400) */
 
 	REG_PAIR(b1,b0);
 	REG_PAIR(b3,b2);
@@ -224,7 +224,7 @@ struct pt_regs {
 	REG_PAIR(b11,b10);
 	REG_PAIR(b13,b12);
 
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(_TMS320C6400)
+#if defined(_TMS320C6400)
 	REG_PAIR(a17,a16);
 	REG_PAIR(a19,a18);
 	REG_PAIR(a21,a20);
@@ -233,7 +233,7 @@ struct pt_regs {
 	REG_PAIR(a27,a26);
 	REG_PAIR(a29,a28);
 	REG_PAIR(a31,a30);
-#endif /* defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(_TMS320C6400) */
+#endif /* defined(_TMS320C6400) */
 
 	REG_PAIR(a1,a0);
 	REG_PAIR(a3,a2);
@@ -251,7 +251,7 @@ struct pt_regs {
  * This is the extended stack used by the context switcher
  */
 struct switch_stack {
-#if defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
 	REG_PAIR(rilc,ilc);
 #endif
 	REG_PAIR(a11,a10);
