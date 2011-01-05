@@ -35,6 +35,7 @@
 #include <linux/freezer.h>
 #include <linux/namei.h>
 #include <asm/uaccess.h>
+#include <asm/unaligned.h>
 #include <asm/processor.h>
 #include <linux/inet.h>
 #include <net/ipv6.h>
@@ -299,9 +300,9 @@ static int coalesce_t2(struct smb_hdr *psecond, struct smb_hdr *pTargetSMB)
 	memcpy(data_area_of_target, data_area_of_buf2, total_in_buf2);
 	total_in_buf += total_in_buf2;
 	pSMBt->t2_rsp.DataCount = cpu_to_le16(total_in_buf);
-	byte_count = le16_to_cpu(BCC_LE(pTargetSMB));
+	byte_count = GET_BCC_LE(pTargetSMB);
 	byte_count += total_in_buf2;
-	BCC_LE(pTargetSMB) = cpu_to_le16(byte_count);
+	SET_BCC_LE(pTargetSMB, byte_count);
 
 	byte_count = pTargetSMB->smb_buf_length;
 	byte_count += total_in_buf2;
@@ -2766,7 +2767,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 		tcon->need_reconnect = false;
 		tcon->tid = smb_buffer_response->Tid;
 		bcc_ptr = pByteArea(smb_buffer_response);
-		bytes_left = BCC(smb_buffer_response);
+		bytes_left = GET_BCC(smb_buffer_response);
 		length = strnlen(bcc_ptr, bytes_left - 2);
 		if (smb_buffer->Flags2 & SMBFLG2_UNICODE)
 			is_unicode = true;

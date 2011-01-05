@@ -20,6 +20,7 @@
  */
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <asm/unaligned.h>
 #include "cifs_unicode.h"
 #include "cifs_uniupr.h"
 #include "cifspdu.h"
@@ -193,25 +194,27 @@ cifs_strtoUCS(__le16 *to, const char *from, int len,
 {
 	int charlen;
 	int i;
-	wchar_t *wchar_to = (wchar_t *)to; /* needed to quiet sparse */
+	wchar_t wchar_to = 0; /* needed to quiet sparse */
+	u8 *to_next = (u8 *)to;
 
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
 
 		/* works for 2.4.0 kernel or later */
-		charlen = codepage->char2uni(from, len, &wchar_to[i]);
+		charlen = codepage->char2uni(from, len, &wchar_to);
 		if (charlen < 1) {
 			cERROR(1,
 			       ("strtoUCS: char2uni of %d returned %d",
 				(int)*from, charlen));
 			/* A question mark */
-			to[i] = cpu_to_le16(0x003f);
+			put_unaligned_le16(0x003f, to_next);
 			charlen = 1;
 		} else
-			to[i] = cpu_to_le16(wchar_to[i]);
+			put_unaligned_le16(wchar_to, to_next);
+		to_next += 2;
 
 	}
 
-	to[i] = 0;
+	put_unaligned_le16(0, to_next);
 	return i;
 }
 
