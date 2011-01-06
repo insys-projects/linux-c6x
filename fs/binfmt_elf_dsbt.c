@@ -1322,7 +1322,8 @@ static int elf_dsbt_map_file(struct elf_dsbt_params *params,
 	if (params->flags & ELF_DSBT_FLAG_EXECUTABLE)
 		flags |= MAP_EXECUTABLE;
 
-	if (find_dynamic_tag(params, DT_TEXTREL) == NULL) {
+	/* only GNU-linked binaries will have a PT_GNU_STACK */
+	if (params->stack_size != 0) {
 		prot = PROT_READ | PROT_EXEC;
 
 		mapped_addr = elf_dsbt_map(file, params->code_seg.p_vaddr,
