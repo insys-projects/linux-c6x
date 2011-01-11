@@ -109,7 +109,7 @@ config CPU_BIG_ENDIAN
 
 config FORCE_MAX_ZONEORDER
 	int
-	default "14"
+	default "13"
 
 menu "Processor type and features"
 
