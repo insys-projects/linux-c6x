@@ -284,7 +284,7 @@ static inline void mcbsp_write(unsigned int id, const char* buf, unsigned int si
 		
 		length = len * MCBSP_TX_BITS_PER_CHAR;
 		
-		init_completion(&(mcbsp_ptr[id]->tx_dma_completion));
+		INIT_COMPLETION(mcbsp_ptr[id]->tx_dma_completion);
 
 		set_edma_params(mcbsp_ptr[id]->dma_tx_lch, &dma_tx_params[id]);
 		set_edma_transfer_params(mcbsp_ptr[id]->dma_tx_lch, 4, length, 1, 0, ASYNC);

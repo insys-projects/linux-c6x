@@ -478,7 +478,7 @@ int mcbsp_xmit_buffer(unsigned int id, dma_addr_t buffer,
 
 	mcbsp_ptr[id]->dma_tx_lch = dma_tx_ch;
 
-	init_completion(&(mcbsp_ptr[id]->tx_dma_completion));
+	INIT_COMPLETION(mcbsp_ptr[id]->tx_dma_completion);
 
 	set_edma_transfer_params(mcbsp_ptr[id]->dma_tx_lch, 2, length / 2, 1, 0, ASYNC);
 	set_edma_dest_params(mcbsp_ptr[id]->dma_tx_lch, mcbsp_ptr[id]->dma_tx_data, 0, 0);
@@ -514,7 +514,7 @@ int mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer,
 
 	DBG("RX DMA on channel %d\n", dma_rx_ch);
 
-	init_completion(&(mcbsp_ptr[id]->rx_dma_completion));
+	INIT_COMPLETION(mcbsp_ptr[id]->rx_dma_completion);
 
 	set_edma_transfer_params(mcbsp_ptr[id]->dma_rx_lch, 2, length / 2, 1,
 				 0, ASYNC);
@@ -662,6 +662,9 @@ static int __devinit mcbsp_probe(struct platform_device *pdev)
 	mcbsp->dma_tx_sync = pdata->dma_tx_sync;
 	mcbsp->dma_rx_data = pdata->dma_rx_data;
 	mcbsp->dma_tx_data = pdata->dma_tx_data;
+
+	init_completion(&(mcbsp->rx_dma_completion));
+	init_completion(&(mcbsp->tx_dma_completion));
 
 	mcbsp->clk = clk_get(&pdev->dev, "mcbsp");
 	if (IS_ERR(mcbsp->clk)) {
