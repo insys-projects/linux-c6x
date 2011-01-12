@@ -26,12 +26,6 @@ extern void *alloca (size_t size);
 extern unsigned int csum_partial(const unsigned char * buff,int len, unsigned int sum);
 extern unsigned int ip_fast_csum(unsigned char *iph, unsigned int ihl);
 
-/* consistent area handling */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle);
-extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
-extern void consistent_sync(void *vaddr, size_t size, int direction);
-
 /******************************************************************************/
 
 /*
@@ -106,12 +100,6 @@ EXPORT_SYMBOL(alloca);
 EXPORT_SYMBOL(__current_thread_info);
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(ip_fast_csum);
-
-/* consistent area handling */
-EXPORT_SYMBOL(pci_alloc_consistent);
-EXPORT_SYMBOL(consistent_alloc);
-EXPORT_SYMBOL(consistent_free);
-EXPORT_SYMBOL(consistent_sync);
 
 /* minimal access checks for no-mmu */
 extern int _access_ok(unsigned long addr, unsigned long size);
