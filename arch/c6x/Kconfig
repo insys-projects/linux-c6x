@@ -219,6 +219,11 @@ if RAPIDIO_TCI648X
 source "drivers/rapidio/Kconfig"
 endif
 
+config IPC
+	bool "Inter Processor Communication low-level driver"
+	default y
+	depends on (SOC_TMS320C6472 || SOC_TMS320C6474)
+
 config TMS320C6X_CACHES_ON
 	bool "L2 cache support"
 	default y
