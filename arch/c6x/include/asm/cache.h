@@ -38,9 +38,10 @@
 #define ARCH_SLAB_MINALIGN 8
 
 /*
- * Align an address on the beginning of a MAR region
+ * Align a physical address to MAR regions
  */
-#define REGION_START(v)       (((u32) (v)) & ~(IMCR_MAR_SIZE - 1))
+#define CACHE_REGION_START(v) (((u32) (v)) & ~(IMCR_MAR_SIZE - 1))
+#define CACHE_REGION_END(v)   (((u32) (v) + (IMCR_MAR_SIZE - 1)) & ~(IMCR_MAR_SIZE - 1))
 
 /*
  * CCFG register values and bits
