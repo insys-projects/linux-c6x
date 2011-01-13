@@ -194,10 +194,10 @@ static int __init tci648x_ipc_init(void)
 		return res;
 
 	/* Set our IPC interrupt methods */
-	ipc_core.ipc_request = tci648x_ipc_request;
-	ipc_core.ipc_free    = tci648x_ipc_free;
-	ipc_core.ipc_send    = tci648x_ipc_send;
-	ipc_core.ipc_wait    = tci648x_ipc_wait;
+	ipc_core->ipc_request = tci648x_ipc_request;
+	ipc_core->ipc_free    = tci648x_ipc_free;
+	ipc_core->ipc_send    = tci648x_ipc_send;
+	ipc_core->ipc_wait    = tci648x_ipc_wait;
 
 	return 0;
 }

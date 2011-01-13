@@ -40,6 +40,16 @@
 #define virtio_wmb() wmb()
 #endif
 
+#ifdef ARCH_HAS_VIRTIO_SYNC_DATA
+extern void arch_virtio_sync_data(u32 addr, u32 len);
+extern void arch_virtio_flush_data(u32 addr, u32 len);
+#define virtio_sync_data(a, l)  arch_virtio_sync_data(a, l)
+#define virtio_flush_data(a, l) arch_virtio_flush_data(a, l)
+#else
+#define virtio_sync_data(a, l)
+#define virtio_flush_data(a, l)
+#endif
+
 #ifdef DEBUG
 /* For development, we want to crash whenever the ring is screwed. */
 #define BAD_RING(_vq, fmt, args...)				\
@@ -254,7 +264,7 @@ static void vring_kick(struct virtqueue *_vq)
 	END_USE(vq);
 }
 
-static void detach_buf(struct vring_virtqueue *vq, unsigned int head)
+static void detach_buf(struct vring_virtqueue *vq, unsigned int head, unsigned int len)
 {
 	unsigned int i;
 
@@ -268,8 +278,15 @@ static void detach_buf(struct vring_virtqueue *vq, unsigned int head)
 	if (vq->vring.desc[i].flags & VRING_DESC_F_INDIRECT)
 		kfree(phys_to_virt(vq->vring.desc[i].addr));
 
+	/* Eventually sync the data from the host */
+	if (len)
+		virtio_sync_data(vq->vring.desc[i].addr, vq->vring.desc[i].len);
+
 	while (vq->vring.desc[i].flags & VRING_DESC_F_NEXT) {
 		i = vq->vring.desc[i].next;
+		if (len)
+			virtio_sync_data(vq->vring.desc[i].addr,
+					 vq->vring.desc[i].len);
 		vq->num_free++;
 	}
 
@@ -320,7 +337,7 @@ static void *vring_get_buf(struct virtqueue *_vq, unsigned int *len)
 
 	/* detach_buf clears data, so grab it now. */
 	ret = vq->data[i];
-	detach_buf(vq, i);
+	detach_buf(vq, i, *len);
 	vq->last_used_idx++;
 	END_USE(vq);
 	return ret;
@@ -365,7 +382,7 @@ static void *vring_detach_unused_buf(struct virtqueue *_vq)
 			continue;
 		/* detach_buf clears data, so grab it now. */
 		buf = vq->data[i];
-		detach_buf(vq, i);
+		detach_buf(vq, i, 0);
 		END_USE(vq);
 		return buf;
 	}

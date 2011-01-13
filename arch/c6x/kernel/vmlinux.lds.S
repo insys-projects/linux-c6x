@@ -46,6 +46,7 @@ SECTIONS
 	
     .vectors : ALIGN(1024)
     .cmdline : ALIGN(4096)
+    .virtio_ipc_dev
 
     /* read-only */
     .text {
@@ -370,6 +371,7 @@ SECTIONS
   . = PAGE_OFFSET_RAW + 0x400;
   . = ALIGN(0x1000);
   .cmdline : { *(.cmdline) }
+  .virtio_ipc_dev : { *(.virtio_ipc_dev) }
 
   /* read-only */
   _stext = .;

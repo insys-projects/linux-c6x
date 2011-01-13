@@ -131,4 +131,6 @@ extern unsigned long __kstk_eip(struct task_struct *p);
 #define spin_lock_prefetch(x) (0)
 #endif
 
+#define ARCH_HAS_VIRTIO_SYNC_DATA
+
 #endif /* ASM_C6X_PROCESSOR_H */

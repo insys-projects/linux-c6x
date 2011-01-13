@@ -18,6 +18,6 @@ struct ipc_core_info {
 	/* Inter-core locks methods */
 };
 
-extern struct ipc_core_info ipc_core;
+extern struct ipc_core_info *ipc_core;
 
 #endif /* _ASM_C6X_IPC_CORE_H */

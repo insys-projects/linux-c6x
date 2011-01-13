@@ -39,10 +39,11 @@ static int dummy_ipc_wait(int ipc_num)
 	return -ENOSYS;
 } 
 
-struct ipc_core_info ipc_core = {
+static struct ipc_core_info __ipc_core = {
 	.ipc_request = dummy_ipc_request,
 	.ipc_free    = dummy_ipc_free,
 	.ipc_send    = dummy_ipc_send,
 	.ipc_wait    = dummy_ipc_wait,
 };
 
+struct ipc_core_info *ipc_core = &__ipc_core;
