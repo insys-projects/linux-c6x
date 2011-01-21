@@ -65,7 +65,7 @@ static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG
 static const char *cpu_name, *cpu_voltage, *mmu, *fpu, *soc_rev;
 static char __cpu_rev[5], *cpu_rev;
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
-static unsigned int cpu_num = 0;
+static unsigned int core_id = 0;
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 unsigned int c6x_platram_start;
@@ -198,10 +198,10 @@ static void __init get_cpuinfo(void)
 	}
 
 #ifdef CONFIG_TMS320C64XPLUS
-	cpu_num = get_coreid();
+	core_id = get_coreid();
 #endif
 	printk(KERN_INFO "CPU%d: %s rev %s, %s volts, %uMHz\n",
-	       cpu_num, cpu_name, cpu_rev,
+	       core_id, cpu_name, cpu_rev,
 	       cpu_voltage, c6x_core_freq / 1000000);
 #ifdef C6X_SOC_HAS_CORE_REV
 	soc_rev = arch_compute_silicon_rev(arch_get_silicon_rev());
@@ -520,14 +520,15 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		   "CPU:\t\t%s\n"
 		   "Core revision:\t%s\n"
 		   "Core voltage:\t%s\n"
-		   "Core num:\t%d\n"
+		   "Core id:\t%d\n"
+		   "SoC cores:\t%d\n"
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
 		   "Silicon rev:\t%s\n"
 		   "Clocking:\t%uMHz\n"
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
-		   cpu_name, cpu_rev, cpu_voltage, cpu_num, mmu, fpu,
+		   cpu_name, cpu_rev, cpu_voltage, core_id, CORE_NUM, mmu, fpu,
 		   soc_rev, (c6x_core_freq + 500000) / 1000000,
 		   (loops_per_jiffy/(500000/HZ)),
 		   (loops_per_jiffy/(5000/HZ))%100,
