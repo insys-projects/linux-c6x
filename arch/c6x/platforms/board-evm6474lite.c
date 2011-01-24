@@ -62,9 +62,9 @@ static struct platform_device evm6474l_rio_device = {
 	.dev		= { .platform_data = &evm6474l_rio_controller },
 };
 
-static void __init evm_init_rio(void)
+static int __init evm_init_rio(void)
 {
-	platform_device_register(&evm6474l_rio_device);
+	return platform_device_register(&evm6474l_rio_device);
 }
 
 core_initcall(evm_init_rio);
@@ -252,11 +252,10 @@ static struct clk_lookup evm_clks[] = {
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
+
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {   
-	int i, ret;
-
 	printk("Designed for the EVM6474 Lite EVM\n");
 
 	mach_progress      = dummy_progress;
@@ -265,7 +264,7 @@ void c6x_board_setup_arch(void)
 	mach_progress(1, "End of EVM6474 Lite specific initialization");
 }
 
-__init void evm_init(void)
+__init int evm_init(void)
 {
 	board_setup_i2c();
 	evm_setup_nand();

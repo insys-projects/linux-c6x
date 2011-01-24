@@ -511,7 +511,6 @@ static irqreturn_t emac_interrupt(int irq, void * netdev_id)
 	struct emac_private *ep  = netdev_priv(dev);
 	struct emac_desc    *desc;
 	unsigned long irq_flags;
-	unsigned long status;
 
 	/* Disable EMAC/MDIO interrupts  */
 	emac_clearbit_reg(EMAC_EWCTL, EMAC_B_INTEN);
