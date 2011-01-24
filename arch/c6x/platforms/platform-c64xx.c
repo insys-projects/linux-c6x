@@ -44,11 +44,11 @@
  * Resources present on the SoC
  */
 static struct resource c6x_soc_res = {
-	"C64X+ SOC peripherals",
+	.name = "C64X+ SOC peripherals",
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
-	0x01800000, 0x02f60000
+	.start = 0x01800000, .end = 0x02f60000
 #elif defined (CONFIG_SOC_TMS320C6455) || defined (CONFIG_SOC_TMS320C6457)
-	0x01800000, 0x2cffffff
+	.start = 0x01800000, .end = 0x2cffffff
 #else
 #error "No SoC peripheral address space defined"
 #endif
@@ -65,7 +65,7 @@ static const char *part_probe_types[] = { "cmdlinepart", NULL };
 static struct platdata_mtd_ram c6x_plat_data = {
 	.mapname   = "DRAM",
 #ifdef CONFIG_MTD_PARTITIONS
-	.probes    = part_probe_types,
+	.probes    = (const char **) part_probe_types,
 #endif
 	.bankwidth = 4,
 };
