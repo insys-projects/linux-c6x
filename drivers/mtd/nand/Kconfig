@@ -488,10 +488,10 @@ config MTD_NAND_W90P910
 	  This enables the driver for the NAND Flash on evaluation board based
 	  on w90p910.
 
-config MTD_NAND_EVM6488
-        tristate "NAND Flash device on EVM6488 board"
-	depends on ARCH_BOARD_EVM6457 || ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6474L
+config MTD_NAND_GPIO_C6X
+        tristate "NAND Flash support on C6x SoC"
+	depends on GENERIC_GPIO && TMS320C6X
         help
-          Support for NAND flash on Texas Instruments EVM6488-like platforms.
+          This enables a GPIO based NAND flash on Texas Instruments C6x SoC boards.
 
 endif # MTD_NAND

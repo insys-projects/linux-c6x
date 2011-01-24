@@ -29,7 +29,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
-#include <linux/mtd/nand-evm6488.h>
+#include <linux/mtd/nand-gpio-c6x.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -123,7 +123,7 @@ static void __init evm_setup_i2c(void)
 #define evm_setup_i2c()
 #endif /* CONFIG_I2C */
 
-#if defined(CONFIG_MTD_NAND_EVM6488) || defined(CONFIG_MTD_NAND_EVM6488_MODULE)
+#if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
 static struct mtd_partition evm_nand_parts[] = {
 	{
 		.name		= "bootloader",
@@ -152,7 +152,7 @@ static struct gpio_nand_platdata evm_nand_platdata = {
 };
 
 static struct platform_device evm_nand = {
-	.name		= "nand-evm6488",
+	.name		= "gpio-nand-c6x",
 	.id		= -1,
 	.dev		= {
 		.platform_data = &evm_nand_platdata,
