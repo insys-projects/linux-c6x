@@ -29,7 +29,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
-#include <linux/mtd/nand-evm6488.h>
+#include <linux/mtd/nand-gpio-c6x.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -61,9 +61,9 @@ static struct platform_device evm6472_rio_device = {
 	.dev		= { .platform_data = &evm6472_rio_controller },
 };
 
-static void __init evm_init_rio(void)
+static int __init evm_init_rio(void)
 {
-	platform_device_register(&evm6472_rio_device);
+	return platform_device_register(&evm6472_rio_device);
 }
 
 core_initcall(evm_init_rio);
@@ -123,7 +123,7 @@ static void __init evm_setup_i2c(void)
 #define evm_setup_i2c()
 #endif /* CONFIG_I2C */
 
-#if defined(CONFIG_MTD_NAND_EVM6488) || defined(CONFIG_MTD_NAND_EVM6488_MODULE)
+#if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
 static struct mtd_partition evm_nand_parts[] = {
 	{
 		.name		= "bootloader",
@@ -152,7 +152,7 @@ static struct gpio_nand_platdata evm_nand_platdata = {
 };
 
 static struct platform_device evm_nand = {
-	.name		= "nand-evm6488",
+	.name		= "gpio-nand-c6x",
 	.id		= -1,
 	.dev		= {
 		.platform_data = &evm_nand_platdata,
@@ -170,16 +170,6 @@ static inline void evm_setup_nand(void) {}
 static struct pll_data pll1_data = {
 	.num       = 1,
 	.phys_base = ARCH_PLL1_BASE,
-};
-
-static struct pll_data pll2_data = {
-	.num       = 2,
-	.phys_base = ARCH_PLL2_BASE,
-};
-
-static struct pll_data pll3_data = {
-	.num       = 3,
-	.phys_base = ARCH_PLL3_BASE,
 };
 
 static struct clk clkin1 = {
@@ -300,8 +290,6 @@ static void dummy_progress(unsigned int step, char *s) {}
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
 {
-	int i, ret;
-
 	printk(KERN_INFO "Designed for the EVM6472 board, Texas Instruments.\n");
 
 	mach_progress      = dummy_progress;
@@ -316,6 +304,7 @@ __init int evm_init(void)
 {
 	evm_setup_i2c();
 	evm_setup_nand();
+
 	return 0;
 }
 

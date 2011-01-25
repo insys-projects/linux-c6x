@@ -27,6 +27,10 @@
 #include <linux/i2c/sc16is7xx.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/nand-gpio-c6x.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -157,6 +161,50 @@ static void __init board_setup_i2c(void)
 #define board_setup_i2c()
 #endif /* CONFIG_I2C */
 
+#if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
+static struct mtd_partition evm_nand_parts[] = {
+	{
+		.name		= "bootloader",
+		.offset		= 0,
+		.size		= 0x00200000,
+		.mask_flags	= MTD_WRITEABLE,
+	},
+	{
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x01000000,
+		.mask_flags	= 0,
+	},
+	{
+		.name		= "filesystem",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.mask_flags	= 0,
+	}	
+};
+
+static struct gpio_nand_platdata evm_nand_platdata = {
+	.parts = evm_nand_parts,
+	.num_parts = ARRAY_SIZE(evm_nand_parts),
+	.chip_delay = 25,
+};
+
+static struct platform_device evm_nand = {
+	.name		= "gpio-nand-c6x",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &evm_nand_platdata,
+	}
+};
+
+static void __init evm_setup_nand(void)
+{
+	platform_device_register(&evm_nand);
+}
+#else
+static inline void evm_setup_nand(void) {}
+#endif
+
 static struct pll_data pll1_data = {
 	.num       = 1,
 	.phys_base = ARCH_PLL1_BASE,
@@ -274,6 +322,7 @@ void c6x_board_setup_arch(void)
 __init int evm_init(void)
 {
 	board_setup_i2c();
+	evm_setup_nand();
 
 	return 0;
 }

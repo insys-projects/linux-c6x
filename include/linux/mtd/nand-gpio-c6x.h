@@ -1,7 +1,8 @@
-#ifndef __LINUX_MTD_NAND_EVM6488_H
-#define __LINUX_MTD_NAND_EVM6488_H
+#ifndef __LINUX_MTD_NAND_GPIO_C6X_H
+#define __LINUX_MTD_NAND_GPIO_C6X_H
 
 #include <linux/mtd/nand.h>
+#include <mach/nand-gpio.h>
 
 struct gpio_nand_platdata {
 	void	(*adjust_parts)(struct gpio_nand_platdata *, size_t);

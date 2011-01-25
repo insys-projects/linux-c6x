@@ -39,7 +39,7 @@
 	.global __c6xabi_remi
 
 __c6xabi_remi:
-	stw	.d2t2	B3, *B15
+	stw	.d2t2	B3, *B15--[2]
 ||	cmpgt	.l1	0, A4, A1
 ||	cmpgt	.l2	0, B4, B2
 ||	mv	.s1	A4, A5
@@ -56,7 +56,7 @@ __c6xabi_remi:
 _divu_ret_1:
 	neg	.l1	A4, A4
 _divu_ret_2:
-	ldw	.d2t2	*B15, B3
+	ldw	.d2t2	*++B15[2], B3
 
 #ifdef CONFIG_TMS320C64XPLUS
 	mpy32	.m1x	A4, B2, A6
