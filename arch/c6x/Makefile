@@ -62,8 +62,6 @@ LDFLAGS_vmlinux	:= --final-script=arch/c6x/vmlinux.cmd \
 LDFLAGS_vmlinux	+= -Wl,arch/c6x/vmlinux.cmd
 
 LD		= $(CROSS_COMPILE)gcc -nostdlib $(LINKFLAGS)
-else
-LDFLAGS_MODULE	+= arch/c6x/lib/helpers.o
 endif
 
 KBUILD_CPPFLAGS += -I$(srctree)/arch/c6x/platforms/include -I$(obj)/arch/c6x/kernel
