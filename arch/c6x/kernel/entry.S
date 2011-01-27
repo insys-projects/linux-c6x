@@ -92,8 +92,8 @@
 		.ref	sys_pwrite64
 		.ref	sys_truncate64
 		.ref	sys_ftruncate64
-		.ref	sys_advise64
-		.ref	sys_advise64_64
+		.ref	sys_fadvise64
+		.ref	sys_fadvise64_64
 		.ref	sys_fallocate
 		.ref	process_exception
 		.ref   sys_ni_syscall
