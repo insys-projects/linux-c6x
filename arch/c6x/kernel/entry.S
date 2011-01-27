@@ -3,7 +3,7 @@
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
-;  Copyright (C) 2004, 2005, 2006, 2009, 2010 Texas Instruments Incorporated
+;  Copyright (C) 2004, 2005, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
 ;  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
 ;
@@ -92,6 +92,8 @@
 		.ref	sys_pwrite64
 		.ref	sys_truncate64
 		.ref	sys_ftruncate64
+		.ref	sys_advise64
+		.ref	sys_advise64_64
 		.ref	sys_fallocate
 		.ref	process_exception
 		.ref   sys_ni_syscall
@@ -915,6 +917,48 @@ sys_ftruncate64_c6x:
 
 ;; On Entry
 ;;   A4 - fd
+;;   B4 - offset_lo (LE), offset_hi (BE)
+;;   A6 - offset_lo (BE), offset_hi (LE)
+;;   B6 - len
+;;   A8 - advice
+sys_fadvise64_c6x:
+	MVKL	.S1	sys_fadvise64,A0
+	MVKH	.S1	sys_fadvise64,A0
+	BNOP	.S2X	A0,2
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	MV	.L2	B4,B5
+ ||	MV	.D2X	A6,B4
+#else
+	MV	.D2X	A6,B5
+#endif
+	MV	.D1X	B6,A6
+	MV	.D2X	A8,B6
+
+;; On Entry
+;;   A4 - fd
+;;   B4 - offset_lo (LE), offset_hi (BE)
+;;   A6 - offset_lo (BE), offset_hi (LE)
+;;   B6 - len_lo (LE), len_hi (BE)
+;;   A8 - len_lo (BE), len_hi (LE)
+;;   B8 - advice
+sys_fadvise64_64_c6x:
+	MVKL	.S1	sys_fadvise64_64,A0
+	MVKH	.S1	sys_fadvise64_64,A0
+	BNOP	.S2X	A0,2
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	MV	.L2	B4,B5
+ ||	MV	.D2X	A6,B4
+	MV	.L1	A8,A6
+ ||	MV	.D1X	B6,A7
+#else
+	MV	.D2X	A6,B5
+	MV	.L1	A8,A7
+ ||	MV	.D1X	B6,A6
+#endif
+	MV	.L2	B8,B6
+
+;; On Entry
+;;   A4 - fd
 ;;   B4 - mode
 ;;   A6 - offset_hi
 ;;   B6 - offset_lo
@@ -1260,7 +1304,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_io_getevents
 	SYSCALL_ENTRY	sys_io_submit
 	SYSCALL_ENTRY	sys_io_cancel
-	SYSCALL_ENTRY	sys_fadvise64
+	SYSCALL_LOCAL	sys_fadvise64_c6x
 	SYSCALL_ENTRY	sys_exit_group
 	SYSCALL_ENTRY	sys_lookup_dcookie
 	SYSCALL_ENTRY	sys_epoll_create
@@ -1281,7 +1325,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_fstatfs64
 	SYSCALL_ENTRY	sys_tgkill
 	SYSCALL_ENTRY	sys_utimes
-	SYSCALL_ENTRY	sys_fadvise64_64
+	SYSCALL_LOCAL	sys_fadvise64_64_c6x
 	SYSCALL_ENTRY	sys_mbind
 	SYSCALL_ENTRY	sys_get_mempolicy
 	SYSCALL_ENTRY	sys_set_mempolicy	; 270
