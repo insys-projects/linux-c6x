@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -56,5 +56,6 @@ extern void (*mach_leds_timer)(void);
 extern void (*mach_setup_timer)(void);
 extern void (*mach_progress) (unsigned int, char *);
 extern void (*mach_print_value) (char *, unsigned long);
+extern void (*mach_nmi_handler)(struct pt_regs *regs);
 
 #endif /* __ASM_C6X_MACHDEP_H */

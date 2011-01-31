@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -91,6 +91,7 @@ void (*mach_setup_timer)(void) = NULL;
 void (*mach_init_IRQ) (void) = NULL;
 void (*mach_progress) (unsigned int, char *) = NULL;
 void (*mach_print_value) (char *, unsigned long) = NULL;
+void (*mach_nmi_handler)(struct pt_regs *regs);
 
 struct tag_header *c6x_tags_pointer __initdata;
 

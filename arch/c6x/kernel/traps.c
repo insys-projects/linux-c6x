@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -361,7 +361,10 @@ asmlinkage int process_exception(struct pt_regs *regs)
 		switch(type_num) {
 		case EXCEPT_TYPE_NXF:
 			ack_exception(EXCEPT_TYPE_NXF);
-			die("Oops - NMI detected", regs, instruction_pointer(regs));
+			if (mach_nmi_handler)
+				(*mach_nmi_handler)(regs);
+			else
+				die("Oops - NMI detected", regs, instruction_pointer(regs));
 			break;
 
 		case EXCEPT_TYPE_IXF:
