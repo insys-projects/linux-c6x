@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -12,15 +12,6 @@
  */
 #ifndef __ASM_C6X_TRAPS_H
 #define __ASM_C6X_TRAPS_H
-
-typedef void (*e_vector)(void);
-
-extern e_vector vectors[];
-
-/* structure for stack frames */
-struct frame {
-    struct pt_regs ptregs;
-};
 
 #ifdef CONFIG_TMS320C64XPLUS
 
