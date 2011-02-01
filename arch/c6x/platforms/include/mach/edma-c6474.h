@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -84,6 +84,19 @@
 /* C6474 uses region indexed on core id */
 #define MACH_EDMA_NUM_REGIONS        8
 #define MACH_EDMA_REGION             (7 - get_coreid())
-#define IRQ_EDMA3CCINT               (IRQ_TPCCINT0 + MACH_EDMA_REGION)
+
+#define MACH_EDMA_NUM_QDMACH         8
+#define MACH_EDMA_NUM_EVQUE	     6
+#define MACH_EDMA_NUM_TC	     6
+
+#define MACH_EDMA_IRQ_CCINT	     (IRQ_TPCCINT0 + MACH_EDMA_REGION)
+#define MACH_EDMA_IRQ_CCERRINT	     IRQ_TPCCERRINT
+
+#define IRQ_TCERRINT0	IRQ_TPTCERRINT0
+#define IRQ_TCERRINT1	IRQ_TPTCERRINT1
+#define IRQ_TCERRINT2	IRQ_TPTCERRINT2
+#define IRQ_TCERRINT3	IRQ_TPTCERRINT3
+#define IRQ_TCERRINT4	IRQ_TPTCERRINT4
+#define IRQ_TCERRINT5	IRQ_TPTCERRINT5
 
 #endif /* _MACH_EDMA3_C6474_H */

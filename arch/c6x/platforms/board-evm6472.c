@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2008, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2008, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -39,6 +39,7 @@
 #include <asm/timer.h>
 #include <asm/percpu.h>
 #include <asm/clock.h>
+#include <asm/edma.h>
 
 #include <mach/i2c.h>
 #include <mach/board.h>
@@ -166,6 +167,124 @@ static void __init evm_setup_nand(void)
 #else
 static inline void evm_setup_nand(void) {}
 #endif
+
+
+#ifdef CONFIG_EDMA3
+
+/* Four Transfer Controllers on TMS320C6472 */
+static const s8
+queue_tc_mapping[][2] = {
+	/* {event queue no, TC no} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static const s8
+queue_priority_mapping[][2] = {
+	/* {event queue no, Priority} */
+	{0, 0},	/* FIXME: what should these priorities be? */
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static struct edma_soc_info edma_cc0_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA_NUM_PARAMENTRY,
+	.n_tc			= EDMA_NUM_EVQUE,
+	.n_cc			= 1,
+	.queue_tc_mapping	= queue_tc_mapping,
+	.queue_priority_mapping	= queue_priority_mapping,
+};
+
+static struct edma_soc_info *edma_info[] = {
+	&edma_cc0_info,
+};
+
+static struct resource edma_resources[] = {
+	{
+		.name	= "edma0",
+		.start	= EDMA_IRQ_CCINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma0_err",
+		.start	= EDMA_IRQ_CCERRINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma_cc0",
+		.start	= EDMA_REGISTER_BASE,
+		.end	= EDMA_REGISTER_BASE + 0xFFFF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc0",
+		.start	= EDMA_TC0_BASE,
+		.end	= EDMA_TC0_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc1",
+		.start	= EDMA_TC1_BASE,
+		.end	= EDMA_TC1_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc2",
+		.start	= EDMA_TC2_BASE,
+		.end	= EDMA_TC2_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc3",
+		.start	= EDMA_TC3_BASE,
+		.end	= EDMA_TC3_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc4",
+		.start	= EDMA_TC4_BASE,
+		.end	= EDMA_TC4_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc5",
+		.start	= EDMA_TC5_BASE,
+		.end	= EDMA_TC5_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	/* not using TC*_ERR */
+};
+
+static struct platform_device edma_device = {
+	.name			= "edma",
+	.id			= 0,
+	.dev.platform_data	= edma_info,
+	.num_resources		= ARRAY_SIZE(edma_resources),
+	.resource		= edma_resources,
+};
+
+
+static void __init evm_setup_edma(void)
+{
+	int status;
+
+	status = platform_device_register(&edma_device);
+	if (status != 0)
+		pr_debug("setup_edma --> %d\n", status);
+}
+#else
+#define evm_setup_edma()
+#endif /* CONFIG_EDMA3 */
+
+/*----------------------------------------------------------------------*/
+
 
 static struct pll_data pll1_data = {
 	.num       = 1,
@@ -302,6 +421,7 @@ void c6x_board_setup_arch(void)
 
 __init int evm_init(void)
 {
+	evm_setup_edma();
 	evm_setup_i2c();
 	evm_setup_nand();
 
