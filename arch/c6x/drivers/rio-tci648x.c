@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -71,25 +71,25 @@ struct port_write_msg {
  * Main TCI648x RapidIO driver data
  */
 struct tci648x_rio_data {
-	struct completion      lsu_completion;
-	struct mutex           lsu_lock;
+	struct completion	lsu_completion;
+	struct mutex		lsu_lock;
 #ifdef CONFIG_EDMA3
-	int	               lsu_edma_ch;   /* LSU load EDMA channel */
-	int	               iccr_edma_ch;  /* ICCR load EDMA channel */
-	int	               rate_edma_ch;  /* RATE load EDMA channel */
-	edmacc_paramentry_regs lsu_edma_params;
-	edmacc_paramentry_regs iccr_edma_params;
-	edmacc_paramentry_regs rate_edma_params;
-	int                    dummy_edma_ch; /* dummy EDMA for int. gen. */
-	int                    iccr_tcc; 
-	int                    rate_tcc;
+	int			lsu_edma_ch;   /* LSU load EDMA channel */
+	int			iccr_edma_ch;  /* ICCR load EDMA channel */
+	int			rate_edma_ch;  /* RATE load EDMA channel */
+	struct edmacc_param	lsu_edma_params;
+	struct edmacc_param	iccr_edma_params;
+	struct edmacc_param	rate_edma_params;
+	int			dummy_edma_ch; /* dummy EDMA for int. gen. */
+	int			iccr_tcc;
+	int			rate_tcc;
 #endif
-	wait_queue_head_t      dbell_waitq[TCI648X_RIO_DBELL_VALUE_MAX];
-	spinlock_t             dbell_i_lock;
-	struct port_write_msg  port_write_msg;
-	struct work_struct     pw_work;
-	struct kfifo           pw_fifo;
-	spinlock_t             pw_fifo_lock;
+	wait_queue_head_t	dbell_waitq[TCI648X_RIO_DBELL_VALUE_MAX];
+	spinlock_t		dbell_i_lock;
+	struct port_write_msg	port_write_msg;
+	struct work_struct	pw_work;
+	struct kfifo		pw_fifo;
+	spinlock_t		pw_fifo_lock;
 };
 
 static struct tci648x_rio_data _tci648x_rio;
@@ -135,7 +135,7 @@ static void tci648x_rio_port_write_handler(struct tci648x_rio_data *p_rio);
 static int tci648x_rio_port_write_init(struct tci648x_rio_data *p_rio);
 static void tci648x_rio_interrupt_setup(void);
 static void tci648x_rio_interrupt_release(void);
-static int tci648x_rio_edma_setup(void);
+static int tci648x_rio_edma_setup(struct platform_device *pdev);
 static int tci648x_rio_edma_release(void);
 static void cppi_tx_handler(u32 queue);
 static void cppi_rx_handler(u32 queue);
@@ -417,7 +417,7 @@ static int tci648x_rio_port_init(u32 port, u32 mode)
 	return 0;
 }
 
-static int tci648x_rio_init(void) 
+static int tci648x_rio_init(struct platform_device *pdev)
 {
 	unsigned int i;
 	int          res;
@@ -454,7 +454,7 @@ static int tci648x_rio_init(void)
 
 #ifdef CONFIG_EDMA3	
 	/* EDMA setup */
-	res = tci648x_rio_edma_setup();
+	res = tci648x_rio_edma_setup(pdev);
 #endif
 
 out:
@@ -472,108 +472,116 @@ static int tci648x_rio_release(void) {
 
 /*----------------------------------- EDMA management ------------------------------*/
 #ifdef CONFIG_EDMA3
-static void lsu_edma_callback(int lch, u16 ch_status, void *data)
+static void lsu_edma_callback(unsigned lch, u16 ch_status, void *data)
 {
 	struct tci648x_rio_data *p_rio = (struct tci648x_rio_data *) data;
 
 	complete(&p_rio->lsu_completion);
 }
 
-static int tci648x_rio_edma_setup(void)
+static int tci648x_rio_edma_setup(struct platform_device *pdev)
 {
-	int                    tcc = -1;
+	int	ch;
+	struct resource *r;
 
 	/* Request the LSU load channel */ 
-	if (request_edma(TCI648X_LSU_CHANNEL_EVENT,
-			 "sRIO LSU",
-			 lsu_edma_callback,
-			 &_tci648x_rio,
-			 &_tci648x_rio.lsu_edma_ch,
-			 &tcc,
-			 EVENTQ_2)) {
+	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, "LSU");
+	if (r == NULL) {
+		printk(KERN_INFO "Unable to find DMA resource for sRIO LSU\n");
+		return -EINVAL;
+	}
+
+	ch = edma_alloc_channel(r->start, lsu_edma_callback,
+				&_tci648x_rio, EVENTQ_2);
+	if (ch < 0) {
 	        printk("Unable to request EDMA channel for sRIO LSU\n");
 		return -EAGAIN;
 	}
+	_tci648x_rio.lsu_edma_ch = ch;
 
 	/* Request the ICCR load channel */ 
-	if (request_edma(TCI648X_ICCR_CHANNEL_EVENT,
-			 "sRIO ICCR",
-			 NULL,
-			 NULL, 
-			 &_tci648x_rio.iccr_edma_ch,
-			 &tcc,
-			 EVENTQ_2)) {
+	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, "ICCR");
+	if (r == NULL) {
+		printk(KERN_INFO "Unable to find DMA resource for sRIO ICCR\n");
+		return -EINVAL;
+	}
+
+	ch = edma_alloc_channel(r->start, NULL, NULL, EVENTQ_2);
+	if (ch < 0) {
 	        printk("Unable to request EDMA channel for sRIO ICCR\n");
 		return -EAGAIN;
 	}
-	
+	_tci648x_rio.iccr_edma_ch = ch;
+
 	/* Request the RATE load channel */ 
-	if (request_edma(TCI648X_RATE_CHANNEL_EVENT,
-			 "sRIO RATE",
-			 NULL,
-			 NULL,
-			 &_tci648x_rio.rate_edma_ch, 
-			 &tcc,
-			 EVENTQ_2)) {
+	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, "RATE");
+	if (r == NULL) {
+		printk(KERN_INFO "Unable to find DMA resource for sRIO RATE\n");
+		return -EINVAL;
+	}
+
+	ch = edma_alloc_channel(r->start, NULL, NULL, EVENTQ_2);
+	if (ch < 0) {
 	        printk("Unable to request EDMA channel for sRIO RATE\n");
 		return -EAGAIN;
 	}
+	_tci648x_rio.rate_edma_ch = ch;
 
 	/* Eventually map the sRIO event to the EDMA event */
 	tci648x_map_rio_edma_event();
 
 	/* Just in case... */
-	stop_edma(_tci648x_rio.lsu_edma_ch); 
-	stop_edma(_tci648x_rio.iccr_edma_ch); 
-	stop_edma(_tci648x_rio.rate_edma_ch); 
+	edma_stop(_tci648x_rio.lsu_edma_ch);
+	edma_stop(_tci648x_rio.iccr_edma_ch);
+	edma_stop(_tci648x_rio.rate_edma_ch);
 
 	/* Setup constant EDMA parameters */	
-	set_edma_dest_index(_tci648x_rio.lsu_edma_ch, 0, 0);
-	set_edma_src_index(_tci648x_rio.lsu_edma_ch, 
+	edma_set_dest_index(_tci648x_rio.lsu_edma_ch, 0, 0);
+	edma_set_src_index(_tci648x_rio.lsu_edma_ch,
 			   sizeof(struct tci648x_rio_lsu_reg), 0);
 
-	set_edma_dest_params(_tci648x_rio.iccr_edma_ch,
+	edma_set_dest(_tci648x_rio.iccr_edma_ch,
 			     TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU_ICCR,
 			     0, 0);
-	set_edma_dest_index(_tci648x_rio.iccr_edma_ch, 0, 0);
-	set_edma_src_index(_tci648x_rio.iccr_edma_ch, 0, 0);
+	edma_set_dest_index(_tci648x_rio.iccr_edma_ch, 0, 0);
+	edma_set_src_index(_tci648x_rio.iccr_edma_ch, 0, 0);
 
-	set_edma_dest_params(_tci648x_rio.rate_edma_ch,
+	edma_set_dest(_tci648x_rio.rate_edma_ch,
 			     TCI648X_RIO_REG_BASE + TCI648X_RIO_INTDST0_RATE_CNTL
 			     + (TCI648X_EDMA_RIO_INT << 2),
 			     0, 0);
-	set_edma_dest_index(_tci648x_rio.rate_edma_ch, 0, 0);
-	set_edma_src_index(_tci648x_rio.rate_edma_ch, 0, 0);
+	edma_set_dest_index(_tci648x_rio.rate_edma_ch, 0, 0);
+	edma_set_src_index(_tci648x_rio.rate_edma_ch, 0, 0);
 
 	/* Setup chaining */
-	edma_chain_lch(_tci648x_rio.iccr_edma_ch, _tci648x_rio.rate_edma_ch);
-	edma_chain_lch(_tci648x_rio.rate_edma_ch, _tci648x_rio.lsu_edma_ch);
+	edma_chain(_tci648x_rio.iccr_edma_ch, _tci648x_rio.rate_edma_ch);
+	edma_chain(_tci648x_rio.rate_edma_ch, _tci648x_rio.lsu_edma_ch);
 
 	/* Add intermediate event generation and set TCCMODE */
-	get_edma_params(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
+	edma_read_slot(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
 	_tci648x_rio.lsu_edma_params.opt |= TCCMODE;
-	set_edma_params(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
+	edma_write_slot(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
 
-	get_edma_params(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
+	edma_read_slot(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
 	_tci648x_rio.iccr_edma_params.opt |= ITCCHEN | TCCMODE;
-	set_edma_params(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
+	edma_write_slot(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
 
-	get_edma_params(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
+	edma_read_slot(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
 	_tci648x_rio.rate_edma_params.opt |= ITCCHEN;
-	set_edma_params(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
+	edma_write_slot(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
 
 	return 0;
 }
 
 static int tci648x_rio_edma_release(void)
 {
-	stop_edma(_tci648x_rio.lsu_edma_ch); 
-	stop_edma(_tci648x_rio.iccr_edma_ch); 
-	stop_edma(_tci648x_rio.rate_edma_ch); 
+	edma_stop(_tci648x_rio.lsu_edma_ch);
+	edma_stop(_tci648x_rio.iccr_edma_ch);
+	edma_stop(_tci648x_rio.rate_edma_ch);
 
-	free_edma(_tci648x_rio.lsu_edma_ch);
-	free_edma(_tci648x_rio.iccr_edma_ch);
-	free_edma(_tci648x_rio.rate_edma_ch);
+	edma_free_channel(_tci648x_rio.lsu_edma_ch);
+	edma_free_channel(_tci648x_rio.iccr_edma_ch);
+	edma_free_channel(_tci648x_rio.rate_edma_ch);
 
 	return 0;
 }
@@ -1019,30 +1027,30 @@ static inline int tci648x_rio_dio_edma_transfer(struct rio_mport *mport,
 
 retry_transfer:
 	/* Setup transfers */
-	set_edma_params(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
-	set_edma_src_params(_tci648x_rio.lsu_edma_ch, (u32) current_lsu_reg_queue, 0, 0);
-	set_edma_dest_params(_tci648x_rio.lsu_edma_ch,
+	edma_write_slot(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
+	edma_set_src(_tci648x_rio.lsu_edma_ch, (u32) current_lsu_reg_queue, 0, 0);
+	edma_set_dest(_tci648x_rio.lsu_edma_ch,
 			     TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU1_REG0,
 			     0, 0);
-	set_edma_transfer_params(_tci648x_rio.lsu_edma_ch, 
+	edma_set_transfer_params(_tci648x_rio.lsu_edma_ch,
 				 sizeof(struct tci648x_rio_lsu_reg), /* ACNT */
 				 count,     /* BCNT */
 				 1,         /* CCNT */    
 				 1,         /* BCNTRLD */
 				 ASYNC);
 	
-	set_edma_params(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
-	set_edma_src_params(_tci648x_rio.iccr_edma_ch, (u32) p_iccr_val, 0, 0);
-	set_edma_transfer_params(_tci648x_rio.iccr_edma_ch, 
+	edma_write_slot(_tci648x_rio.iccr_edma_ch, &_tci648x_rio.iccr_edma_params);
+	edma_set_src(_tci648x_rio.iccr_edma_ch, (u32) p_iccr_val, 0, 0);
+	edma_set_transfer_params(_tci648x_rio.iccr_edma_ch,
 				 4,         /* ACNT */
 				 count,     /* BCNT */
 				 1,         /* CCNT */    
 				 1,         /* BCNTRLD */
 				 ASYNC);
 
-	set_edma_params(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
-	set_edma_src_params(_tci648x_rio.rate_edma_ch, (u32) p_rate_val, 0, 0);
-	set_edma_transfer_params(_tci648x_rio.rate_edma_ch, 
+	edma_write_slot(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
+	edma_set_src(_tci648x_rio.rate_edma_ch, (u32) p_rate_val, 0, 0);
+	edma_set_transfer_params(_tci648x_rio.rate_edma_ch,
 				 4,         /* ACNT */
 				 count,     /* BCNT */
 				 1,         /* CCNT */    
@@ -1062,12 +1070,14 @@ retry_transfer:
 				  TCI648X_EDMA_RIO_INT);
 
 	/* Start EDMA */
-	start_edma(_tci648x_rio.rate_edma_ch);
-	start_edma(_tci648x_rio.iccr_edma_ch);
-	start_edma(_tci648x_rio.lsu_edma_ch);
+	edma_start(_tci648x_rio.rate_edma_ch);
+	edma_start(_tci648x_rio.iccr_edma_ch);
+	edma_start(_tci648x_rio.lsu_edma_ch);
 
 	/* Launch transfer */
+#if 0 /* FIXME. Is this necessary? Why doesn't above edma_start work? */
 	edma_trigger_evt(_tci648x_rio.lsu_edma_ch);
+#endif
 
 	/* Wait for EDMA completion */
 	wait_for_completion(&_tci648x_rio.lsu_completion);
@@ -1094,9 +1104,9 @@ retry_transfer:
 				  TCI648X_LSU_RIO_INT);
 
 	/* Stop EDMA */
-	stop_edma(_tci648x_rio.lsu_edma_ch);
-	stop_edma(_tci648x_rio.iccr_edma_ch);
-	stop_edma(_tci648x_rio.rate_edma_ch);
+	edma_stop(_tci648x_rio.lsu_edma_ch);
+	edma_stop(_tci648x_rio.iccr_edma_ch);
+	edma_stop(_tci648x_rio.rate_edma_ch);
 
 	mutex_unlock(&_tci648x_rio.lsu_lock);
 
@@ -1124,11 +1134,11 @@ retry_transfer:
 	 * or unavailable outbound credit.
 	 */
 	if ((res == -EAGAIN) && (retry_count-- > 0)) {
-		edmacc_paramentry_regs edma_params;
+		struct edmacc_param edma_params;
 
 		__delay(1000);
 		/* Restart from previous LSU reg data */
-		get_edma_params(_tci648x_rio.lsu_edma_ch, &edma_params);
+		edma_read_slot(_tci648x_rio.lsu_edma_ch, &edma_params);
 		if (edma_params.opt == 0) {
 			/* transfer is finished */
 			current_lsu_reg_queue = lsu_reg_queue + (real_count - 1);
@@ -2730,7 +2740,7 @@ static int __init tci648x_rio_probe(struct platform_device *pdev)
 	int res;
 
 	/* sRIO main driver hw initialization (global setup, PSC, interrupts) */
-	res = tci648x_rio_init();
+	res = tci648x_rio_init(pdev);
 	if (res < 0)
 		return res;
 
