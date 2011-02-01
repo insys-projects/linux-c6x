@@ -383,6 +383,24 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		}
 		break;
 		
+	case PTRACE_GETDSBT: {
+		unsigned long tmp = 0;
+
+		switch (addr) {
+		case PTRACE_GETDSBT_EXEC:
+			tmp = child->mm->context.exec_dsbt_loadmap;
+			break;
+		case PTRACE_GETDSBT_INTERP:
+			tmp = child->mm->context.interp_dsbt_loadmap;
+			break;
+		default:
+			break;
+		}
+
+		ret = put_user(tmp, (unsigned long __user *)data);
+		break;
+	}
+
 	default:
 		ret = -EIO;
 		break;
