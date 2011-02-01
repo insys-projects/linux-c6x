@@ -310,6 +310,11 @@ static struct clk core_clk = {
 	.parent = &pll1_sysclk1,
 };
 
+static struct clk watchdog_clk = {
+	.name = "watchdog",
+	.parent = &pll1_sysclk5,
+};
+
 static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1", &pll1_clk),
 	CLK(NULL, "pll1_sysclk1", &pll1_sysclk1),
@@ -317,8 +322,9 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
 	CLK(NULL, "pll1_sysclk4", &pll1_sysclk4),
 	CLK(NULL, "pll1_sysclk5", &pll1_sysclk5),
-	CLK("i2c_davinci.1", NULL, &i2c_clk),
 	CLK(NULL, "core", &core_clk),
+	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK("watchdog", NULL, &watchdog_clk),
 	CLK("", NULL, NULL)
 };
 
