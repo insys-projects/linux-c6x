@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -31,8 +31,14 @@
 /*
  * Timer definitions
  */
+#if defined(CONFIG_DAVINCI_WATCHDOG) || defined(CONFIG_DAVINCI_WATCHDOG_MODULE)
+#define LINUX_TIMER_SRC TIMER_0
+#define LINUX_TIMER_IRQ IRQ_TINT0
+#define LINUX_WATCHDOG_SRC TIMER_1
+#else
 #define LINUX_TIMER_SRC TIMER_1
 #define LINUX_TIMER_IRQ IRQ_TINT1
+#endif
 
 #ifdef CONFIG_IDLE_LED
 #ifndef __ASSEMBLY__

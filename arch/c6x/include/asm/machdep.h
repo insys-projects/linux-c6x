@@ -56,6 +56,7 @@ extern void (*mach_leds_timer)(void);
 extern void (*mach_setup_timer)(void);
 extern void (*mach_progress) (unsigned int, char *);
 extern void (*mach_print_value) (char *, unsigned long);
+extern void (*mach_set_wdt_mode) (int mode, int delay);
 extern void (*mach_nmi_handler)(struct pt_regs *regs);
 
 #endif /* __ASM_C6X_MACHDEP_H */

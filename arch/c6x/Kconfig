@@ -258,11 +258,6 @@ config PCI
 	bool "PCI support"
 	help
 	  Support for PCI bus.
-
-# source "drivers/pci/Kconfig"
-
-# source "drivers/pcmcia/Kconfig"
-
 endmenu
 
 menu "Executable file formats"
@@ -282,11 +277,7 @@ endmenu
 
 source "net/Kconfig"
 
-menu "Device Drivers"
-
 source "drivers/Kconfig"
-
-endmenu
 
 source "fs/Kconfig"
 

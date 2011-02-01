@@ -335,10 +335,6 @@ CONFIG_WIRELESS=y
 #
 
 #
-# Device Drivers
-#
-
-#
 # Generic Driver Options
 #
 CONFIG_UEVENT_HELPER_PATH=""
@@ -670,8 +666,14 @@ CONFIG_GPIO_SYSFS=y
 # CONFIG_POWER_SUPPLY is not set
 # CONFIG_HWMON is not set
 # CONFIG_THERMAL is not set
-# CONFIG_WATCHDOG is not set
-CONFIG_SSB_POSSIBLE=y
+CONFIG_WATCHDOG=y
+# CONFIG_WATCHDOG_NOWAYOUT is not set
+
+#
+# Watchdog Device Drivers
+#
+# CONFIG_SOFT_WATCHDOG is not set
+CONFIG_DAVINCI_WATCHDOG=m
 
 #
 # Sonics Silicon Backplane
