@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/if_ether.h>
 
 #include <asm/ipc-core.h>
 
@@ -23,9 +24,9 @@
 
 /*
  * Maximal number of interfaces in a SoC
- * (must be mostly equal to max number of cores)
+ * (must be norammly equal to max number of cores)
  */
-#define VIRTIO_BRIDGE_MAX_IF  32
+#define VIRTIO_BRIDGE_MAX_IF CORE_NUM
 
 struct bridge_if_desc {
 	__u16        last_avail;
@@ -36,9 +37,7 @@ struct bridge_if_desc {
 
 DEFINE_MUTEX(bridge_lock);
 
-/* AJ: this must be fixed */
 #define get_local_if_id() (get_coreid())
-#define get_dst_if_id()   ((get_coreid() + 1) % 2)
 
 static struct bridge_if_desc bridge_if[VIRTIO_BRIDGE_MAX_IF];
 
@@ -47,8 +46,9 @@ static struct bridge_if_desc bridge_if[VIRTIO_BRIDGE_MAX_IF];
  * function returns the next descriptor in the chain, or vq->vring.num if we're
  * at the end.
  */
-static unsigned next_desc(struct vring_desc *desc,
-			  unsigned int i, unsigned int max)
+static unsigned int next_desc(struct vring_desc *desc,
+			      unsigned int       i, 
+			      unsigned int       max)
 {
 	unsigned int next;
 
@@ -72,34 +72,36 @@ static unsigned next_desc(struct vring_desc *desc,
  */
 static void add_used(struct vring *vring, unsigned int head, int len)
 {
-	struct vring_used_elem *used;
+	struct vring_used_elem *used;	
 
 	/*
 	 * The virtqueue contains a ring of used buffers. Get a pointer to the
 	 * next entry in that used ring.
 	 */
 	used      = &vring->used->ring[vring->used->idx % vring->num];
+
+	mutex_lock(&bridge_lock);
+
 	used->id  = head;
 	used->len = len;
-
 	vring->used->idx++;
+
+	mutex_unlock(&bridge_lock);
 }
 
+
 /*
- * This looks in the virtqueue for the first in and out available buffers
- * This function changes the out_desc and in_desc pointers to the first out 
- * and in descriptors and returns 1 if at least a descriptor is found.
+ * This looks in the virtqueue for the first in or out available head desc
  */
-static int get_vq_desc(struct bridge_if_desc  *bdesc,
-		       struct vring_desc     **out_desc,
-		       struct vring_desc     **in_desc,
-		       unsigned int           *out_num,
-		       unsigned int           *in_num,
-		       unsigned int           *head)
+static int get_next_head_desc(struct bridge_if_desc *bdesc,
+			      unsigned int           out)
 {
-	unsigned int       i, max;
 	struct vring_desc *desc;
 	u16               *last_avail = &bdesc->last_avail;
+	unsigned int       head;
+	unsigned int       max = bdesc->vring.num;
+
+	mutex_lock(&bridge_lock);
 
 	/* 
 	 * Check if there are available buffers
@@ -107,80 +109,300 @@ static int get_vq_desc(struct bridge_if_desc  *bdesc,
 	if (*last_avail == bdesc->vring.avail->idx) {
 		DPRINTK("no available buffer %u %u\n",
 			*last_avail, bdesc->vring.avail->idx);
-		return 0;
+		mutex_unlock(&bridge_lock);
+		return max;
 	}
 
-	/* Check it isn't doing very strange things with descriptor numbers. */
-	if ((u16)(bdesc->vring.avail->idx - *last_avail) > bdesc->vring.num) {
+	/* 
+	 * Check it isn't doing very strange things with descriptor numbers.
+	 */
+	if ((u16)(bdesc->vring.avail->idx - *last_avail) > max) {
 		EPRINTK("bridge moved used index from %u to %u\n",
 			*last_avail, bdesc->vring.avail->idx);
+		mutex_unlock(&bridge_lock);
 		return -1;
 	}
 
 	/*
 	 * Grab the next descriptor number they're advertising
 	 */
-	*head = bdesc->vring.avail->ring[*last_avail % bdesc->vring.num];
+	head = bdesc->vring.avail->ring[*last_avail % max];
+
+	/*
+	 * Go to the next available head
+	 */
 	(*last_avail)++;
 	
 	/* If their number is silly, that's a fatal mistake. */
-	if (*head >= bdesc->vring.num) {
-		EPRINTK("bridge says index %u is available\n", *head);
+	if (head >= max) {
+		EPRINTK("bridge says index %u is available\n", head);
+		mutex_unlock(&bridge_lock);	
 		return -1;
 	}
-	
-	/* When we start there are none of either input nor output. */
-	*out_num = *in_num = 0;
-	
-	max  = bdesc->vring.num;
+
 	desc = bdesc->vring.desc;
-	i    = *head;
-	
-	DPRINTK("new head is now %d\n", *head);
+
+	DPRINTK("new head for 0x%x is now %d\n", (unsigned int) bdesc, head);
 
 	/*
-	 * If this is an indirect entry, then this buffer contains a descriptor
-	 * table which we handle as if it's any normal descriptor chain.
+	 * Find the head of the wanted type of desc
 	 */
-	if (desc[i].flags & VRING_DESC_F_INDIRECT) {
-		if (desc[i].len % sizeof(struct vring_desc)) {
-			EPRINTK("invalid size for indirect buffer table\n");
-			return -1;
-		}
-		max  = desc[i].len / sizeof(struct vring_desc);
-		desc = (struct vring_desc *) get_vaddr(desc[i].addr);
-		i    = 0;
-	}
-	
 	do {
-                /* If this is an input descriptor, get it and increment that count. */
-		if (desc[i].flags & VRING_DESC_F_WRITE) {
-			(*in_num)++;
-			if (in_desc)
-				(*in_desc++) = &desc[i];
+		/* If this is an input descriptor */
+		if (desc[head].flags & VRING_DESC_F_WRITE) {
+			if (!out)
+				goto found;
 		} else {
 			/*
 			 * If it's an output descriptor, they're all supposed
 			 * to come before any input descriptors.
 			 */
-			if (*in_num) {
-				EPRINTK("descriptor has out after in\n");
-				return -1;
-			}
-			(*out_num)++;
-			if (out_desc)
-				(*out_desc++) = &desc[i];
-		}
+			if (out) 
+				goto found;
+		}  
+	} while ((head = next_desc(desc, head, bdesc->vring.num)) != bdesc->vring.num);
+
+	/* We did no found any corresponding descriptor */
+	mutex_unlock(&bridge_lock);
+	return -1;
+
+found:
+	mutex_unlock(&bridge_lock);
+	return (int) head;
+}
+
+/*
+ * Determine the destination interface number for a given Ethernet packet
+ * Unicast 
+ */
+static int get_dst_if_id(unsigned int addr)
+{
+	struct ethhdr *hdr = (struct ethhdr *) addr;
+	unsigned int   if_id;
+
+	DPRINTK("source " MAC_FMT "\n",
+		hdr->h_source[0], hdr->h_source[1], hdr->h_source[2],
+		hdr->h_source[3], hdr->h_source[4], hdr->h_source[5]);
+
+	DPRINTK("destination " MAC_FMT "\n",
+		hdr->h_dest[0],	hdr->h_dest[1], hdr->h_dest[2],
+		hdr->h_dest[3],	hdr->h_dest[4],	hdr->h_dest[5]);
+
+	/*
+	 * Normally we should check the full destination MAC address
+	 * to verify if it matches the VIRTIO_IPC_NET_MACn OUI,
+	 * but we are lazy and we want to go fast...
+	 */
+	if_id = hdr->h_dest[5];
+
+	/*
+	 * We suppose it is broadcast
+	 */
+	if (if_id == 0xff)
+		return VIRTIO_BRIDGE_MAX_IF;
+
+	/*
+	 * Interface numbers are 0, 2, ..., VIRTIO_BRIDGE_MAX_IF * 2
+	 */
+	if (if_id < (VIRTIO_BRIDGE_MAX_IF << 1))
+		return (if_id >> 1);
+	else
+		return -1;
+}
+
+/*
+ * Copy a head of buffers to the remote head
+ */
+static int virtio_bridge_transfer(struct vring_virtqueue *vq,
+				  struct bridge_if_desc  *src_bdesc)
+{
+	struct bridge_if_desc *dst_bdesc;
+	struct vring_desc *src_desc = src_bdesc->vring.desc;
+	struct vring_desc *dst_desc;
+	unsigned int free = 0;
+	unsigned int addr = 0;
+	unsigned int tlen;
+	unsigned int len;
+	unsigned int i;
+	unsigned int j;
+
+	int src_head;
+	int dst_head;
+	int eth_head;
+	int index = 0;
+	int ret;
+	int id, min_id, max_id;
+	int k;
+	u16 max = src_bdesc->vring.num;
+
+	/* Get the next outcomming buffer from source ring */
+	src_head = get_next_head_desc(src_bdesc, 1);
+
+	/* Did we finish? */
+	if (src_head == max)
+		return 0;
+
+	/* Error case */
+	if (src_head == -1)
+		return -1;
+
+	/* Retrieve destination interface from destination MAC addr */
+	if (src_desc[src_head].flags & VRING_DESC_F_NEXT) {
+		eth_head = src_desc[src_head].next;
+	} else {
+		EPRINTK("Missing Ethernet frame\n");
+		return -1;
+	}
 		
-		/* If we've got too many, that implies a descriptor loop. */
-		if (*out_num + *in_num > max) {
-			EPRINTK("looped descriptor\n");
+	id = get_dst_if_id(get_vaddr(src_desc[eth_head].addr));
+	if (id == -1) {
+		EPRINTK("Invalid Ethernet frame\n");
+		return -1;
+	}
+	if (id == VIRTIO_BRIDGE_MAX_IF) {
+		/* Broadcast case */
+		min_id = 0;
+		max_id = VIRTIO_BRIDGE_MAX_IF;
+	} else {
+		/* Unicast case */
+		min_id = id;
+		max_id = id + 1;
+	}
+		
+	/* 
+	 * Iterate for all interfaces
+	 */
+	for (k = min_id; k < max_id; k++) {
+		
+		tlen = 0;
+		ret  = 0;
+
+		dst_bdesc = &bridge_if[k];
+		if (dst_bdesc == NULL) {
+			DPRINTK("no remote (%d) interface found\n", k);
+			continue;
+		}
+
+		dst_desc = dst_bdesc->vring.desc;
+		if (dst_desc == NULL) {
+			DPRINTK("interface found %d not configured\n", k);
+			continue;
+		}
+
+		/* Retrieve an available destination incomming buffer */
+		dst_head = get_next_head_desc(dst_bdesc, 0);
+	
+		/* No more space in destination ring */
+		if (dst_head == max) {
+			DPRINTK("destination ring full for %d\n", k);
+			/* Skip this interface */
+			continue;
+		} 
+
+		/* Error case */ 
+		if (dst_head == -1) {
 			return -1;
 		}
-	} while ((i = next_desc(desc, i, max)) != max);
 
-	/* We found a descriptor */
-	return 1;
+		/* Number of total treated buffers */
+		index = 0; 
+
+		/* Source and destination desc indexes */
+		i = src_head;
+		j = dst_head;
+
+		/* Invalidate the destination input remote ring content from our caches */
+		virtio_ipc_sync_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
+
+		/* 
+		 * Copy and aggregate incoming buffers in the destination .
+		 * Will use EDMA or CPPI/QM later.
+		 */
+		do {
+			if (index++ <= 1) {
+				/* 
+				 * The two first buffers are set in distinc buffers
+				 */
+				if (j == max) {
+					/* No more desc */
+					ret = -1;
+					goto error;
+				}
+
+				free = dst_desc[j].len;
+				addr = get_vaddr(dst_desc[j].addr);
+			
+				j =  next_desc(dst_desc, j, max);
+			}
+			
+			/* Length of the descriptor to transfer*/
+			len = src_desc[i].len;
+		
+			if ((index > 0) && (free >= len) && (len)) {
+				/* 
+				 * Copy the payload data and aggregate them in the second buf.
+				 * Do not need to flush copied data as destination address
+				 * space is not cached
+				 */
+				memcpy((void*) addr, (void*) get_vaddr(src_desc[i].addr), len);
+			} else {
+				EPRINTK("not enough space ! i = %d, j = %d, free = %d, len = %d\n",
+					i, j, free, len);
+				ret = -1;
+				goto error;
+			}
+			
+			addr += len;
+			tlen += len;
+			free -= len;
+
+		} while ((i = next_desc(src_desc, i, max)) != max);
+
+		/* Finished with the destination */
+		add_used(&dst_bdesc->vring, dst_head, tlen);
+		
+		DPRINTK("%d bytes transfered\n", tlen);
+
+		if (ret == 0) {
+			/* Flush the modified destination input remote ring content from our caches */
+			virtio_ipc_flush_ring(&dst_bdesc->vring, CACHE_SYNC_RING_USED);
+
+			/* Signal the destination core for this packet */
+			ipc_core->ipc_send(dst_bdesc->core_id, IPC_INT_NET);
+		}
+	}
+
+	/* Finished with the source */
+	add_used(&src_bdesc->vring, src_head, 0); /* 0 length to avoid syncing data */
+
+	return 0;
+error:
+	return ret;
+}
+
+/*
+ * When the output vq is notified: meaning probably a transfer to perform
+ */
+void virtio_output_vq_notify(struct vring_virtqueue *vq)
+{
+	struct bridge_if_desc  *src_bdesc;
+	int                     ret;
+
+	src_bdesc = &bridge_if[get_local_if_id()];
+
+	/* Perform the buffer transfer */
+	while(1) {
+		/* Do the transfer for a set of available buffers  */
+		ret = virtio_bridge_transfer(vq, src_bdesc);
+		if (ret <= 0)
+			break;
+	}
+
+	if (ret == 0) {
+		if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT))
+			/* Local transmit ACK */
+			vring_interrupt(0, &vq->vq);
+	}
 }
 
 /*
@@ -198,135 +420,9 @@ void virtio_bridge_interrupt(u32 ipc_num, void *_vq)
 		
 		/* Call virtio vring interrupt handler */
 		vring_interrupt(ipc_num, _vq);
-	}
+	} 
 }
 EXPORT_SYMBOL(virtio_bridge_interrupt);
-
-static struct vring_desc *desc_src[VIRTQUEUE_NUM];
-static struct vring_desc *desc_dst[VIRTQUEUE_NUM];
-
-/*
- * Bridge transfer
- */
-static int virtio_bridge_transfer(struct vring_virtqueue *vq,
-				  struct bridge_if_desc  *src_bdesc,
-				  struct bridge_if_desc  *dst_bdesc)
-{
-	unsigned int       head_src, head_dst, out_src, out, in;
-	unsigned int       free = 0, len, tlen = 0;
-	unsigned  int      addr = 0;
-	int                ret, i;
-
-	/* Retrieve a desc to send */
-	ret = get_vq_desc(src_bdesc, desc_src, NULL, &out_src, &in, &head_src);
-	if (in) {
-		EPRINTK("input buffers in net output queue?\n");
-		return -1;
-	}
-
-	/* No more desc */
-	if (ret <= 0)
-		return ret; 
-
-	/* Invalidate the destination input remote ring content in our caches */
-	virtio_ipc_sync_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
-
-	/* Retrieve a destination available desc */
-	ret = get_vq_desc(dst_bdesc, NULL, desc_dst, &out, &in, &head_dst);
-	if (out) {
-		EPRINTK("output buffers in net input queue?\n");
-		return -1;
-	}
-	if (ret == 0) {
-		EPRINTK("destination ring full\n");
-		return -1;
-	} 
-	if (ret < 0)
-		return ret;
-
-	DPRINTK("get %d desc\n", out_src);
-
-	/* 
-	 * Copy and aggregate incoming buffers.
-	 * Will use EDMA or CPPI later.
-	 */
-	for (i = 0; i < out_src; i++) {
-		if (i <= 1) {
-			free = desc_dst[i]->len;
-			addr = get_vaddr(desc_dst[i]->addr);
-		}
-
-		/* Length of the descriptor to transfer*/
-		len = desc_src[i]->len;
-
-		if ((free >= len) && (len)) {
-			/* 
-			 * Copy the payload data.
-			 * Do not need to flush copied data as destination address 
-			 * space is not cached
-			 */
-			memcpy((void*) addr, (void*) get_vaddr(desc_src[i]->addr), len);
-		} else
-			EPRINTK("not enough space ! i = %d, free = %d, len = %d\n", i, free, len);
-	       
-		addr += len;
-		tlen += len;
-		free -= len;
-	}
-	DPRINTK("%d bytes transfered\n", tlen);
-
-	/*
-	 * Done with these ones
-	 */
-	add_used(&dst_bdesc->vring, head_dst, tlen);
-	add_used(&src_bdesc->vring, head_src, 0);     /* to avoid syncing data */
-
-	/* Flush the modified destination input remote ring content from our caches */
-	virtio_ipc_flush_ring(&dst_bdesc->vring, CACHE_SYNC_RING_USED);
-
-	return 0;
-}
-
-/*
- * When the output vq is notified: meaning probably a transfer to perform
- */
-void virtio_output_vq_notify(struct vring_virtqueue *vq)
-{
-	struct bridge_if_desc  *src_bdesc;
-	struct bridge_if_desc  *dst_bdesc;
-	int                     ret;
-
-	/*
-	 * Find the source and destination bdesc
-	 */
-	src_bdesc = &bridge_if[get_local_if_id()];
-	dst_bdesc = &bridge_if[get_dst_if_id()];
-
-	if (dst_bdesc->vring.desc == NULL) {
-		EPRINTK("no remote (%d) interface found\n", get_dst_if_id());
-		return;
-	}
-
-	/* Perform the buffer transfer */
-	while(1) {
-
-		mutex_lock(&bridge_lock);
-		ret = virtio_bridge_transfer(vq, src_bdesc, dst_bdesc);
-		mutex_unlock(&bridge_lock);
-
-		if (ret <= 0)
-			break;
-	}
-
-	if (ret == 0) {
-		/* Signal the destination core */
-		ipc_core->ipc_send(dst_bdesc->core_id, IPC_INT_NET);
-
-		if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT))
-			/* Local transmit ACK */
-			vring_interrupt(0, &vq->vq);
-	}
-}
 
 /*
  * When the virtio_ring code wants to notify the bridge, it calls us here
@@ -336,7 +432,8 @@ void virtio_bridge_notify(struct virtqueue *_vq)
 {
 	struct vring_virtqueue *vq  = to_vvq(_vq);
 
-	DPRINTK("called with source vq %s (0x%x)\n", vq->vq.name, &vq->vq);
+	DPRINTK("called with source vq %s (0x%x)\n",
+		vq->vq.name, (unsigned int) &vq->vq);
 
 	/* Case of an output vq */
 	if (strcmp(vq->vq.name, "output") == 0)

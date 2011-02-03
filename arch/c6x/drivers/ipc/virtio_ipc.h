@@ -1,3 +1,16 @@
+/*
+ *  linux/arch/c6x/drivers/ipc/virtio_ipc.c - IPC driver for virtio devices
+ *
+ *  Port on Texas Instruments TMS320C6x architecture
+ *
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ */
+
 #ifndef _C6X_VIRTIO_IPC_H
 #define _C6X_VIRTIO_IPC_H
 
@@ -22,18 +35,18 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-#define VIRTIO_IPC_NET_FEATURES (VIRTIO_F_NOTIFY_ON_EMPTY	\
-				 | VIRTIO_NET_F_CSUM		\
-				 | VIRTIO_NET_F_GUEST_CSUM	\
-				 | VIRTIO_NET_F_GUEST_TSO4	\
-				 | VIRTIO_NET_F_GUEST_TSO6	\
-				 | VIRTIO_NET_F_GUEST_ECN	\
-				 | VIRTIO_NET_F_HOST_TSO4	\
-				 | VIRTIO_NET_F_HOST_TSO6	\
-				 | VIRTIO_NET_F_HOST_ECN        \
-				 | VIRTIO_RING_F_INDIRECT_DESC)
+#define FEATURE_SET(f) (1 << (f))
 
-#define VIRTQUEUE_NUM           256
+#define VIRTIO_IPC_NET_FEATURES (FEATURE_SET(VIRTIO_F_NOTIFY_ON_EMPTY)	\
+				 | FEATURE_SET(VIRTIO_NET_F_MAC))
+
+#define VIRTIO_IPC_NET_MAC0 0x00;
+#define VIRTIO_IPC_NET_MAC1 0x01;
+#define VIRTIO_IPC_NET_MAC2 0x01; /* This is a private OUI */
+#define VIRTIO_IPC_NET_MAC3 0x00;
+#define VIRTIO_IPC_NET_MAC4 0x00;
+
+#define VIRTQUEUE_DESC_NUM      256
 
 #define get_vaddr(a)            ((__u32)((a) & 0xffffffff))
 #define set_vaddr(a)            ((__u64)(a))
@@ -57,7 +70,7 @@ struct ipc_device_desc {
 	__u8 owner;
 	/* The number of virtqueues (first in config array) */
 	__u8 num_vq;
-	/* The number of bytes of the config array after virtqueues. */
+	/* The number of bytes of the config info after virtqueues. */
 	__u8 config_len;
 	/* A status byte . */
 	__u8 status;
@@ -81,6 +94,14 @@ struct ipc_vqconfig {
 };
 
 #define get_vqconfig(a, i) (struct ipc_vqconfig *)((u32) (a) + ((i) * sizeof(struct ipc_vqconfig)))
+
+/*
+ * Return the location of the config info structure
+ */
+static inline char *virtio_ipc_device_get_config_info(const struct ipc_device_desc *desc)
+{
+	return ((char *)desc  + sizeof(*desc) + desc->num_vq * sizeof(struct ipc_vqconfig));
+}
 
 /*
  * The total size of the device config used by this device (incl. desc) aligned on cache lines

@@ -278,15 +278,18 @@ static void detach_buf(struct vring_virtqueue *vq, unsigned int head, unsigned i
 	if (vq->vring.desc[i].flags & VRING_DESC_F_INDIRECT)
 		kfree(phys_to_virt(vq->vring.desc[i].addr));
 
-	/* Eventually sync the data from the host */
+	/* Eventually sync the data from the host (but not the GSO buffer) */
 	if (len)
-		virtio_sync_data(vq->vring.desc[i].addr, vq->vring.desc[i].len);
+		len -= vq->vring.desc[i].len;
 
 	while (vq->vring.desc[i].flags & VRING_DESC_F_NEXT) {
 		i = vq->vring.desc[i].next;
-		if (len)
+		if (len) {
 			virtio_sync_data(vq->vring.desc[i].addr,
-					 vq->vring.desc[i].len);
+					 len < vq->vring.desc[i].len ? 
+					 len : vq->vring.desc[i].len);
+			len -= vq->vring.desc[i].len;
+		}
 		vq->num_free++;
 	}
 

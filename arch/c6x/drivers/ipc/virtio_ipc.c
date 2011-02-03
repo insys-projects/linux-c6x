@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -23,12 +23,10 @@
 #include "virtio_ipc.h"
 
 /* 
- * Return 1 if we are the master core
- * Temporary hardcoded as CORE0 is master and CORE1 is the peer one
+ * 1 if we are the master core
+ * This is detected if we are the first Linux kernel in DDR, not necessarily the core 0
  */
-#define get_core_type()         (get_coreid() == 0 ? 1 : 0)
-
-static int master_core;
+static int master_core = 0;
 
 /*
  * Pointer to the SoC virtio device repository
@@ -45,7 +43,7 @@ void arch_virtio_sync_data(u32 addr, u32 len)
 		return;
 
 	DPRINTK("syncing data: start = 0x%x, len = %d, end = 0x%x\n", addr, len, addr + len);
-	L2_cache_block_writeback_invalidate(addr, addr + len);
+	L2_cache_block_invalidate(addr, addr + len);
 }
 
 void arch_virtio_flush_data(u32 addr, u32 len)
@@ -121,20 +119,33 @@ static u32 virtio_ipc_set_config_space(void)
 
 	/* Register network bridges in the devices configuration space */
 	for (dev = 0; dev < CORE_NUM; dev++) {
-		struct ipc_device_desc *desc = (struct ipc_device_desc*) addr;
-		
+		struct ipc_device_desc   *desc = (struct ipc_device_desc*) addr;
+		struct virtio_net_config *conf;
+
 		desc->id         = dev;                             /* id */
 		desc->type       = VIRTIO_ID_NET;
 		desc->owner      = (get_coreid() + dev) % CORE_NUM; /* core owner*/
 		desc->num_vq     = 2;
-		desc->config_len = 0;
+		desc->config_len = sizeof(struct virtio_net_config);
 		desc->status     = 0;
 
 		/* Network devices need a recv and a send queue */
 		add_virtqueue((u32) &desc->config,
-			      0, VIRTQUEUE_NUM, IPC_INT_NET);  /* input */
+			      0, VIRTQUEUE_DESC_NUM, IPC_INT_NET);  /* input */
 		add_virtqueue((u32) &desc->config,
-			      1, VIRTQUEUE_NUM, IPC_INT_NET);  /* output */
+			      1, VIRTQUEUE_DESC_NUM, IPC_INT_NET);  /* output */
+
+		conf = (struct virtio_net_config *)
+			virtio_ipc_device_get_config_info(desc); /* config info */
+
+		conf->status = 0;
+
+		conf->mac[0] = VIRTIO_IPC_NET_MAC0;
+		conf->mac[1] = VIRTIO_IPC_NET_MAC1;
+		conf->mac[2] = VIRTIO_IPC_NET_MAC2;
+		conf->mac[3] = VIRTIO_IPC_NET_MAC3;
+		conf->mac[4] = VIRTIO_IPC_NET_MAC4;
+		conf->mac[5] = (dev << 1) & 0xff;
 
 		addr += virtio_ipc_device_config_size(desc);
 
@@ -176,7 +187,9 @@ static int virtio_ipc_scan_config_space(u32 cf_base)
 	return 0;
 }
 
-/* This gets the device's feature bits. */
+/* 
+ * This gets the device's feature bits.
+ */
 static u32 virtio_ipc_get_features(struct virtio_device *vdev)
 {
 	return VIRTIO_IPC_NET_FEATURES;
@@ -189,18 +202,26 @@ static void virtio_ipc_finalize_features(struct virtio_device *vdev)
 }
 
 /*
- * Reading and writing elements in config space
+ * Reading and writing elements in config info
  */
 static void virtio_ipc_get(struct virtio_device *vdev, unsigned int offset,
 			   void *buf, unsigned len)
-{
-	DPRINTK("called\n");
+{	
+	struct virtio_ipc_device *dev  = to_virtio_ipc_dev(vdev);
+	struct ipc_device_desc   *desc = dev->idev;
+
+	BUG_ON(offset + len > desc->config_len);
+	memcpy(buf, virtio_ipc_device_get_config_info(desc) + offset, len);
 }
 
 static void virtio_ipc_set(struct virtio_device *vdev, unsigned int offset,
 			   const void *buf, unsigned len)
 {
-	DPRINTK("called\n");
+	struct virtio_ipc_device *dev  = to_virtio_ipc_dev(vdev);
+	struct ipc_device_desc   *desc = dev->idev;
+
+	BUG_ON(offset + len > desc->config_len);
+	memcpy(virtio_ipc_device_get_config_info(desc) + offset, buf, len);
 }
 
 /*
@@ -220,7 +241,8 @@ static void virtio_ipc_set_status(struct virtio_device *vdev, u8 status)
 {
 	struct virtio_ipc_device *dev = to_virtio_ipc_dev(vdev);
 
-	dev->status = status;	
+	dev->status = status;
+
 	DPRINTK("status = %d\n", dev->status);
 }
 
@@ -283,7 +305,9 @@ static struct virtqueue *virtio_ipc_find_vq(struct virtio_device *vdev,
 		goto error;
 	}
 
-	/* Sync the ring content for other cores */
+	/* 
+	 * Sync the ring content for other cores
+	 */
 	vq = to_vvq(_vq);
 	virtio_ipc_sync_ring(&vq->vring, CACHE_SYNC_RING_ALL);
 
@@ -291,10 +315,7 @@ static struct virtqueue *virtio_ipc_find_vq(struct virtio_device *vdev,
 	 * Set our net bridge interrupt (rx) handler
 	 */
 	if ((strcmp(name, "input") == 0) && (vdev->id.device == VIRTIO_ID_NET)) {
-		ipc_core->ipc_request(virtio_bridge_interrupt,
-				      0,
-				      IPC_INT_NET,
-				      _vq);
+		ipc_core->ipc_request(virtio_bridge_interrupt, 0, IPC_INT_NET, _vq);
 	}
 
 	return _vq;
@@ -412,14 +433,17 @@ static int __init virtio_ipc_devices_init(void)
 {
 	int rc;
 
-	master_core = get_core_type();
-
 	/* 
 	 * Compute the virtio device repository
 	 */
 	virtio_ipc_devices_ptr = (u32*) get_master_vaddr(&__virtio_ipc_devices_ptr);
+	DPRINTK("virtio_ipc_devices = 0x%x\n", virtio_ipc_devices_ptr);
 
-	DPRINTK("virtio_ipc_devices = 0x%x, master = %d\n", virtio_ipc_devices_ptr, master_core);
+	/*
+	 * If we our kernel text is a the beginning of DDR2, we are the master core
+	 */
+	if ((u32) &__virtio_ipc_devices_ptr == (u32) virtio_ipc_devices_ptr)
+		master_core = 1;
 
 	/* 
 	 * If we are the master core, allocate and initialize the shared 
@@ -447,6 +471,11 @@ static int __init virtio_ipc_devices_init(void)
 
 	/* Register the different virtio_ipc devices reading the shared config space */
 	virtio_ipc_scan_devices(*virtio_ipc_devices_ptr);
+
+	printk("IPC: virtio backend registered");
+	if (master_core)
+		printk(" (master)");
+	printk("\n");
 
 	return 0;
 }
