@@ -30,6 +30,7 @@
 
 struct bridge_if_desc {
 	__u16        last_avail;
+	__u16        last_added;
 	__u16        core_id;
 	__u16        __pad;
 	struct vring vring;
@@ -101,15 +102,12 @@ static int get_next_head_desc(struct bridge_if_desc *bdesc,
 	unsigned int       head;
 	unsigned int       max = bdesc->vring.num;
 
-	mutex_lock(&bridge_lock);
-
 	/* 
 	 * Check if there are available buffers
 	 */
 	if (*last_avail == bdesc->vring.avail->idx) {
 		DPRINTK("no available buffer %u %u\n",
 			*last_avail, bdesc->vring.avail->idx);
-		mutex_unlock(&bridge_lock);
 		return max;
 	}
 
@@ -119,9 +117,10 @@ static int get_next_head_desc(struct bridge_if_desc *bdesc,
 	if ((u16)(bdesc->vring.avail->idx - *last_avail) > max) {
 		EPRINTK("bridge moved used index from %u to %u\n",
 			*last_avail, bdesc->vring.avail->idx);
-		mutex_unlock(&bridge_lock);
 		return -1;
 	}
+
+	mutex_lock(&bridge_lock);
 
 	/*
 	 * Grab the next descriptor number they're advertising
@@ -136,7 +135,7 @@ static int get_next_head_desc(struct bridge_if_desc *bdesc,
 	/* If their number is silly, that's a fatal mistake. */
 	if (head >= max) {
 		EPRINTK("bridge says index %u is available\n", head);
-		mutex_unlock(&bridge_lock);	
+		mutex_unlock(&bridge_lock);
 		return -1;
 	}
 
@@ -381,9 +380,77 @@ error:
 }
 
 /*
+ * Copy a head of buffers to the remote head
+ */
+static int virtio_sync_buffers(struct vring_virtqueue *vq,
+			       u16                    *last_added)
+{
+	struct vring_desc *desc;
+	unsigned int       max        = vq->vring.num;
+	unsigned int       first      = 1;
+	unsigned int       index;
+
+	/* 
+	 * Check if there are available buffers
+	 */
+	if (*last_added == vq->vring.avail->idx) {
+		DPRINTK("no available buffer %u %u\n",
+			*last_added, vq->vring.avail->idx);
+		return 0;
+	}
+
+	DPRINTK("new buffer to sync, last_added = %d, idx = %d\n",
+		*last_added, vq->vring.avail->idx);
+
+	mutex_lock(&bridge_lock);
+	
+	/* Get the next incomming buffer from ring */
+	index = vq->vring.avail->ring[*last_added % max];
+
+	/* Go to the next available desc */
+	(*last_added)++;
+
+	/* If their number is silly, that's a fatal mistake. */
+	if (index >= max) {
+		EPRINTK("bridge says index %u is available\n", index);
+		mutex_unlock(&bridge_lock);
+		return -1;
+	}
+
+	desc = vq->vring.desc;
+	
+	/* Look into new set of descriptors */
+	do {
+		/* Find incomming buffers */
+		if ((desc[index].flags & VRING_DESC_F_WRITE)
+		    && (desc[index].len != 0)
+		    && (!first)) {
+			/*
+			 * Invalidate the buffer content
+			 */ 
+			L2_cache_block_invalidate((u32) desc[index].addr,
+						  (u32) desc[index].addr
+						  + desc[index].len);
+			
+			DPRINTK("caches WBINV index = %d, addr = 0x%x, len = %d, first = %d\n",
+				index, get_vaddr(desc[index].addr), desc[index].len, first);
+		}
+		/*
+		 * Do not flush the first buffer as it contains GSO info which 
+		 * are not used and are not aligned on cache lines.
+		 */
+		first = 0;
+		
+	} while ((index = next_desc(desc, index, max)) != max);
+
+	mutex_unlock(&bridge_lock);
+	return 1;
+}
+
+/*
  * When the output vq is notified: meaning probably a transfer to perform
  */
-void virtio_output_vq_notify(struct vring_virtqueue *vq)
+static void virtio_output_vq_notify(struct vring_virtqueue *vq)
 {
 	struct bridge_if_desc  *src_bdesc;
 	int                     ret;
@@ -402,6 +469,24 @@ void virtio_output_vq_notify(struct vring_virtqueue *vq)
 		if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT))
 			/* Local transmit ACK */
 			vring_interrupt(0, &vq->vq);
+	}
+}
+
+/*
+ * When the input vq is notified: need to sync the new buffers
+ */
+static void virtio_input_vq_notify(struct vring_virtqueue *vq)
+{
+	struct bridge_if_desc  *bdesc;
+	int                     ret;
+
+	bdesc = &bridge_if[get_local_if_id()];
+
+	/* Perform the buffer synchronization */
+	while(1) {
+		ret = virtio_sync_buffers(vq, &bdesc->last_added);
+		if (ret <= 0)
+			break;
 	}
 }
 
@@ -438,6 +523,8 @@ void virtio_bridge_notify(struct virtqueue *_vq)
 	/* Case of an output vq */
 	if (strcmp(vq->vq.name, "output") == 0)
 		virtio_output_vq_notify(vq);
+	else
+		virtio_input_vq_notify(vq);
 }
 
 EXPORT_SYMBOL(virtio_bridge_notify);
@@ -472,6 +559,7 @@ int virtio_bridge_register_if(struct ipc_device_desc *desc)
 
 	bdesc->core_id    = desc->owner;
 	bdesc->last_avail = 0;
+	bdesc->last_added = 0;
 
 	return 0;
 }

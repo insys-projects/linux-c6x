@@ -34,39 +34,6 @@ static int master_core = 0;
 static u32 __virtio_ipc_devices_ptr __section(.virtio_ipc_dev);
 static u32 *virtio_ipc_devices_ptr;
 
-/*
- * Used to synchronize data when calling get_buf() from the virtio transport layer
- */
-void arch_virtio_sync_data(u32 addr, u32 len)
-{
-	if (len == 0)
-		return;
-
-	DPRINTK("syncing data: start = 0x%x, len = %d, end = 0x%x\n", addr, len, addr + len);
-	L2_cache_block_invalidate(addr, addr + len);
-}
-
-void arch_virtio_flush_data(u32 addr, u32 len)
-{
-	if (len == 0)
-		return;
-
-	DPRINTK("syncing data: start = 0x%x, len = %d, end = 0x%x\n", addr, len, addr + len);
-	L2_cache_block_writeback(addr, addr + len);
-}
-
-#ifdef VIRTIO_USE_CACHED_RING
-void arch_virtio_sync_ring(struct vring *vring)
-{
-	virtio_ipc_sync_ring(vring, CACHE_SYNC_RING_USED);
-}
-
-void arch_virtio_flush_ring(struct vring *vring)
-{
-	virtio_ipc_flush_ring(vring, CACHE_SYNC_RING_DESC);
-}
-#endif
-
 static int add_virtqueue(u32 addr, u32 index, u32 num, u32 irq)
 {
 	struct ipc_vqconfig *vqc = get_vqconfig(addr, index);
