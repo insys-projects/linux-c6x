@@ -137,51 +137,72 @@ struct virtio_ipc_device {
 
 #define to_virtio_ipc_dev(vd) container_of(vd, struct virtio_ipc_device, vdev)
 
+extern int master_core;
+
+/*
+ *
+ */
+#define VIRTIO_USE_CACHED_RING
+
 #ifdef VIRTIO_USE_CACHED_RING
 /*
  * Cache coherency synchronization primitives
  */
-#define CACHE_SYNC_RING_DESC 0
-#define CACHE_SYNC_RING_USED 1
-#define CACHE_SYNC_RING_ALL  2
+#define CACHE_SYNC_RING_DESC     0
+#define CACHE_SYNC_RING_USED     1
+#define CACHE_SYNC_RING_USED_IDX 2
+#define CACHE_SYNC_RING_ALL      3
 
 #define __VIRTIO_RING_SET_START_END()					\
-    switch (how) {							\
+	switch (how) {							\
 	case CACHE_SYNC_RING_DESC:					\
 		start = (u32) vring->desc;				\
 		end   = (u32) vring->used;				\
 		break;							\
 	case CACHE_SYNC_RING_USED:					\
 		start = (u32) vring->used;				\
-		end   = (u32) start + vring_size(vring->num, VIRTIO_IPC_RING_ALIGN) \
+		end   = (u32) start					\
+			+ vring_size(vring->num, VIRTIO_IPC_RING_ALIGN) \
 			- ((u32)vring->used - (u32)vring->desc);	\
+		break;							\
+	case CACHE_SYNC_RING_USED_IDX:					\
+		start = (u32) vring->used;				\
+		end   = (u32) &vring->used->ring;			\
 		break;							\
 	case CACHE_SYNC_RING_ALL:					\
 		start = (u32) vring->desc;				\
 		end   = (u32) start + vring_size(vring->num, VIRTIO_IPC_RING_ALIGN); \
 		break;							\
 	}								\
-	DPRINTK("start = 0%x, end = 0x%x\n", start, end)
+	DPRINTK("%s start = 0x%x, end = 0x%x\n", (how == CACHE_SYNC_RING_DESC) ? "desc" : \
+		((how == CACHE_SYNC_RING_USED) ? "used" : "all"),	\
+		start, end)
 	
 static inline void virtio_ipc_flush_ring(struct vring *vring, int how) 
 {
-	u32 start, end;
-	__VIRTIO_RING_SET_START_END();
-	L2_cache_block_writeback(start, end);
+	if (master_core) {
+		u32 start, end;
+		__VIRTIO_RING_SET_START_END();
+		L2_cache_block_writeback(start, end);
+	}
 }
 
 static inline void virtio_ipc_invalidate_ring(struct vring *vring, int how) 
 {
-	u32 start, end;
-	__VIRTIO_RING_SET_START_END();
-	L2_cache_block_invalidate(start, end);
+	if (master_core) {
+		u32 start, end;
+		__VIRTIO_RING_SET_START_END();
+		L2_cache_block_invalidate(start, end);
+	}
 }
 
 static inline void virtio_ipc_sync_ring(struct vring *vring, int how) 
 {
-	u32 start, end;
-	__VIRTIO_RING_SET_START_END();
-	L2_cache_block_writeback_invalidate(start, end);
+	if (master_core) {
+		u32 start, end;
+		__VIRTIO_RING_SET_START_END();
+		L2_cache_block_writeback_invalidate(start, end);
+	}
 }
 
 #define virtio_ipc_flush_config(base)       L2_cache_block_writeback((base), (base) + PAGE_SIZE);

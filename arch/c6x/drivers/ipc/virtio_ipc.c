@@ -26,7 +26,7 @@
  * 1 if we are the master core
  * This is detected if we are the first Linux kernel in DDR, not necessarily the core 0
  */
-static int master_core = 0;
+int master_core = 0;
 
 /*
  * Pointer to the SoC virtio device repository
@@ -124,7 +124,7 @@ static u32 virtio_ipc_set_config_space(void)
 
 	/* Sync the config space to slave cores */
 	DPRINTK("sync config space at 0x%x\n", base);
-	virtio_ipc_sync_config(base);
+	virtio_ipc_flush_config(base);
 
 	return base;
 }
@@ -276,7 +276,7 @@ static struct virtqueue *virtio_ipc_find_vq(struct virtio_device *vdev,
 	 * Sync the ring content for other cores
 	 */
 	vq = to_vvq(_vq);
-	virtio_ipc_sync_ring(&vq->vring, CACHE_SYNC_RING_ALL);
+	virtio_ipc_flush_ring(&vq->vring, CACHE_SYNC_RING_ALL);
 
 	/*
 	 * Set our net bridge interrupt (rx) handler

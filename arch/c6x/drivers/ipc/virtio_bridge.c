@@ -75,21 +75,35 @@ static void add_used(struct vring *vring, unsigned int head, int len)
 {
 	struct vring_used_elem *used;	
 
+	mutex_lock(&bridge_lock);
+
 	/*
 	 * The virtqueue contains a ring of used buffers. Get a pointer to the
 	 * next entry in that used ring.
 	 */
-	used      = &vring->used->ring[vring->used->idx % vring->num];
-
-	mutex_lock(&bridge_lock);
-
+	used      = &vring->used->ring[vring->used->idx % vring->num];	
 	used->id  = head;
 	used->len = len;
+
+	/*
+	 * We must flush twice to respect the semantic:
+	 * 1 - update the used desc
+	 * 2 - then update the used index to make point to the used desc
+	 * This allow to be sure that desc has been correctly updated
+	 */
+	if (len)
+		virtio_ipc_flush_ring(vring, CACHE_SYNC_RING_USED);
+
 	vring->used->idx++;
+
+	/* 
+	 * Flush the caches for remote to update the used index now
+	 */
+	if (len)
+		virtio_ipc_flush_ring(vring, CACHE_SYNC_RING_USED_IDX);
 
 	mutex_unlock(&bridge_lock);
 }
-
 
 /*
  * This looks in the virtqueue for the first in or out available head desc
@@ -172,7 +186,6 @@ found:
 
 /*
  * Determine the destination interface number for a given Ethernet packet
- * Unicast 
  */
 static int get_dst_if_id(unsigned int addr)
 {
@@ -189,7 +202,7 @@ static int get_dst_if_id(unsigned int addr)
 
 	/*
 	 * Normally we should check the full destination MAC address
-	 * to verify if it matches the VIRTIO_IPC_NET_MACn OUI,
+	 * to verify if it matches the VIRTIO_IPC_NET_MAC OUI,
 	 * but we are lazy and we want to go fast...
 	 */
 	if_id = hdr->h_dest[5];
@@ -210,7 +223,7 @@ static int get_dst_if_id(unsigned int addr)
 }
 
 /*
- * Copy a head of buffers to the remote head
+ * Copy a head of buffers to the remote head(s)
  */
 static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 				  struct bridge_if_desc  *src_bdesc)
@@ -276,6 +289,9 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 		tlen = 0;
 		ret  = 0;
 
+		if (k == get_local_if_id())
+			continue;
+
 		dst_bdesc = &bridge_if[k];
 		if (dst_bdesc == NULL) {
 			DPRINTK("no remote (%d) interface found\n", k);
@@ -288,10 +304,13 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 			continue;
 		}
 
+		/* Invalidate the destination input remote ring content from our caches */
+		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
+
 		/* Retrieve an available destination incomming buffer */
 		dst_head = get_next_head_desc(dst_bdesc, 0);
 	
-		/* No more space in destination ring */
+		/* No more space in destination ring? */
 		if (dst_head == max) {
 			DPRINTK("destination ring full for %d\n", k);
 			/* Skip this interface */
@@ -309,9 +328,6 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 		/* Source and destination desc indexes */
 		i = src_head;
 		j = dst_head;
-
-		/* Invalidate the destination input remote ring content from our caches */
-		virtio_ipc_sync_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
 
 		/* 
 		 * Copy and aggregate incoming buffers in the destination .
@@ -357,18 +373,13 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 
 		} while ((i = next_desc(src_desc, i, max)) != max);
 
+       		DPRINTK("%d bytes transfered\n", tlen);
+
 		/* Finished with the destination */
 		add_used(&dst_bdesc->vring, dst_head, tlen);
-		
-		DPRINTK("%d bytes transfered\n", tlen);
 
-		if (ret == 0) {
-			/* Flush the modified destination input remote ring content from our caches */
-			virtio_ipc_flush_ring(&dst_bdesc->vring, CACHE_SYNC_RING_USED);
-
-			/* Signal the destination core for this packet */
-			ipc_core->ipc_send(dst_bdesc->core_id, IPC_INT_NET);
-		}
+		/* Signal the destination core for this packet */
+		ipc_core->ipc_send(dst_bdesc->core_id, IPC_INT_NET);
 	}
 
 	/* Finished with the source */
@@ -380,7 +391,7 @@ error:
 }
 
 /*
- * Copy a head of buffers to the remote head
+ * Invalidate new added buffers after being kicked (so ready to receive from remote)
  */
 static int virtio_sync_buffers(struct vring_virtqueue *vq,
 			       u16                    *last_added)
@@ -410,7 +421,7 @@ static int virtio_sync_buffers(struct vring_virtqueue *vq,
 	/* Go to the next available desc */
 	(*last_added)++;
 
-	/* If their number is silly, that's a fatal mistake. */
+	/* If their number is silly, that's a fatal mistake */
 	if (index >= max) {
 		EPRINTK("bridge says index %u is available\n", index);
 		mutex_unlock(&bridge_lock);
@@ -431,9 +442,6 @@ static int virtio_sync_buffers(struct vring_virtqueue *vq,
 			L2_cache_block_invalidate((u32) desc[index].addr,
 						  (u32) desc[index].addr
 						  + desc[index].len);
-			
-			DPRINTK("caches WBINV index = %d, addr = 0x%x, len = %d, first = %d\n",
-				index, get_vaddr(desc[index].addr), desc[index].len, first);
 		}
 		/*
 		 * Do not flush the first buffer as it contains GSO info which 
@@ -488,23 +496,25 @@ static void virtio_input_vq_notify(struct vring_virtqueue *vq)
 		if (ret <= 0)
 			break;
 	}
+
+	/* Flush the ready-to-receive input ring content from our caches */
+	virtio_ipc_flush_ring(&vq->vring, CACHE_SYNC_RING_DESC);
 }
 
 /*
- * Bridge interrupt handler
+ * Bridge interrupt handler for the input vq
  */
 void virtio_bridge_interrupt(u32 ipc_num, void *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 	
-	if ((ipc_num == IPC_INT_NET) 
-	    && (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT))) {
-		
+	if (ipc_num == IPC_INT_NET) {
 		/* Sync our rx ring */
-		virtio_ipc_sync_ring(&vq->vring, CACHE_SYNC_RING_DESC);
+		virtio_ipc_invalidate_ring(&vq->vring, CACHE_SYNC_RING_USED);
 		
-		/* Call virtio vring interrupt handler */
-		vring_interrupt(ipc_num, _vq);
+		/* Call virtio vring interrupt handler */		
+		if (!(vq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT))
+			vring_interrupt(ipc_num, _vq);
 	} 
 }
 EXPORT_SYMBOL(virtio_bridge_interrupt);
