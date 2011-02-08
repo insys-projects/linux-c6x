@@ -629,7 +629,30 @@ void __init init_pic_c64xplus(void)
 #if NR_CIC_COMBINERS > 0
 	memset(&cic_output_to_evt[0], 0, sizeof(cic_output_to_evt));
 	memset(&cic_evt_to_output[0], 0, sizeof(cic_evt_to_output));
+#endif
 
+	/* initialize megamodule combined IRQs */
+	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
+		desc = irq_to_desc(i);
+
+		IC_EVTMASK[i] = ~0;	/* mask all events */
+		IC_EVTCLR[i] = ~0;	/* clear all events */
+
+		desc->status |= (IRQ_NOREQUEST | IRQ_NOPROBE);
+		set_irq_chip(i, &dummy_irq_chip);
+		set_irq_handler(i, handle_bad_irq);
+
+		megamod_chips[i].minfo = &megamod_mask_info[i];
+		set_irq_data(i, &megamod_handler_info[i]);
+	}
+
+	/* initialize individual megamodule IRQs */
+	for (i = NR_MEGAMOD_COMBINERS; i < (NR_MEGAMOD_COMBINERS * 32); i++) {
+		set_irq_chip(i, (struct irq_chip *)&megamod_chips[i / 32]);
+		set_irq_handler(i, handle_level_irq);
+	}
+
+#if NR_CIC_COMBINERS > 0
 	/* megamodule IRQs coming from CIC cannot be used directly */
 	for (i = CIC_MAPBASE; i < (CIC_MAPBASE + CIC_MAPLEN); i++) {
 		desc = irq_to_desc(i);
@@ -672,6 +695,14 @@ void __init init_pic_c64xplus(void)
 		set_irq_chip(irq, (struct irq_chip *)&cic_chips[i / 32]);
 		set_irq_handler(irq, handle_level_irq);
 	}
+
+	/* 
+	 * clear again megamodule combined IRQs because spurious CIC interrupts
+	 * may have occur after the CIC initialization.
+	 */
+	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
+		IC_EVTCLR[i] = ~0;	/* clear all events */
+	}
 #endif
 
 	/*
@@ -687,27 +718,6 @@ void __init init_pic_c64xplus(void)
 			gpio_chips[idx++] = *chip;
 		}
 		irq_to_desc(i)->chip = (struct irq_chip *)&gpio_chips[idx - 1];
-	}
-
-	/* initialize megamodule combined IRQs */
-	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
-		desc = irq_to_desc(i);
-
-		IC_EVTMASK[i] = ~0;	/* mask all events */
-		IC_EVTCLR[i] = ~0;	/* clear all events */
-
-		desc->status |= (IRQ_NOREQUEST | IRQ_NOPROBE);
-		set_irq_chip(i, &dummy_irq_chip);
-		set_irq_handler(i, handle_bad_irq);
-
-		megamod_chips[i].minfo = &megamod_mask_info[i];
-		set_irq_data(i, &megamod_handler_info[i]);
-	}
-
-	/* initialize individual megamodule IRQs */
-	for (i = NR_MEGAMOD_COMBINERS; i < (NR_MEGAMOD_COMBINERS * 32); i++) {
-		set_irq_chip(i, (struct irq_chip *)&megamod_chips[i / 32]);
-		set_irq_handler(i, handle_level_irq);
 	}
 
 	/* map megamodule combined IRQs to low-priority core IRQs */
