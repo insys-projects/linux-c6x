@@ -42,7 +42,7 @@
 #define GPIO_NAND_NWE	    12
 #define GPIO_NAND_RDY	    13
 #define GPIO_NAND_NRE	    15
-#define GPIO_NAND_NCE	    14
+#define GPIO_NAND_NCE	    10
 #undef  GPIO_NAND_NWP       /* not used */
 
 #define GPIO_NAND_DATA_MASK 0xff
