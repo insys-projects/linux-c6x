@@ -86,9 +86,22 @@ static inline void cache_block_operation(unsigned int *start,
 	unsigned int wc = 0;
 	
 	for (; wcnt; wcnt -= wc, start += wc) {
-
+loop:		
 		save_global_flags(flags);
 		global_cli();
+
+		/*
+		 * If another cache operation is occuring
+		 */
+	        if(unlikely(*((volatile unsigned int *) wc_reg))) {
+		    restore_global_flags(flags);
+
+		    /* Wait for previous operation completion */
+		    while (*((volatile unsigned int *) wc_reg));
+
+		    /* Try again */
+		    goto loop;
+		}
 
 		*((volatile unsigned int *) bar_reg) =
 			L2_CACHE_ALIGN_LOW((unsigned int) start);
@@ -97,7 +110,7 @@ static inline void cache_block_operation(unsigned int *start,
 			wc = 0xffff;
 		else
 			wc = wcnt;
-		
+
 		/* Set word count value in the WC register */
 		*((volatile unsigned int *) wc_reg) = wc & 0xffff;
 
