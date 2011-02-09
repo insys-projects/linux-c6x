@@ -307,6 +307,22 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 		/* Invalidate the destination input remote ring content from our caches */
 		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
 
+#if 1 /* Workaround to allow multiple interfaces without multi-queue support */
+		
+		/*
+		 * Check if the last_avail index has moved behind our back due to
+		 * the activity of other core interfaces.
+		 * If so we are trying to update this index based on the used index 
+		 * but this does not protect us against concurrent accesses.
+		 */
+		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_USED_IDX);
+		if (dst_bdesc->vring.used->idx > dst_bdesc->last_avail) {
+			DPRINTK("moving last_avail from %d to %d for if %d\n",
+				dst_bdesc->last_avail, dst_bdesc->vring.used->idx, k);
+			dst_bdesc->last_avail = dst_bdesc->vring.used->idx;
+		}
+#endif
+
 		/* Retrieve an available destination incomming buffer */
 		dst_head = get_next_head_desc(dst_bdesc, 0);
 	
