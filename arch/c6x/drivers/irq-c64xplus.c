@@ -695,6 +695,14 @@ void __init init_pic_c64xplus(void)
 		set_irq_chip(irq, (struct irq_chip *)&cic_chips[i / 32]);
 		set_irq_handler(irq, handle_level_irq);
 	}
+
+	/* 
+	 * clear again megamodule combined IRQs because spurious CIC interrupts
+	 * may have occur after the CIC initialization.
+	 */
+	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
+		IC_EVTCLR[i] = ~0;	/* clear all events */
+	}
 #endif
 
 	/*
