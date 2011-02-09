@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  Modified for 2.6.34: Mark Salter <msalter@redhat.com>
@@ -55,7 +55,6 @@ static inline cycles_t get_cycles (void)
 
 #ifdef CONFIG_TMS320C64XPLUS
 extern int init_tsc_clocksource(void);
-extern unsigned int timer_clock_divisor;
 extern int init_timer64_clocksource(void);
 #endif
 

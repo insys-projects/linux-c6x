@@ -6,7 +6,7 @@ ifdef CONFIG_TI_C6X_COMPILER
 include $(srctree)/arch/c6x/Makefile.lib
 endif
 
-lib-y	:= memcmp.o memmove.o memset.o misc.o delay.o io-readwrite.o \
+lib-y  := memcmp.o memmove.o memset.o misc.o delay.o io-readwrite.o \
            unaligned.o divu.o divi.o pop_rts.o push_rts.o remi.o remu.o \
            strasgi.o llshru.o llshr.o llshl.o negll.o mpyll.o divull.o
 

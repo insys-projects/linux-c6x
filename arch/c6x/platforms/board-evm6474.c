@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Texas Instruments Incorporated
+ * Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -41,6 +41,7 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 
+#include <asm/edma.h>
 #include <mach/board.h>
 
 #ifdef CONFIG_RAPIDIO_TCI648X
@@ -55,10 +56,32 @@ struct tci648x_rio_board_controller_info evm6474_rio_controller = {
 	1                            /* large size (16bit)*/
 };
 
+static struct resource evm6474_rio_resources[] = {
+	{
+		.name	= "LSU",
+		.start	= DMA_CIC_EVT6,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "ICCR",
+		.start	= DMA_CIC_EVT5,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "RATE",
+		.start	= DMA_CIC_EVT7,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
 static struct platform_device evm6474_rio_device = {
 	.name           = "tci648x-rapidio",
 	.id             = 1,
-	.dev		= { .platform_data = &evm6474_rio_controller },
+	.dev		= {
+		.platform_data = &evm6474_rio_controller,
+	},
+	.num_resources	= ARRAY_SIZE(evm6474_rio_resources),
+	.resource	= evm6474_rio_resources,
 };
 
 static int __init evm_init_rio(void)
@@ -71,7 +94,6 @@ core_initcall(evm_init_rio);
 
 #ifdef CONFIG_MCBSP
 #include <asm/mcbsp.h>
-#include <asm/edma.h>
 
 static const struct mcbsp_info evm6474_mcbsp_info[] = {
 	[0] = {.phys_base   = IO_ADDRESS(MCBSP0_BASE_ADDR),
@@ -136,6 +158,137 @@ static int __init evm_init_mcbsp_uart(void)
 
 core_initcall(evm_init_mcbsp_uart);
 #endif
+
+
+/*----------------------------------------------------------------------*/
+
+#ifdef CONFIG_EDMA3
+
+/* Six Transfer Controllers on TMS320C6474 */
+static const s8
+queue_tc_mapping[][2] = {
+	/* {event queue no, TC no} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{4, 4},
+	{5, 5},
+	{-1, -1},
+};
+
+static const s8
+queue_priority_mapping[][2] = {
+	/* {event queue no, Priority} */
+	{0, 4},	/* FIXME: what should these priorities be? */
+	{1, 0},
+	{2, 5},
+	{3, 1},
+	{4, 2},
+	{5, 3},
+	{-1, -1},
+};
+
+
+static struct edma_soc_info edma_cc0_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA_NUM_PARAMENTRY,
+	.n_tc			= EDMA_NUM_EVQUE,
+	.n_cc			= 1,
+	.queue_tc_mapping	= queue_tc_mapping,
+	.queue_priority_mapping	= queue_priority_mapping,
+};
+
+static struct edma_soc_info *edma_info[] = {
+	&edma_cc0_info,
+};
+
+static struct resource edma_resources[] = {
+	/*
+	 * NB: Keep "edma0" IRQ first so it can be easily found at
+	 *     runtime. It is based on core id.
+	 */
+	{
+		.name	= "edma0",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma0_err",
+		.start	= EDMA_IRQ_CCERRINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma_cc0",
+		.start	= EDMA_REGISTER_BASE,
+		.end	= EDMA_REGISTER_BASE + 0xFFFF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc0",
+		.start	= EDMA_TC0_BASE,
+		.end	= EDMA_TC0_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc1",
+		.start	= EDMA_TC1_BASE,
+		.end	= EDMA_TC1_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc2",
+		.start	= EDMA_TC2_BASE,
+		.end	= EDMA_TC2_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc3",
+		.start	= EDMA_TC3_BASE,
+		.end	= EDMA_TC3_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc4",
+		.start	= EDMA_TC4_BASE,
+		.end	= EDMA_TC4_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_tc5",
+		.start	= EDMA_TC5_BASE,
+		.end	= EDMA_TC5_BASE + 0x03FF,
+		.flags	= IORESOURCE_MEM,
+	},
+	/* not using TC*_ERR */
+};
+
+static struct platform_device edma_device = {
+	.name			= "edma",
+	.id			= 0,
+	.dev.platform_data	= edma_info,
+	.num_resources		= ARRAY_SIZE(edma_resources),
+	.resource		= edma_resources,
+};
+
+
+static void __init board_setup_edma(void)
+{
+	int status;
+
+	/* this is based on coreid, so must be calculated at runtime */
+	edma_resources[0].start = EDMA_IRQ_CCINT;
+
+	status = platform_device_register(&edma_device);
+	if (status != 0)
+		pr_debug("setup_edma --> %d\n", status);
+}
+#else
+#define board_setup_edma()
+#endif /* CONFIG_EDMA3 */
+
+/*----------------------------------------------------------------------*/
+
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -288,6 +441,11 @@ static struct clk core_clk = {
 	.parent = &pll1_sysclk7,
 };
 
+static struct clk watchdog_clk = {
+	.name = "watchdog",
+	.parent = &pll1_sysclk10,
+};
+
 static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1", &pll1_clk),
 	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
@@ -296,10 +454,11 @@ static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),
 	CLK(NULL, "pll1_sysclk12", &pll1_sysclk12),
 	CLK(NULL, "pll1_sysclk13", &pll1_sysclk13),
+	CLK(NULL, "core", &core_clk),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
 	CLK("mcbsp.1", NULL, &mcbsp1_clk),
 	CLK("mcbsp.2", NULL, &mcbsp2_clk),
-	CLK(NULL, "core", &core_clk),
+	CLK("watchdog", NULL, &watchdog_clk),
 	CLK("", NULL, NULL)
 };
 
@@ -321,6 +480,7 @@ void c6x_board_setup_arch(void)
 
 __init int evm_init(void)
 {
+	board_setup_edma();
 	board_setup_i2c();
 	evm_setup_nand();
 

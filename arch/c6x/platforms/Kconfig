@@ -7,6 +7,7 @@ config SOC_TMS320C6455
 	select GPIO_TCI648X
 	select TIMER_TCI648X
 	select PIC_C64XPLUS
+	select EDMA3
 
 config SOC_TMS320C6457
 	bool "TMS320C6457"
@@ -16,6 +17,7 @@ config SOC_TMS320C6457
 	select GPIO_TCI648X
 	select TIMER_TCI648X
 	select PIC_C64XPLUS
+	select EDMA3
 	select SGMII
 
 config SOC_TMS320C6472
@@ -26,6 +28,7 @@ config SOC_TMS320C6472
 	select GPIO_TCI648X
 	select TIMER_TCI648X
 	select PIC_C64XPLUS
+	select EDMA3
 
 config SOC_TMS320C6474
 	bool "TMS320C6474"
@@ -35,6 +38,7 @@ config SOC_TMS320C6474
 	select GPIO_TCI648X
 	select TIMER_TCI648X
 	select PIC_C64XPLUS
+	select EDMA3
 	select SGMII
 
 comment "Board Selection"

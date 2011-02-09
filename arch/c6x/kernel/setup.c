@@ -91,6 +91,8 @@ void (*mach_setup_timer)(void) = NULL;
 void (*mach_init_IRQ) (void) = NULL;
 void (*mach_progress) (unsigned int, char *) = NULL;
 void (*mach_print_value) (char *, unsigned long) = NULL;
+void (*mach_set_wdt_mode) (int mode, int delay);
+void (*mach_nmi_handler)(struct pt_regs *regs);
 
 struct tag_header *c6x_tags_pointer __initdata;
 

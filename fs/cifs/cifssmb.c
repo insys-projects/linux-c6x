@@ -33,6 +33,7 @@
 #include <linux/slab.h>
 #include <linux/posix_acl_xattr.h>
 #include <asm/uaccess.h>
+#include <asm/unaligned.h>
 #include "cifspdu.h"
 #include "cifsglob.h"
 #include "cifsacl.h"
@@ -315,7 +316,6 @@ static int validate_t2(struct smb_t2_rsp *pSMB)
 {
 	int rc = -EINVAL;
 	int total_size;
-	char *pBCC;
 
 	/* check for plausible wct, bcc and t2 data and parm sizes */
 	/* check for parm and data offset going beyond end of smb */
@@ -329,10 +329,7 @@ static int validate_t2(struct smb_t2_rsp *pSMB)
 				total_size +=
 					le16_to_cpu(pSMB->t2_rsp.DataCount);
 				/* BCC le converted in SendReceive */
-				pBCC = (pSMB->hdr.WordCount * 2) +
-					sizeof(struct smb_hdr) +
-					(char *)pSMB;
-				if ((total_size <= (*(u16 *)pBCC)) &&
+				if ((total_size <= GET_BCC(&pSMB->hdr)) &&
 				   (total_size <
 					CIFSMaxBufSize+MAX_CIFS_HDR_SIZE)) {
 					return 0;
@@ -5544,7 +5541,7 @@ QAllEAsRetry:
 	}
 
 	/* make sure list_len doesn't go past end of SMB */
-	end_of_smb = (char *)pByteArea(&pSMBr->hdr) + BCC(&pSMBr->hdr);
+	end_of_smb = (char *)pByteArea(&pSMBr->hdr) + GET_BCC(&pSMBr->hdr);
 	if ((char *)ea_response_data + list_len > end_of_smb) {
 		cFYI(1, ("EA list appears to go beyond SMB"));
 		rc = -EIO;

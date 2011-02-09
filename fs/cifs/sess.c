@@ -30,6 +30,7 @@
 #include "nterr.h"
 #include <linux/utsname.h>
 #include <linux/slab.h>
+#include <asm/unaligned.h>
 #include "cifs_spnego.h"
 
 extern void SMBNTencrypt(unsigned char *passwd, unsigned char *c8,
@@ -856,7 +857,7 @@ ssetup_ntlmssp_authenticate:
 	count = iov[1].iov_len + iov[2].iov_len;
 	smb_buf->smb_buf_length += count;
 
-	BCC_LE(smb_buf) = cpu_to_le16(count);
+	SET_BCC_LE(smb_buf, count);
 
 	rc = SendReceive2(xid, ses, iov, 3 /* num_iovecs */, &resp_buf_type,
 			  CIFS_STD_OP /* not long */ | CIFS_LOG_ERROR);
@@ -892,7 +893,7 @@ ssetup_ntlmssp_authenticate:
 	cFYI(1, ("UID = %d ", ses->Suid));
 	/* response can have either 3 or 4 word count - Samba sends 3 */
 	/* and lanman response is 3 */
-	bytes_remaining = BCC(smb_buf);
+	bytes_remaining = GET_BCC(smb_buf);
 	bcc_ptr = pByteArea(smb_buf);
 
 	if (smb_buf->WordCount == 4) {

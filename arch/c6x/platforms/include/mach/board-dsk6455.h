@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -27,7 +27,9 @@
  */
 #define LINUX_TIMER_SRC TIMER_1
 #define LINUX_TIMER_IRQ IRQ_TINT1
- 
+
+#define LINUX_WATCHDOG_SRC TIMER_0
+
 /* 
  * DSK6455 CPLD registers
  */

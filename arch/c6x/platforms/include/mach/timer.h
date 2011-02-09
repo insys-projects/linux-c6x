@@ -3,7 +3,7 @@
  *
  *  Timer definitions for Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -26,6 +26,9 @@
 #elif defined(CONFIG_SOC_TMS320C6474)
 #define TIMER_BASE_ADDR   0x02910000
 #define TIMER_CHAN_MULT   0x10000
+#define TIMER_TINPSEL_REG	0x02900000
+#define TIMER_TOUTPSEL_REG	0x02900004
+#define TIMER_WDRSTSEL_REG	0x02900008
 #else
 #error "no timer base defined"
 #endif
@@ -33,14 +36,15 @@
 /*
  * Timers management
  */
-#define TIMER_EMUMGTCLKSPD_REG(chan) (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x04)
-#define TIMER_CNTLO_REG(chan)        (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x10)
-#define TIMER_CNTHI_REG(chan)        (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x14)
-#define TIMER_PRDLO_REG(chan)        (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x18)
-#define TIMER_PRDHI_REG(chan)        (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x1c)
-#define TIMER_TCR_REG(chan)          (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x20)
-#define TIMER_TGCR_REG(chan)         (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x24)
-#define TIMER_WDTCR_REG(chan)        (TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT) + 0x28)
+#define TIMER_BASE(chan)		(TIMER_BASE_ADDR + ((chan) * TIMER_CHAN_MULT))
+#define TIMER_EMUMGTCLKSPD_REG(chan)	(TIMER_BASE(chan) + 0x04)
+#define TIMER_CNTLO_REG(chan)		(TIMER_BASE(chan) + 0x10)
+#define TIMER_CNTHI_REG(chan)		(TIMER_BASE(chan) + 0x14)
+#define TIMER_PRDLO_REG(chan)		(TIMER_BASE(chan) + 0x18)
+#define TIMER_PRDHI_REG(chan)		(TIMER_BASE(chan) + 0x1c)
+#define TIMER_TCR_REG(chan)		(TIMER_BASE(chan) + 0x20)
+#define TIMER_TGCR_REG(chan)		(TIMER_BASE(chan) + 0x24)
+#define TIMER_WDTCR_REG(chan)		(TIMER_BASE(chan) + 0x28)
 
 #define TIMER_B_TCR_TSTATLO          0x001
 #define TIMER_B_TCR_INVOUTPLO        0x002
@@ -84,6 +88,13 @@
 #define TIMER_10                     10
 #define TIMER_11                     11
 #endif /* defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
+
+/*
+ * Timer clocks are divided down from the CPU clock
+ * The divisor is in the EMUMGTCLKSPD register
+ */
+#define TIMER_DIVISOR(t) \
+	((__raw_readl(TIMER_EMUMGTCLKSPD_REG(t)) & (0xf << 16)) >> 16)
 
 #define timer_period(f, d)            (((f) * 1000000) / ((d) * HZ))
 #define ticks2usecs(f, d, x)          (((x) * (d)) / (f))

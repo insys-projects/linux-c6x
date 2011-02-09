@@ -414,9 +414,16 @@ struct smb_hdr {
 	__u16 Mid;
 	__u8 WordCount;
 } __attribute__((packed));
-/* given a pointer to an smb_hdr retrieve the value of byte count */
-#define BCC(smb_var) (*(__u16 *)((char *)(smb_var) + sizeof(struct smb_hdr) + (2 * (smb_var)->WordCount)))
-#define BCC_LE(smb_var) (*(__le16 *)((char *)(smb_var) + sizeof(struct smb_hdr) + (2 * (smb_var)->WordCount)))
+/* given a pointer to an smb_hdr return pointer to byte count */
+#define pBCC(smb_var) ((char *)(smb_var) + sizeof(struct smb_hdr) \
+		       + (2 * (smb_var)->WordCount))
+
+/* 16-bit byte count is unaligned */
+#define GET_BCC(smb_var) get_unaligned16(pBCC(smb_var))
+#define SET_BCC(smb_var, val) put_unaligned(val, (u16 *)pBCC(smb_var))
+#define GET_BCC_LE(smb_var) get_unaligned_le16(pBCC(smb_var))
+#define SET_BCC_LE(smb_var, val) put_unaligned_le16(val, pBCC(smb_var))
+
 /* given a pointer to an smb_hdr retrieve the pointer to the byte area */
 #define pByteArea(smb_var) ((unsigned char *)(smb_var) + sizeof(struct smb_hdr) + (2 * (smb_var)->WordCount) + 2)
 

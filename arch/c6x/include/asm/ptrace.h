@@ -278,6 +278,10 @@ struct switch_stack {
 #define PTRACE_GETFPREGS          14
 #define PTRACE_SETFPREGS          15
 
+#define PTRACE_GETDSBT           31	/* get the ELF DSBT loadmap address */
+#define PTRACE_GETDSBT_EXEC       0	/* [addr] request the executable loadmap */
+#define PTRACE_GETDSBT_INTERP     1	/* [addr] request the interpreter loadmap */
+
 #ifdef __KERNEL__
 
 #define DEFAULT_CSR               0x0001	/* interrupt enable by default */

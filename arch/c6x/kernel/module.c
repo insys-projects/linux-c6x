@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2005, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2005, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Thomas Charleux (thomas.charleux@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -99,8 +99,30 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 	return 0;
 }
 
-#define FETCH_PKT(x)  ((x) & 0xFFFFFFE0)
+static inline int fixup_pcr(u32 *ip, Elf32_Addr dest, u32 maskbits, int shift)
+{
+	u32 opcode;
+	long ep = (long)ip & ~31;
+	long delta = ((long)dest - ep) >> 2;
+	long mask = (1 << maskbits) - 1;
 
+	if ((delta >> (maskbits - 1)) == 0 ||
+	    (delta >> (maskbits - 1)) == -1) {
+		opcode = *ip;
+		opcode &= ~(mask << shift);
+		opcode |= ((delta & mask) << shift);
+		*ip = opcode;
+
+		DEBUGP("REL PCR_S%d[%p] dest[0p] opcode[%08x]\n",
+		       maskbits, ip, (void *)dest, opcode);
+
+		return 0;
+	}
+	printk(KERN_ERR "PCR_S%d reloc %p -> %p out of range!\n",
+	       maskbits, ip, (void *)dest);
+
+	return -1;
+}
 
 /*
  * apply a REL relocation
@@ -113,7 +135,7 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 {
 	Elf32_Rel *rel = (void *) sechdrs[relsec].sh_addr;
 	Elf_Sym *sym;
-	u32 *location, opcode, ep;
+	u32 *location;
 	unsigned int i;
 	Elf32_Addr v;
 #ifdef CONFIG_TI_C6X_COMPILER
@@ -129,9 +151,6 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 		/* This is where to make the change */
 		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset - offset;
-
-		/* this is the execution packet start */
-		ep = (u32)location & ~31;
 
 		/* This is the symbol it is referring to.  Note that all
 		   undefined symbols have been resolved.  */
@@ -159,25 +178,16 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 			*(u8 *)location = v;
 			break;
 		case R_C6000_PCR_S21:
-			opcode = *location;
-			opcode &= ~0x0fffff80;
-			opcode |= ((((v - ep) >> 2) & 0x1fffff) << 7);
-			DEBUGP("REL PCR_S21[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 21, 7))
+				return -ENOEXEC;
 			break;
 		case R_C6000_PCR_S12:
-			opcode = *location;
-			opcode &= ~0x0fff0000;
-			opcode |= ((((v - ep) >> 2) & 0xfff) << 16);
-			DEBUGP("REL PCR_S12[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 12, 16))
+				return -ENOEXEC;
 			break;
 		case R_C6000_PCR_S10:
-			opcode = *location;
-			opcode &= ~0x7fe000;
-			opcode |= ((((v - ep) >> 2) & 0x3ff) << 13);
-			DEBUGP("REL PCR_S10[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 10, 13))
+				return -ENOEXEC;
 			break;
 		default:
 			printk(KERN_ERR "module %s: Unknown REL relocation: %u\n",
@@ -200,7 +210,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 {
 	Elf32_Rela *rel = (void *) sechdrs[relsec].sh_addr;
 	Elf_Sym *sym;
-	u32 *location, opcode, ep;
+	u32 *location, opcode;
 	unsigned int i;
 	Elf32_Addr v;
 #ifdef CONFIG_TI_C6X_COMPILER
@@ -216,9 +226,6 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		/* This is where to make the change */
 		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset - offset;
-
-		/* this is the execution packet start */
-		ep = (u32)location & ~31;
 
 		/* This is the symbol it is referring to.  Note that all
 		   undefined symbols have been resolved.  */
@@ -260,25 +267,16 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			*location = opcode;
 			break;
 		case R_C6000_PCR_S21:
-			opcode = *location;
-			opcode &= ~0x0fffff80;
-			opcode |= ((((v - ep) >> 2) & 0x1fffff) << 7);
-			DEBUGP("RELA PCR_S21[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 21, 7))
+				return -ENOEXEC;
 			break;
 		case R_C6000_PCR_S12:
-			opcode = *location;
-			opcode &= ~0x0fff0000;
-			opcode |= ((((v - ep) >> 2) & 0xfff) << 16);
-			DEBUGP("RELA PCR_S12[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 12, 16))
+				return -ENOEXEC;
 			break;
 		case R_C6000_PCR_S10:
-			opcode = *location;
-			opcode &= ~0x7fe000;
-			opcode |= ((((v - ep) >> 2) & 0x3ff) << 13);
-			DEBUGP("RELA PCR_S10[%p] v[0x%x] opcode[0x%x]\n", location, v, opcode);
-			*location = opcode;
+			if (fixup_pcr(location, v, 10, 13))
+				return -ENOEXEC;
 			break;
 		default:
 			printk(KERN_ERR "module %s: Unknown RELA relocation: %u\n",

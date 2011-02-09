@@ -99,7 +99,7 @@ void mcbsp_dump_reg(u8 id)
 
 }
 
-static void mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data)
+static void mcbsp_tx_dma_callback(unsigned lch, u16 ch_status, void *data)
 {
 	struct mcbsp *mcbsp_dma_tx = (struct mcbsp *)(data);
 
@@ -109,13 +109,13 @@ static void mcbsp_tx_dma_callback(int lch, u16 ch_status, void *data)
 	/* We can free the channels */
 	DBG("mcbsp_dma_tx->dma_tx_lch = %d\n",
 	       mcbsp_dma_tx->dma_tx_lch);
-	stop_edma(mcbsp_dma_tx->dma_tx_lch);
-	free_edma(mcbsp_dma_tx->dma_tx_lch);
+	edma_stop(mcbsp_dma_tx->dma_tx_lch);
+	edma_free_channel(mcbsp_dma_tx->dma_tx_lch);
 	mcbsp_dma_tx->dma_tx_lch = -1;
 	complete(&mcbsp_dma_tx->tx_dma_completion);
 }
 
-static void mcbsp_rx_dma_callback(int lch, u16 ch_status, void *data)
+static void mcbsp_rx_dma_callback(unsigned lch, u16 ch_status, void *data)
 {
 	struct mcbsp *mcbsp_dma_rx = (struct mcbsp *)(data);
 
@@ -123,7 +123,7 @@ static void mcbsp_rx_dma_callback(int lch, u16 ch_status, void *data)
 	    MCBSP_READ(mcbsp_dma_rx->io_base, SPCR2));
 
 	/* We can free the channels */
-        free_edma(mcbsp_dma_rx->dma_rx_lch);
+	edma_free_channel(mcbsp_dma_rx->dma_rx_lch);
 	mcbsp_dma_rx->dma_rx_lch = -1;
 
 	complete(&mcbsp_dma_rx->rx_dma_completion);
@@ -463,31 +463,30 @@ int mcbsp_xmit_buffer(unsigned int id, dma_addr_t buffer,
 		      unsigned int length)
 {
 	int dma_tx_ch;
-	int tcc;
 
 	if (mcbsp_check(id) < 0)
 		return -EINVAL;
 
-	if (request_edma
-	    (mcbsp_ptr[id]->dma_tx_sync, "McBSP TX", mcbsp_tx_dma_callback,
-	     mcbsp_ptr[id], &dma_tx_ch, &tcc, EVENTQ_3)) {
-		DBG("McBSP: Unable to request DMA channel for McBSP%d TX. Trying IRQ based TX\n",
-		     id + 1);
+	dma_tx_ch = edma_alloc_channel(mcbsp_ptr[id]->dma_tx_sync,
+				       mcbsp_tx_dma_callback, mcbsp_ptr[id],
+				       EVENTQ_3);
+	if (dma_tx_ch < 0) {
+		DBG("McBSP: Unable to request DMA channel for McBSP%d TX. "
+		    "Trying IRQ based TX\n", id + 1);
 		return -EAGAIN;
 	}
-
 	mcbsp_ptr[id]->dma_tx_lch = dma_tx_ch;
 
 	init_completion(&(mcbsp_ptr[id]->tx_dma_completion));
 
-	set_edma_transfer_params(mcbsp_ptr[id]->dma_tx_lch, 2, length / 2, 1, 0, ASYNC);
-	set_edma_dest_params(mcbsp_ptr[id]->dma_tx_lch, mcbsp_ptr[id]->dma_tx_data, 0, 0);
+	edma_set_transfer_params(dma_tx_ch, 2, length / 2, 1, 0, ASYNC);
+	edma_set_dest(dma_tx_ch, mcbsp_ptr[id]->dma_tx_data, 0, 0);
 
-	set_edma_src_params(mcbsp_ptr[id]->dma_tx_lch, (buffer), 0, 0);
-	set_edma_src_index(mcbsp_ptr[id]->dma_tx_lch, 2, 0);
-	set_edma_dest_index(mcbsp_ptr[id]->dma_tx_lch, 0, 0);
+	edma_set_src(dma_tx_ch, buffer, 0, 0);
+	edma_set_src_index(dma_tx_ch, 2, 0);
+	edma_set_dest_index(dma_tx_ch, 0, 0);
 
-	start_edma(mcbsp_ptr[id]->dma_tx_lch);
+	edma_start(dma_tx_ch);
 
 	wait_for_completion(&(mcbsp_ptr[id]->tx_dma_completion));
 
@@ -498,16 +497,16 @@ int mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer,
 		      unsigned int length)
 {
 	int dma_rx_ch;
-	int tcc = -1;
 
 	if (mcbsp_check(id) < 0)
 		return -EINVAL;
 
-	if (request_edma
-	    (mcbsp_ptr[id]->dma_rx_sync, "McBSP RX", mcbsp_rx_dma_callback,
-	     mcbsp_ptr[id], &dma_rx_ch, &tcc, EVENTQ_3)) {
-		DBG("McBSP: Unable to request DMA channel for McBSP%d RX. Trying IRQ based RX\n",
-		     id + 1);
+	dma_rx_ch = edma_alloc_channel(mcbsp_ptr[id]->dma_rx_sync,
+				       mcbsp_rx_dma_callback, mcbsp_ptr[id],
+				       EVENTQ_3);
+	if (dma_rx_ch < 0) {
+		DBG("McBSP: Unable to request DMA channel for McBSP%d RX. "
+		    "Trying IRQ based RX\n", id + 1);
 		return -EAGAIN;
 	}
 	mcbsp_ptr[id]->dma_rx_lch = dma_rx_ch;
@@ -516,18 +515,16 @@ int mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer,
 
 	init_completion(&(mcbsp_ptr[id]->rx_dma_completion));
 
-	set_edma_transfer_params(mcbsp_ptr[id]->dma_rx_lch, 2, length / 2, 1,
-				 0, ASYNC);
+	edma_set_transfer_params(dma_rx_ch, 2, length / 2, 1, 0, ASYNC);
 
-	set_edma_src_params(mcbsp_ptr[id]->dma_rx_lch, mcbsp_ptr[id]->dma_rx_data, 0, 0);
+	edma_set_src(dma_rx_ch, mcbsp_ptr[id]->dma_rx_data, 0, 0);
 				   
-	set_edma_dest_params(mcbsp_ptr[id]->dma_rx_lch,
-			     (unsigned long) virt_to_phys((void *)buffer),
-			     0, 0);
-	set_edma_src_index(mcbsp_ptr[id]->dma_rx_lch, 0, 0);
-	set_edma_dest_index(mcbsp_ptr[id]->dma_rx_lch, 2, 0);
+	edma_set_dest(dma_rx_ch, (unsigned long)virt_to_phys((void *)buffer),
+		      0, 0);
+	edma_set_src_index(dma_rx_ch, 0, 0);
+	edma_set_dest_index(dma_rx_ch, 2, 0);
 
-	start_edma(mcbsp_ptr[id]->dma_rx_lch);
+	edma_start(dma_rx_ch);
 
 	wait_for_completion(&(mcbsp_ptr[id]->rx_dma_completion));
 	DBG(" mcbsp_recv_buffer: after wait_for_completion\n");

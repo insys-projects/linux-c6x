@@ -96,7 +96,7 @@ KBUILD_CFLAGS	+= $(arch-y)
 KBUILD_AFLAGS	+= $(arch-y)
 
 head-y		:= arch/c6x/kernel/head.o
-core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/drivers/ arch/c6x/platforms/
+core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/platforms/ arch/c6x/drivers/
 libs-y		+= arch/c6x/lib/
 
 ifdef CONFIG_TI_C6X_LINKER

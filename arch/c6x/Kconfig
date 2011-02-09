@@ -139,6 +139,9 @@ config PIC_C64XPLUS
 config GPIO_TCI648X
 	bool
 
+config EDMA3
+	bool
+
 source "arch/c6x/platforms/Kconfig"
 
 config USE_RT_TIMER
@@ -188,14 +191,6 @@ config MCBSP_UART_CONSOLE
           the system console (the system console is the device which receives all
           kernel messages and warnings and which allows logins in single user
           mode).
-
-config EDMA3
-	bool "EDMA3 support"
-	depends on SOC_TMS320C6474 || SOC_TMS320C6472
-	default y if (MCBSP || RAPIDIO_TCI648X)
-	help 
-          If you say Y here, the kernel will include drivers and
-          infrastructure code to support TI EDMA3 devices.
 
 config RAPIDIO_TCI648X
         bool "RapidIO support"
@@ -263,11 +258,6 @@ config PCI
 	bool "PCI support"
 	help
 	  Support for PCI bus.
-
-# source "drivers/pci/Kconfig"
-
-# source "drivers/pcmcia/Kconfig"
-
 endmenu
 
 menu "Executable file formats"
@@ -287,11 +277,7 @@ endmenu
 
 source "net/Kconfig"
 
-menu "Device Drivers"
-
 source "drivers/Kconfig"
-
-endmenu
 
 source "fs/Kconfig"
 

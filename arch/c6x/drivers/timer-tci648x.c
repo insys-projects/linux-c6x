@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Contributed by: Mark Salter (msalter@redhat.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -26,8 +26,6 @@
 #include <mach/board.h>
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
-
-unsigned int timer_clock_divisor;
 
 static int next_event(unsigned long delta,
 		      struct clock_event_device *evt)
@@ -107,8 +105,6 @@ int __init c6x_arch_init_clockevents(void)
 	TIMER_REG(timer_TGCR) &= ~TIMER_B_TGCR_TIMMODE_MASK;
 	TIMER_REG(timer_TGCR) |= (TIMER_B_TGCR_TIMLORS | TIMER_B_TGCR_TIMMODE_UD32);
 
-	timer_clock_divisor = (TIMER_REG(timer_EMUMGTCLKSPD) & (0xf << 16)) >> 16;
-
 	cd->irq		= LINUX_TIMER_IRQ;
 	cd->name	= "TIMER64_EVT32_TIMER";
 	cd->features	= CLOCK_EVT_FEAT_ONESHOT;
@@ -116,7 +112,9 @@ int __init c6x_arch_init_clockevents(void)
 	/* Calculate the min / max delta */
 	/* Find a shift value */
 	for (shift = 32; shift > 0; shift--) {
-		temp = (u64) (c6x_core_freq / timer_clock_divisor) << shift;
+		temp = (u64)(c6x_core_freq / TIMER_DIVISOR(LINUX_TIMER_SRC));
+		temp <<=  shift;
+
 		do_div(temp, NSEC_PER_SEC);
 		if ((temp >> 32) == 0)
 			break;

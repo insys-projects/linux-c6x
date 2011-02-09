@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2007, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
  *  Updated: Mark Salter <msalter@redhat.com>
  *
@@ -36,6 +36,8 @@
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/dscr.h>
+#include <asm/machdep.h>
+#include <asm/traps.h>
 
 #include <mach/board.h>
 #include <mach/gemac.h>
@@ -354,6 +356,124 @@ static void init_power(void)
 #endif/* CONFIG_SOC_TMS320C6472 */
 }
 
+#ifdef CONFIG_WATCHDOG
+
+#define WDT_MODE_LOCAL		1
+#define WDT_MODE_NMI		2
+#define WDT_MODE_DELAYED	3
+#define WDT_MODE_PLL		4
+
+#ifdef CONFIG_SOC_TMS320C6472
+static void c6472_set_wdt_mode(int mode, int delay)
+{
+	unsigned long reg = DSCR_RSTMUX0 + (get_coreid() * 4);
+	unsigned long old = __raw_readl(reg) & ~0xf;
+
+	switch (mode) {
+	case WDT_MODE_LOCAL:
+		__raw_writel(old | (2 << 1) | 1, reg);
+		break;
+	case WDT_MODE_NMI:
+		__raw_writel(old | (3 << 1) | 1, reg);
+		break;
+	case WDT_MODE_DELAYED:
+		switch (delay) {
+		case 256:
+			delay = 0;
+			break;
+		case 512:
+			delay = 1;
+			break;
+		case 1024:
+			delay = 2;
+			break;
+		case 2048:
+			delay = 3;
+			break;
+		case 4096:
+		case -1:
+			delay = 4;
+			break;
+		case 8192:
+			delay = 5;
+			break;
+		case 16384:
+			delay = 6;
+			break;
+		case 32768:
+			delay = 7;
+			break;
+		default:
+			/* illegal delay */
+			return;
+		}
+		__raw_writel(old | (delay << 6) | (4 << 1) | 1, reg);
+		break;
+	case WDT_MODE_PLL:
+		__raw_writel(old | (5 << 1) | 1, reg);
+		break;
+	}
+}
+#endif /* CONFIG_SOC_TMS320C6472 */
+
+#ifdef CONFIG_SOC_TMS320C6457
+static void c6457_set_wdt_mode(int mode, int delay)
+{
+	unsigned long old = __raw_readl(DSCR_WDRSTSEL);
+
+	if (mode == WDT_MODE_LOCAL)
+		__raw_writel(old | 1, DSCR_WDRSTSEL);
+}
+#endif
+
+#ifdef CONFIG_SOC_TMS320C6474
+static void c6474_set_wdt_mode(int mode, int delay)
+{
+	unsigned long old = __raw_readl(TIMER_WDRSTSEL_REG);
+
+	if (mode == WDT_MODE_LOCAL)
+		__raw_writel(old | (1 << (2 - get_coreid())),
+			     TIMER_WDRSTSEL_REG);
+}
+#endif
+
+#ifdef CONFIG_SOC_TMS320C6455
+static void c6455_set_wdt_mode(int mode, int delay)
+{
+}
+#endif
+
+static int wdt_action_setup(char *str)
+{
+	unsigned long long delay;
+	char *endptr;
+
+	if (strcmp("local", str) == 0)
+		mach_set_wdt_mode(WDT_MODE_LOCAL, 0);
+	else if (strcmp("nmi", str) == 0)
+		mach_set_wdt_mode(WDT_MODE_NMI, 0);
+	else if (strncmp("delay", str, 5) == 0) {
+		str += 5;
+		if (*str == ',') {
+			delay = memparse(str, &endptr);
+			if (*endptr == '\0')
+				mach_set_wdt_mode(WDT_MODE_DELAYED, delay);
+		} else if (*str == '\0')
+			mach_set_wdt_mode(WDT_MODE_DELAYED, -1);
+	} else if (strcmp("system", str) == 0)
+		mach_set_wdt_mode(WDT_MODE_PLL, 0);
+
+	return 1;
+}
+__setup("wdt_action=", wdt_action_setup);
+
+static void default_nmi_handler(struct pt_regs *regs)
+{
+	printk(KERN_CRIT "NMI interrupt!\n");
+}
+#endif /* CONFIG_WATCHDOG */
+
+
 void c6x_soc_setup_arch(void)
 {
  	/* Initialize C64x+ IRQs */          	
@@ -419,7 +539,53 @@ void c6x_soc_setup_arch(void)
 	/* Initialize SoC resources */
 	iomem_resource.name = "Memory";
 	request_resource(&iomem_resource, &c6x_soc_res);
+
+#ifdef CONFIG_WATCHDOG
+#ifdef CONFIG_SOC_TMS320C6455
+	mach_set_wdt_mode = c6455_set_wdt_mode;
+#endif
+#ifdef CONFIG_SOC_TMS320C6457
+	mach_set_wdt_mode = c6457_set_wdt_mode;
+#endif
+#ifdef CONFIG_SOC_TMS320C6472
+	mach_set_wdt_mode = c6472_set_wdt_mode;
+#endif
+#ifdef CONFIG_SOC_TMS320C6474
+	mach_set_wdt_mode = c6474_set_wdt_mode;
+#endif
+	mach_nmi_handler = default_nmi_handler;
+#endif /* CONFIG_WATCHDOG */
 }
+
+
+#if defined(CONFIG_DAVINCI_WATCHDOG) || defined(CONFIG_DAVINCI_WATCHDOG_MODULE)
+
+static struct resource wdt_resources[] = {
+	{
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device davinci_wdt_device = {
+	.name		= "watchdog",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(wdt_resources),
+	.resource	= wdt_resources,
+};
+
+#define WDOG_BASE TIMER_BASE(LINUX_WATCHDOG_SRC)
+
+static void setup_wdt(void)
+{
+
+	wdt_resources[0].start = WDOG_BASE;
+	wdt_resources[0].end = WDOG_BASE + 63,
+
+	platform_device_register(&davinci_wdt_device);
+}
+#else
+#define setup_wdt()
+#endif
 
 
 static int __init platform_arch_init(void)
@@ -428,6 +594,7 @@ static int __init platform_arch_init(void)
 
 	/* Intialize EMAC SoC resources */
 	setup_emac();
+	setup_wdt();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
