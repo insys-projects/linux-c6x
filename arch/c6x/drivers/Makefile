@@ -2,7 +2,7 @@
 # Makefile for arch/c6x/drivers/
 #
 
-obj-$(CONFIG_HPI_CONSOLE)      += cio/
+obj-$(CONFIG_CIO_CONSOLE)      += cio/
 
 obj-$(CONFIG_PLL_TCI648X)      += pll-tci648x.o
 obj-$(CONFIG_GPIO_TCI648X)     += gpio-tci648x.o
