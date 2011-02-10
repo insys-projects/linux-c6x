@@ -21,7 +21,7 @@
 /*
  * L2 used as cache
  */
-#define L2MODE_SIZE       L2MODE_256K_CACHE
+#define L2MODE_SIZE       L2MODE_MAX_CACHE
 
 /*
  * Internal Memory Control Registers for caches

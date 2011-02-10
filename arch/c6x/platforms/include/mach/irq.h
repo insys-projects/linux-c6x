@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -19,6 +19,8 @@
 #include <mach/irq-c6472.h>
 #elif defined(CONFIG_SOC_TMS320C6474)
 #include <mach/irq-c6474.h>
+#elif defined(CONFIG_SOC_TMS320C6670)
+#include <mach/irq-c6670.h>
 #else
 #error "No machine IRQ definitions"
 #endif

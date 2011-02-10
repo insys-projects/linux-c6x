@@ -49,7 +49,7 @@
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
 
-#elif defined(CONFIG_SOC_TMS320C6474)
+#elif defined(CONFIG_SOC_TMS320C6670)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
 #define RAM_SRAM_OFFSET   0x01000000
@@ -59,7 +59,8 @@
 #define RAM_EMIFA_CE4     0xc0000000
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0x80000000
-#define RAM_MEMORY_START  RAM_DDR2_CE0
+#define RAM_MSM_BASE      0x0c000000
+#define RAM_MEMORY_START  RAM_MSM_BASE
 
 #else
 #error "No SoC memory address space defines"
@@ -69,11 +70,6 @@
  * VBUS clock Rate in MHz (1-255)
  */
 #define VBUSCLK           165
-
-/* 
- * GPIO registers base
- */
-#define GPIO_REG_BASE     0x02b00000
 
 /*
  * PSC Registers
@@ -154,6 +150,14 @@
 #define PSC_MDCTL13                  0x02ae0a34
 #endif  /* CONFIG_SOC_TMS320C6472 */
 
+#if defined(CONFIG_SOC_TMS320C6670)
+#define PSC_BASE                     0x02350000
+#define PSC_PTCMD                    0x02350120
+#define PSC_PTSTAT                   0x02350128
+#define PSC_PDCTL0                   0x02ac0300
+#define PSC_MDSTAT0                  0x02ac0800
+#define PSC_MDCTL0                   0x02ac0a00
+#endif  /* CONFIG_SOC_TMS329C6670 */
 /*
  * TCI648x megamodules misc registers & constants
  */
@@ -164,6 +168,8 @@
 #define C6X_SOC_HAS_CORE_REV
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define CORE_NUM                     6
+#elif defined(CONFIG_SOC_TMS320C6670)
+#define CORE_NUM                     4
 #else
 #define CORE_NUM                     1
 #endif
@@ -180,6 +186,13 @@
 #define IPCGR_BASE                   0x02a80540
 #define IPCAR_BASE                   0x02a80580
 #endif
+#if defined(CONFIG_SOC_TMS320C6670)
+#define NMIGR_BASE                   0x02620200
+#define IPCGR_BASE                   0x02620240
+#define IPCGRH                       0x0262027c
+#define IPCAR_BASE                   0x02620280
+#define IPCARH                       0x026202bc
+#endif
 
 #if defined(CONFIG_SOC_TMS320C6474)
 /*
@@ -189,6 +202,10 @@
 #define MCBSP1_BASE_ADDR             0x028d0000
 #define MCBSP0_EDMA_BASE_ADDR        0x30000000
 #define MCBSP1_EDMA_BASE_ADDR        0x34000000
+#endif
+
+#if defined(CONFIG_SOC_TMS320C6670)
+#define UART_BASE_ADDR               0x02540000
 #endif
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

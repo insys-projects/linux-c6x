@@ -5,6 +5,7 @@
  *
  *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -19,16 +20,19 @@
  */
 #if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
 #define TIMER_BASE_ADDR   0x02940000
-#define TIMER_CHAN_MULT   0x40000
+#define TIMER_CHAN_MULT   0x00040000
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define TIMER_BASE_ADDR   0x025e0000
-#define TIMER_CHAN_MULT   0x10000
+#define TIMER_CHAN_MULT   0x00010000
 #elif defined(CONFIG_SOC_TMS320C6474)
 #define TIMER_BASE_ADDR   0x02910000
-#define TIMER_CHAN_MULT   0x10000
+#define TIMER_CHAN_MULT   0x00010000
 #define TIMER_TINPSEL_REG	0x02900000
 #define TIMER_TOUTPSEL_REG	0x02900004
 #define TIMER_WDRSTSEL_REG	0x02900008
+#elif defined(CONFIG_SOC_TMS320C6670)
+#define TIMER_BASE_ADDR   0x02200000
+#define TIMER_CHAN_MULT   0x00010000
 #else
 #error "no timer base defined"
 #endif
@@ -75,7 +79,6 @@
 
 #define TIMER_0                      0
 #define TIMER_1                      1
-
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
 #define TIMER_2                      2
 #define TIMER_3                      3
@@ -88,6 +91,14 @@
 #define TIMER_10                     10
 #define TIMER_11                     11
 #endif /* defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474) */
+#if defined(CONFIG_SOC_TMS320C6670)
+#define TIMER_2                      2
+#define TIMER_3                      3
+#define TIMER_4                      4
+#define TIMER_5                      5
+#define TIMER_6                      6
+#define TIMER_7                      7
+#endif /* defined(CONFIG_SOC_TMS320C6670) */
 
 /*
  * Timer clocks are divided down from the CPU clock
