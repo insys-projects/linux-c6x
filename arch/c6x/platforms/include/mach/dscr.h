@@ -169,6 +169,28 @@
 
 #endif   /* CONFIG_SOC_TMS320C6472 */
 
+#if defined(CONFIG_SOC_TMS320C6670)
+#define DSCR_JTAGID                  0x02620018
+#define DSCR_DEVSTAT                 0x02620020
+#define DSCR_KICK0                   0x02620038
+#define DSCR_KICK1                   0x0262003c
+#define DSCR_BOOTADDR                0x02620040
+#define DSCR_DEVCFG                  0x0262014c
+#define DSCR_MACID                   0x02620110
+#define DSCR_PRI_ALLOC               0x0288091c
+
+#define DSCR_KICK0_KEY               0x83E70B13
+#define DSCR_KICK1_KEY               0x95A4F1E0
+
+#define DSCR_B_DEVSTAT_LENDIAN       BIT(0)
+#define DSCR_B_DEVSTAT_PCIESSEN      BIT(16)
+
+/* Using SGMII */
+#define DEVSTAT_MACSEL_OFFSET        0
+#define DEVSTAT_MACSEL_MASK          0
+
+#endif  /* CONFIG_SOC_TMS320C6670 */
+
 /*
  * MDIO interfaces
  */

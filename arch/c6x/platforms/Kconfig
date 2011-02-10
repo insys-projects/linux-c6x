@@ -41,6 +41,14 @@ config SOC_TMS320C6474
 	select EDMA3
 	select SGMII
 
+config SOC_TMS320C6670
+	bool "TMS320C6670"
+	default n
+	select TMS320C66X
+	select TIMER_TCI648X
+	select PIC_C64XPLUS
+	select SGMII
+
 comment "Board Selection"
 choice
 	prompt "Board"
@@ -67,5 +75,9 @@ config ARCH_BOARD_EVM6474
 config ARCH_BOARD_EVM6474L
 	bool "EVM6474L"
 	select SOC_TMS320C6474
+
+config ARCH_BOARD_EVMTCI6616
+	bool "EVMTCI6616"
+	select SOC_TMS320C6670
 
 endchoice
