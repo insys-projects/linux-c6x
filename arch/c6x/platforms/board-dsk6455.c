@@ -38,9 +38,11 @@
 #include <asm/percpu.h>
 #include <asm/clock.h>
 #include <asm/edma.h>
+#include <asm/dscr.h>
 
 #include <mach/gmdio.h>
 #include <mach/board.h>
+#include <mach/emif.h>
 
 /*
  * Resources present on the DSK6455 board
@@ -279,6 +281,53 @@ void c6x_board_setup_arch(void)
 	int i;
 
 	printk("Designed for the DSK6455 board, Spectrum Digital Inc.\n");
+
+	/* Bootloader may not have setup EMIFA, so we do it here just in case */
+	dscr_set_reg(DSCR_PERCFG1, 3);
+	__delay(100);
+
+	/* CPLD */
+	EMIFA_CE2CFG = EMIFA_CFG_ASYNC |
+		       EMIFA_CFG_W_SETUP(1)   |
+		       EMIFA_CFG_W_STROBE(10) |
+		       EMIFA_CFG_W_HOLD(1)    |
+		       EMIFA_CFG_R_SETUP(1)   |
+		       EMIFA_CFG_R_STROBE(10) |
+		       EMIFA_CFG_R_HOLD(1)    |
+		       EMIFA_CFG_WIDTH_8;
+
+	/* NOR Flash */
+	EMIFA_CE3CFG = EMIFA_CFG_ASYNC |
+		       EMIFA_CFG_W_SETUP(1)   |
+		       EMIFA_CFG_W_STROBE(10) |
+		       EMIFA_CFG_W_HOLD(1)    |
+		       EMIFA_CFG_R_SETUP(1)   |
+		       EMIFA_CFG_R_STROBE(10) |
+		       EMIFA_CFG_R_HOLD(1)    |
+		       EMIFA_CFG_WIDTH_8;
+
+	/* Daughter Card */
+	EMIFA_CE4CFG = EMIFA_CFG_ASYNC |
+		       EMIFA_CFG_W_SETUP(1)   |
+		       EMIFA_CFG_W_STROBE(10) |
+		       EMIFA_CFG_W_HOLD(1)    |
+		       EMIFA_CFG_R_SETUP(1)   |
+		       EMIFA_CFG_R_STROBE(10) |
+		       EMIFA_CFG_R_HOLD(1)    |
+		       EMIFA_CFG_WIDTH_32;
+
+	/* Daughter Card */
+	EMIFA_CE5CFG = EMIFA_CFG_ASYNC |
+		       EMIFA_CFG_W_SETUP(1)   |
+		       EMIFA_CFG_W_STROBE(10) |
+		       EMIFA_CFG_W_HOLD(1)    |
+		       EMIFA_CFG_R_SETUP(1)   |
+		       EMIFA_CFG_R_STROBE(10) |
+		       EMIFA_CFG_R_HOLD(1)    |
+		       EMIFA_CFG_WIDTH_32;
+
+	/* Raise priority of waiting bus commands after 255 transfers */
+	EMIFA_BPRIO = 0xFE;
 
 	/* Initialize DSK6455 resources */
 	iomem_resource.name = "Memory";
