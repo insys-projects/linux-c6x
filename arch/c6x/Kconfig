@@ -120,10 +120,10 @@ config TMS320C64XPLUS
 	bool "TMS320C64X+"
 	select SERIAL_CORE
 
-config HPI_CONSOLE
-       bool "Host Port Interface Console"
+config CIO_CONSOLE
+       bool "CIO Console"
        help
-         Say Y if you want a write-only console on the Host Port Interface.
+         Say Y if you want a write-only console over CIO.
          This is only useful for running kernels from a debugger or simulator.
 
 config PLL_TCI648X
