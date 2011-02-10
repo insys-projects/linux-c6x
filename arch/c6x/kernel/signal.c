@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
@@ -127,7 +127,7 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
         COPY(a0); COPY(a1); COPY(a2); COPY(a3); COPY(a5); COPY(a7); COPY(a9);
 	COPY(b0); COPY(b1); COPY(b2); COPY(b3); COPY(b5); COPY(b7); COPY(b9);
 
-#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
+#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS || defined(CONFIG_TMS320C66X)
 	COPY(a16); COPY(a17); COPY(a18); COPY(a19); COPY(a20); COPY(a21); COPY(a22); COPY(a23);
 	COPY(a24); COPY(a25); COPY(a26); COPY(a27); COPY(a28); COPY(a29); COPY(a30); COPY(a31);
 	COPY(b16); COPY(b17); COPY(b18); COPY(b19); COPY(b20); COPY(b21); COPY(b22); COPY(b23);
@@ -228,7 +228,7 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask
         COPY(a0); COPY(a1); COPY(a2); COPY(a3); COPY(a5); COPY(a7); COPY(a9);
 	COPY(b0); COPY(b1); COPY(b2); COPY(b3); COPY(b5); COPY(b7); COPY(b9);
 
-#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
+#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS || defined(CONFIG_TMS320C66X)
 	COPY(a16); COPY(a17); COPY(a18); COPY(a19); COPY(a20); COPY(a21); COPY(a22); COPY(a23);
 	COPY(a24); COPY(a25); COPY(a26); COPY(a27); COPY(a28); COPY(a29); COPY(a30); COPY(a31);
 	COPY(b16); COPY(b17); COPY(b18); COPY(b19); COPY(b20); COPY(b21); COPY(b22); COPY(b23);
@@ -289,7 +289,7 @@ static int setup_frame(int signr, struct k_sigaction *ka,
 	else {
 		retcode = (unsigned long *) &frame->retcode;
 		put_user(0x00003BAAUL, retcode++); /* MVK 119,B0 ; __NR_sigreturn in B0 */
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 		put_user(0x010403E2UL, retcode++); /* MVC CSR,B2 */
 		put_user(0x008800CAUL, retcode++); /* CLR B2,0,0,B1 */
 		put_user(0x008403A2UL, retcode++); /* MVC B1,CSR */
@@ -298,7 +298,7 @@ static int setup_frame(int signr, struct k_sigaction *ka,
 		put_user(0x010403A2UL, retcode++); /* MVC B1,ISR */
 		put_user(0x008803A2UL, retcode++); /* MVC B2,CSR */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
-#else /* CONFIG_TMS320C64XPLUS */
+#else /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 		put_user(0x10000000UL, retcode++); /* SWE */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
@@ -307,7 +307,7 @@ static int setup_frame(int signr, struct k_sigaction *ka,
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
-#endif /* CONFIG_TMS320C64XPLUS */
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 		flush_icache_range((unsigned long) &frame->retcode,
 				   (unsigned long) &frame->retcode + RETCODE_SIZE);
 
@@ -362,7 +362,7 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	else {
 		retcode = (unsigned long *) &frame->retcode;
 		put_user(0x000056AAUL, retcode++); /* MVK 173,B0 ; __NR_rt_sigreturn in B0 */
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 		put_user(0x010403E2UL, retcode++); /* MVC CSR,B2 */
 		put_user(0x008800CAUL, retcode++); /* CLR B2,0,0,B1 */
 		put_user(0x008403A2UL, retcode++); /* MVC B1,CSR */
@@ -371,7 +371,7 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 		put_user(0x010403A2UL, retcode++); /* MVC B1,ISR */
 		put_user(0x008803A2UL, retcode++); /* MVC B2,CSR */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
-#else /* CONFIG_TMS320C64XPLUS */
+#else /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 		put_user(0x10000000UL, retcode++); /* SWE */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
@@ -380,7 +380,7 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
 		put_user(0x00006000UL, retcode++); /* NOP 4 */
-#endif /* CONFIG_TMS320C64XPLUS */
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 		flush_icache_range((unsigned long) &frame->retcode,
 				   (unsigned long) &frame->retcode + RETCODE_SIZE);
 

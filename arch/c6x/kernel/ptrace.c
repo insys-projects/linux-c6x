@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
@@ -54,7 +54,7 @@
    specially (see get_reg/put_reg below). */
 
 static int regoff[] = {
-#if defined(CONFIG_TMS320C64XPLUS) || defined(__TMS320C6XPLUS__)
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	PT_REGPAIR(tsr,orig_a4),
 	PT_REGPAIR(rilc,ilc),
 #else
@@ -62,7 +62,7 @@ static int regoff[] = {
 #endif
 	PT_REGPAIR(pc,csr),
 
-#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64X) || defined (CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	PT_REGPAIR(b17,b16),
 	PT_REGPAIR(b19,b18),
 	PT_REGPAIR(b21,b20),
@@ -81,7 +81,7 @@ static int regoff[] = {
 	PT_REGPAIR(b11,b10),
 	PT_REGPAIR(b13,b12),
 
-#if defined CONFIG_TMS320C64X || defined CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64X) || defined (CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	PT_REGPAIR(a17,a16),
 	PT_REGPAIR(a19,a18),
 	PT_REGPAIR(a21,a20),
@@ -103,7 +103,7 @@ static int regoff[] = {
 	PT_REGPAIR(sp,dp),
 };
 
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 static struct timer_list   bkpt_timer;
 static atomic_t            bkpt_timer_refc = 0;
 #endif
@@ -123,7 +123,7 @@ static inline long get_reg(struct task_struct *task, int regno)
 	return *addr;
 }
 
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 /*
  * Look up if there is a pending breakpoint
  */
@@ -199,7 +199,7 @@ static inline int write_long(struct task_struct *tsk,
  */
 void remove_bkpt(void)
 {
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	/* if we are the last traced thread, remove the timer */
 	if (atomic_dec_and_test(&bkpt_timer_refc))
 		del_timer(&bkpt_timer);
@@ -208,7 +208,7 @@ void remove_bkpt(void)
 
 void activate_bkpt(void)
 {
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	/* add breakpoint emulation */
 	if (bkpt_timer_refc == 0) {
 		init_timer(&bkpt_timer);

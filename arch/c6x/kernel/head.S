@@ -3,7 +3,7 @@
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
-;  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+;  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
 ;
 ;  This program is free software; you can redistribute it and/or modify
@@ -79,7 +79,7 @@ __bss_done:
 	MVC	.S2	CSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,CSR
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	MVC	.S2	TSR,B2
 	CLR	.S2	B2,0,1,B2
 	MVC	.S2	B2,TSR

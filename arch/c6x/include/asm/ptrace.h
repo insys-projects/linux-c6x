@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
@@ -15,7 +15,7 @@
 #ifndef __ASM_C6X_PTRACE_H
 #define __ASM_C6X_PTRACE_H
 
-#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS) || defined(__TMS320C66X__)
 #define BKPT_OPCODE        0x56454314       /* illegal opcode */
 #else
 #define BKPT_OPCODE        0x0000a122       /* BNOP .S2 0,5 */
@@ -29,7 +29,7 @@
 #define PT_HI(odd,even)  odd
 #endif
 
-#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS) || defined(__TMS320C66X__)
 
 #define PT_A4_ORG  PT_LO(1,0)
 #define PT_TSR     PT_HI(1,0)
@@ -197,7 +197,7 @@
  * which means the word ordering of the pair depends on endianess.
  */
 struct pt_regs {
-#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)  || defined(__TMS320C66X__)
 	REG_PAIR(tsr,orig_a4);
 	REG_PAIR(rilc,ilc);
 #else
@@ -251,7 +251,7 @@ struct pt_regs {
  * This is the extended stack used by the context switcher
  */
 struct switch_stack {
-#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS)
+#if defined(__TMS320C6XPLUS__) || defined(_TMS320C6400_PLUS) || defined(__TMS320C66X__)
 	REG_PAIR(rilc,ilc);
 #endif
 	REG_PAIR(a11,a10);
@@ -287,7 +287,7 @@ struct switch_stack {
 #define DEFAULT_CSR               0x0001	/* interrupt enable by default */
                                                 /* used in /include/asm/processor.h*/
 
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 extern unsigned long current_ksp;
 #define user_mode(regs)           (((((regs)->sp) ^ current_ksp) >> PAGE_SHIFT) != 0)
 #else

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2005, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2005, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -45,19 +45,24 @@
 /*
  * CCFG register values and bits
  */
-#define L2MODE_0K_CACHE   0x0
-#define L2MODE_32K_CACHE  0x1
-#define L2MODE_64K_CACHE  0x2
-#define L2MODE_128K_CACHE 0x3
-#define L2MODE_256K_CACHE 0x7
+#define L2MODE_0K_CACHE    0x0
+#define L2MODE_32K_CACHE   0x1
+#define L2MODE_64K_CACHE   0x2
+#define L2MODE_128K_CACHE  0x3
+#define L2MODE_256K_CACHE  0x4
+#if defined(CONFIG_TMS320C66X)
+#define L2MODE_512K_CACHE  0x5
+#define L2MODE_1024K_CACHE 0x6
+#endif
+#define L2MODE_MAX_CACHE   0x7
 
-#define L2PRIO_URGENT     0x0
-#define L2PRIO_HIGH       0x1
-#define L2PRIO_MEDIUM     0x2
-#define L2PRIO_LOW        0x3
+#define L2PRIO_URGENT      0x0
+#define L2PRIO_HIGH        0x1
+#define L2PRIO_MEDIUM      0x2
+#define L2PRIO_LOW         0x3
 
-#define CCFG_ID           0x100   /* Invalidate L1P bit */
-#define CCFG_IP           0x200   /* Invalidate L1D bit */
+#define CCFG_ID            0x100   /* Invalidate L1P bit */
+#define CCFG_IP            0x200   /* Invalidate L1D bit */
 	
 /*
  * L1 & L2 caches generic functions
@@ -157,7 +162,7 @@ static inline void cache_block_operation_wait(unsigned int wc_reg)
  */
 static inline void L1_cache_off(void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	unsigned int cfg = 0;
 	imcr_set(IMCR_L1PCFG, cfg);
 	imcr_set(IMCR_L1DCFG, cfg);
@@ -171,7 +176,7 @@ static inline void L1_cache_off(void)
  */
 static inline void L1_cache_on(void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	unsigned int cfg = 7;
 	imcr_set(IMCR_L1PCFG, cfg);
 	imcr_set(IMCR_L1DCFG, cfg);
@@ -184,7 +189,7 @@ static inline void L1_cache_on(void)
 /*
  *  L1P global-invalidate all
  */    
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 static inline void L1P_cache_global_invalidate(void)
 {
 	unsigned int ccfg = imcr_get(IMCR_CCFG);
@@ -207,7 +212,7 @@ static inline void L1P_cache_global_invalidate(void)
  * be discarded rather than written back to the lower levels of
  * memory
  */
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 static inline void L1D_cache_global_invalidate(void)
 {
 	unsigned int ccfg = imcr_get(IMCR_CCFG);
@@ -255,7 +260,7 @@ static inline void L1D_cache_global_writeback_invalidate(void)
                               (unsigned int *) (end),      \
                               IMCR_L1DWIBAR, IMCR_L1DWIWC)
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 #define L1D_cache_block_writeback(start, end)              \
         cache_block_operation((unsigned int *) (start),    \
                               (unsigned int *) (end),      \

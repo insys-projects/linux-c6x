@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -77,7 +77,7 @@ EXPORT_SYMBOL(__c6xabi_push_rts);
 extern void __c6xabi_pop_rts(void);
 EXPORT_SYMBOL(__c6xabi_pop_rts);
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 extern void __c6xabi_strasgi_64plus(int *dst, const int *src, unsigned cnt);
 EXPORT_SYMBOL(__c6xabi_strasgi_64plus);
 #endif

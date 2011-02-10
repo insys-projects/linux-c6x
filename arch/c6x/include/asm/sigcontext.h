@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ struct sigcontext {
 	unsigned long  sc_b7;
 	unsigned long  sc_b9;
 
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) 
+#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)  || defined(CONFIG_TMS320C66X)
 	unsigned long  sc_a16;
 	unsigned long  sc_a17;
 	unsigned long  sc_a18;

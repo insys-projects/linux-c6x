@@ -120,6 +120,10 @@ config TMS320C64XPLUS
 	bool "TMS320C64X+"
 	select SERIAL_CORE
 
+config TMS320C66X
+	bool "TMS320C66X"
+	select SERIAL_CORE
+
 config CIO_CONSOLE
        bool "CIO Console"
        help

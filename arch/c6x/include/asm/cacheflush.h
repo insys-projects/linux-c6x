@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -40,7 +40,7 @@
 /*
  * physically-indexed cache management
  */
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 
 #define flush_icache_range(s,e)                                   \
         do {                                                      \
@@ -48,7 +48,7 @@
                 L1P_cache_block_invalidate((s), (e));             \
         } while (0)
 
-#else /* CONFIG_TMS320C64XPLUS */
+#else /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 
 #define flush_icache_range(s,e)                                   \
         do {                                                      \
@@ -56,7 +56,7 @@
                 L1P_cache_block_invalidate((s), (e));             \
         } while (0)
 
-#endif /* CONFIG_TMS320C64XPLUS */
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 
 #define flush_icache_page(vma, page)	                                  \
         do {                                                              \
