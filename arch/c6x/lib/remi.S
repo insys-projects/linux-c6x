@@ -1,4 +1,4 @@
-;;  Copyright 2010  Free Software Foundation, Inc.
+;;  Copyright 2010, 2011 Free Software Foundation, Inc.
 ;;  Contributed by Bernd Schmidt <bernds@codesourcery.com>.
 ;;
 ;; This program is free software; you can redistribute it and/or modify
@@ -58,7 +58,7 @@ _divu_ret_1:
 _divu_ret_2:
 	ldw	.d2t2	*++B15[2], B3
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	mpy32	.m1x	A4, B2, A6
 	nop		3
 	ret	.s2	B3

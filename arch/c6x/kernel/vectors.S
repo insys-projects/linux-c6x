@@ -3,7 +3,7 @@
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
-;  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+;  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
 ;  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
 ;
 ;  This program is free software; you can redistribute it and/or modify
@@ -78,7 +78,7 @@ RESET:     MVKL	.S1	_c_int00,A0		; branch to _c_int00
 
            IRQVEC INT4,_int4_handler
            IRQVEC INT5,_int5_handler
-#ifndef	CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
            IRQVEC INT6,_system_call
 #else
            IRQVEC INT6,_int6_handler

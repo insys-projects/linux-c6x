@@ -7,6 +7,7 @@ obj-$(CONFIG_CIO_CONSOLE)      += cio/
 obj-$(CONFIG_PLL_TCI648X)      += pll-tci648x.o
 obj-$(CONFIG_GPIO_TCI648X)     += gpio-tci648x.o
 obj-$(CONFIG_TMS320C64XPLUS)   += tsc-c64xplus.o
+obj-$(CONFIG_TMS320C66X)       += tsc-c64xplus.o
 obj-$(CONFIG_TIMER_TCI648X)    += timer-tci648x.o
 obj-$(CONFIG_PIC_C64XPLUS)     += irq-c64xplus.o
 

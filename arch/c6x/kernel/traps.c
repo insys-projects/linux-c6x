@@ -40,7 +40,7 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr);
 
 void __init unmask_eexception(void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	/* Unmask events number 119 to 127 */
 	__dint();
 	IC_EXPMASK[3] &= 0x00ffffff;
@@ -56,7 +56,7 @@ void __init unmask_eexception(void)
 
 void __init trap_init (void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	ack_exception(EXCEPT_TYPE_NXF);
 	ack_exception(EXCEPT_TYPE_EXC);
 	ack_exception(EXCEPT_TYPE_IXF);
@@ -97,8 +97,7 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr)
 	die(str, fp ,nr);
 }
 
-
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 
 /* Internal exceptions */
 static struct exception_info iexcept_table[10] = {
@@ -387,8 +386,7 @@ asmlinkage int process_exception(struct pt_regs *regs)
 	return 0;
 }
 
-#endif /* CONFIG_TMS320C64XPLUS */
-
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 
 int kstack_depth_to_print = 48;
 

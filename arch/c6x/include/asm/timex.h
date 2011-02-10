@@ -20,7 +20,7 @@
  */
 #define CLOCK_TICK_RATE ((1000 * 1000000UL) / 6)
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 /* 64-bit timestamp */
 typedef unsigned long long cycles_t;
 #else
@@ -31,7 +31,7 @@ extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles (void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	unsigned l, h;
 
 #ifdef CONFIG_TI_C6X_COMPILER
@@ -53,7 +53,7 @@ static inline cycles_t get_cycles (void)
 #endif
 }
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 extern int init_tsc_clocksource(void);
 extern int init_timer64_clocksource(void);
 #endif

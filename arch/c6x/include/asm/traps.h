@@ -13,7 +13,7 @@
 #ifndef __ASM_C6X_TRAPS_H
 #define __ASM_C6X_TRAPS_H
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 
 #define EXCEPT_TYPE_NXF   31       /* NMI */
 #define EXCEPT_TYPE_EXC   30       /* external exception */
@@ -35,5 +35,5 @@ struct exception_info {
 	int  code;
 };
 
-#endif /* CONFIG_TMS320C64XPLUS */
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 #endif /* __ASM_C6X_TRAPS_H */

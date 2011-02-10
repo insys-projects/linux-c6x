@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -238,7 +238,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.r.pc = (unsigned long) kernel_thread_helper;
 	local_save_flags(regs.r.csr);
 	regs.r.csr |= 1;
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	regs.r.tsr = 5; /* Set GEE and GIE in TSR */
 #endif
 
@@ -313,7 +313,7 @@ void start_thread(struct pt_regs * regs, unsigned int pc, unsigned long usp)
 	set_fs(USER_DS);
 	regs->pc  = pc;
 	regs->sp  = usp;
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	regs->tsr |= 0x40; /* set user mode */
 #endif
 	current->thread.usp = usp;
