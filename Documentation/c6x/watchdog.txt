@@ -1,0 +1,47 @@
+C64X+ Watchdog Interface
+========================
+
+The supported C64X+ SOCs use the same watchdog hardware as does the ARM-based
+Davinci processors (davinci_wdt). This is a bare bones watchdog driver which
+provides a /dev/watchdog device. The watchdog timer is initially disabled after
+reset and boot. To load the watchdog driver:
+
+  % modprobe davinci_wdt
+
+The default expiry time of 60 seconds can be modified with the "heartbeat"
+option when loading the module. For example, you can achieve a ten second
+expriry time with:
+
+  % modprobe davinci_wdt heartbeat=10
+
+Loading the driver does not start the watchdog. To do that, you must open the
+device file (/dev/watchdog). To reset the watchdog timer counter in order to
+prevent it from expiring,for keepalive one must write to the device file. For
+instance:
+
+  % echo >/dev/watchdog
+
+will reset the watchdog counter (and activate it if it was not already started).
+
+On TMS320C6455 based boards, external circuitry is needed to respond to the
+watchdog output signal. The default response to a watchdog expiration on other
+SOCs is to do nothing. These other SOCs may be configured to take other actions
+based on a kernel cmdline parameter:
+
+      wdt_action=<local|nmi|delay,NNN|system>
+       where:
+           local     => perform megamodule reset
+           nmi       => perform an NMI
+           delay,NNN => nmi followed by delayed local reset
+                        NNN is number of CPU/6 clocks to delay
+           system    => system reset
+
+The "nmi", "delay", and "system" options are only available on the TMS320C6472.
+
+Board-specific code may provide an NMI handler by setting mach_nmi_handler to
+the address of the handler. This should be done in c6x_board_setup_arch() which
+if after mach_nmi_handler is set to the default handler. The handler prototype
+is:
+
+   extern void (*mach_nmi_handler)(struct pt_regs *regs);
+

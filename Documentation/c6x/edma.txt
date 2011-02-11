@@ -1,0 +1,424 @@
+C64X+ EDMA3 Interface
+========================
+
+This document describes the kernel interface to the EDMA3 controller. For
+details on the actual operation of EDMA3, see the appropriate hardware manual.
+
+
+Platform Device Interface
+=========================
+
+The EDMA driver requires a platform_device structure to describe details of its
+configuration:
+
+static struct platform_device edma_device = {
+	.name			= "edma",
+	.id			= 0,
+	.dev.platform_data	= edma_info,
+	.num_resources		= ARRAY_SIZE(edma_resources),
+	.resource		= edma_resources,
+};
+
+The platform_data is an array (one per EDMA controller) of EDMA information
+used to configure the EDMA controller:
+
+static struct edma_soc_info edma_cc0_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA_NUM_PARAMENTRY,
+	.n_tc			= EDMA_NUM_EVQUE,
+	.n_cc			= 1,
+	.queue_tc_mapping	= queue_tc_mapping,
+	.queue_priority_mapping	= queue_priority_mapping,
+};
+
+static struct edma_soc_info *edma_info[] = {
+	&edma_cc0_info,
+};
+
+The edma_soc_info struct provides the number of channels, regions, param slots,
+and event queues available on the controller. Also, queue -> transfer controller
+mapping and queue priority are provided.
+
+The EDMA3 controller has a limited number of channels which may be shared with
+other processors on the SoC. Furthermore, various SoC events may be used to
+trigger DMA operations, but these events are assigned to specific channels. If
+a specific driver needs to use specific DMA channels, those channels must be
+reserved. This is done through the device driver resource list. For example:
+
+static struct resource evm6474_rio_resources[] = {
+	{
+		.name	= "LSU",
+		.start	= DMA_CIC_EVT6,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "ICCR",
+		.start	= DMA_CIC_EVT5,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "RATE",
+		.start	= DMA_CIC_EVT7,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
+static struct platform_device evm6474_rio_device = {
+	.resource	= evm6474_rio_resources,
+};
+
+The above ensures that DMA channels for the given events will not be dynamically
+assigned so that they will be available for the RIO driver.
+
+
+API
+===
+
+------------------------------------------------------------------------------
+int edma_alloc_channel(int channel,
+		void (*callback)(unsigned channel, u16 ch_status, void *data),
+		void *data,
+		enum dma_event_q eventq_no)
+
+ Allocate DMA channel and paired parameter RAM
+
+    @channel: specific channel to allocate; negative for "any unmapped channel"
+    @callback: optional; to be called on DMA completion or errors
+    @data: passed to callback
+    @eventq_no: an EVENTQ_* constant, used to choose which Transfer
+	       Controller (TC) executes requests using this channel.  Use
+	       EVENTQ_DEFAULT unless you really need a high priority queue.
+
+This allocates a DMA channel and its associated parameter RAM slot.
+The parameter RAM is initialized to hold a dummy transfer.
+
+Normal use is to pass a specific channel number as @channel, to make
+use of hardware events mapped to that channel.  When the channel will
+be used only for software triggering or event chaining, channels not
+mapped to hardware events (or mapped to unused events) are preferable.
+
+DMA transfers start from a channel using edma_start(), or by
+chaining.  When the transfer described in that channel's parameter RAM
+slot completes, that slot's data may be reloaded through a link.
+
+DMA errors are only reported to the @callback associated with the
+channel driving that transfer, but transfer completion callbacks can
+be sent to another channel under control of the TCC field in
+the option word of the transfer's parameter RAM set.  Drivers must not
+use DMA transfer completion callbacks for channels they did not allocate.
+(The same applies to TCC codes used in transfer chaining.)
+
+Returns an integer 'handle' for the channel which is used in further API
+calls. If negative, the returned handle is an errno.
+
+
+------------------------------------------------------------------------------
+void edma_free_channel(unsigned channel)
+
+ Deallocate DMA channel
+
+    @channel: dma channel returned from edma_alloc_channel()
+
+This deallocates the DMA channel and associated parameter RAM slot
+allocated by edma_alloc_channel().
+
+Callers are responsible for ensuring the channel is inactive, and
+will not be reactivated by linking, chaining, or software calls to
+edma_start().
+
+
+------------------------------------------------------------------------------
+int edma_alloc_slot(unsigned ctlr, int slot)
+
+ Allocate DMA parameter RAM
+
+     @slot: specific slot to allocate; negative for "any unused slot"
+
+This allocates a parameter RAM slot, initializing it to hold a
+dummy transfer.  Slots allocated using this routine have not been
+mapped to a hardware DMA channel, and will normally be used by
+linking to them from a slot associated with a DMA channel.
+
+Normal use is to pass EDMA_SLOT_ANY as the @slot, but specific
+slots may be allocated on behalf of DSP firmware.
+
+Returns the number of the slot, else negative errno.
+
+
+------------------------------------------------------------------------------
+void edma_free_slot(unsigned slot)
+
+ Deallocate DMA parameter RAM
+
+    @slot: parameter RAM slot returned from edma_alloc_slot()
+
+This deallocates the parameter RAM slot allocated by edma_alloc_slot().
+Callers are responsible for ensuring the slot is inactive, and will
+not be activated.
+
+
+------------------------------------------------------------------------------
+int edma_alloc_cont_slots(unsigned ctlr, unsigned int id, int slot, int count)
+
+ Alloc contiguous parameter RAM slots
+ The API will return the starting point of a set of
+ contiguous parameter RAM slots that have been requested
+
+    @id: can only be EDMA_CONT_PARAMS_ANY or EDMA_CONT_PARAMS_FIXED_EXACT
+         or EDMA_CONT_PARAMS_FIXED_NOT_EXACT
+    @count: number of contiguous Paramter RAM slots
+    @slot: the start value of Parameter RAM slot that should be passed if id
+           is EDMA_CONT_PARAMS_FIXED_EXACT or EDMA_CONT_PARAMS_FIXED_NOT_EXACT
+
+If id is EDMA_CONT_PARAMS_ANY then the API starts looking for a set of
+contiguous Parameter RAM slots from parameter RAM 64 in the case of
+DaVinci SOCs and 32 in the case of DA8xx SOCs.
+
+If id is EDMA_CONT_PARAMS_FIXED_EXACT then the API starts looking for a
+set of contiguous parameter RAM slots from the "slot" that is passed as an
+argument to the API.
+
+If id is EDMA_CONT_PARAMS_FIXED_NOT_EXACT then the API initially tries
+starts looking for a set of contiguous parameter RAMs from the "slot"
+that is passed as an argument to the API. On failure the API will try to
+find a set of contiguous Parameter RAM slots from the remaining Parameter
+RAM slots
+
+
+------------------------------------------------------------------------------
+int edma_free_cont_slots(unsigned slot, int count)
+
+ Deallocate DMA parameter RAM slots
+
+    @slot: first parameter RAM of a set of parameter RAM slots to be freed
+    @count: the number of contiguous parameter RAM slots to be freed
+
+This deallocates the parameter RAM slots allocated by edma_alloc_cont_slots.
+Callers/applications need to keep track of sets of contiguous parameter RAM
+slots that have been allocated using the edma_alloc_cont_slots API.
+Callers are responsible for ensuring the slots are inactive, and will not be
+activated.
+
+
+------------------------------------------------------------------------------
+void edma_set_src(unsigned slot, dma_addr_t src_port,
+				enum address_mode mode, enum fifo_width width)
+
+ Set initial DMA source address in parameter RAM slot
+
+    @slot: parameter RAM slot being configured
+    @src_port: physical address of source (memory, controller FIFO, etc)
+    @addressMode: INCR, except in very rare cases
+    @fifoWidth: ignored unless @addressMode is FIFO, else specifies the
+	        width to use when addressing the fifo (e.g. W8BIT, W32BIT)
+
+Note that the source address is modified during the DMA transfer according to
+edma_set_src_index().
+
+
+------------------------------------------------------------------------------
+void edma_set_dest(unsigned slot, dma_addr_t dest_port,
+				 enum address_mode mode, enum fifo_width width)
+
+ Set initial DMA destination address in parameter RAM slot
+
+    @slot: parameter RAM slot being configured
+    @dest_port: physical address of destination (memory, controller FIFO, etc)
+    @addressMode: INCR, except in very rare cases
+    @fifoWidth: ignored unless @addressMode is FIFO, else specifies the
+                width to use when addressing the fifo (e.g. W8BIT, W32BIT)
+
+Note that the destination address is modified during the DMA transfer according
+to edma_set_dest_index().
+
+
+------------------------------------------------------------------------------
+void edma_get_position(unsigned slot, dma_addr_t *src, dma_addr_t *dst)
+
+ Returns the current transfer points
+
+    @slot: parameter RAM slot being examined
+    @src: pointer to source port position
+    @dst: pointer to destination port position
+
+Returns current source and destination addresses for a particular parameter
+RAM slot.  Its channel should not be active when this is called.
+
+
+------------------------------------------------------------------------------
+void edma_set_src_index(unsigned slot, s16 src_bidx, s16 src_cidx)
+
+ Configure DMA source address indexing
+
+    @slot: parameter RAM slot being configured
+    @src_bidx: byte offset between source arrays in a frame
+    @src_cidx: byte offset between source frames in a block
+
+Offsets are specified to support either contiguous or discontiguous memory
+transfers, or repeated access to a hardware register, as needed. When accessing
+hardware registers, both offsets are normally zero.
+
+
+------------------------------------------------------------------------------
+void edma_set_dest_index(unsigned slot, s16 dest_bidx, s16 dest_cidx)
+
+ Configure DMA destination address indexing
+
+    @slot: parameter RAM slot being configured
+    @dest_bidx: byte offset between destination arrays in a frame
+    @dest_cidx: byte offset between destination frames in a block
+
+Offsets are specified to support either contiguous or discontiguous memory
+transfers, or repeated access to a hardware register, as needed. When accessing
+hardware registers, both offsets are normally zero.
+
+
+------------------------------------------------------------------------------
+void edma_set_transfer_params(unsigned slot,
+		u16 acnt, u16 bcnt, u16 ccnt,
+		u16 bcnt_rld, enum sync_dimension sync_mode)
+
+ Configure DMA transfer parameters
+
+    @slot: parameter RAM slot being configured
+    @acnt: how many bytes per array (at least one)
+    @bcnt: how many arrays per frame (at least one)
+    @ccnt: how many frames per block (at least one)
+    @bcnt_rld: used only for A-Synchronized transfers; this specifies
+               the value to reload into bcnt when it decrements to zero
+    @sync_mode: ASYNC or ABSYNC
+
+See the EDMA3 documentation to understand how to configure and link transfers
+using the fields in PaRAM slots.  If you are not doing it all at once with
+edma_write_slot(), you will use this routine plus two calls each for source
+and destination, setting the initial address and saying how to index that
+address.
+
+An example of an A-Synchronized transfer is a serial link using a single word
+shift register.  In that case, @acnt would be equal to that word size; the
+serial controller issues a DMA synchronization event to transfer each word,
+and memory access by the DMA transfer controller will be word-at-a-time.
+
+An example of an AB-Synchronized transfer is a device using a FIFO. In that
+case, @acnt equals the FIFO width and @bcnt equals its depth. The controller
+with the FIFO issues DMA synchronization events when the FIFO threshold is
+reached, and the DMA transfer controller will transfer one frame to (or from)
+the FIFO.  It will probably use efficient burst modes to access memory.
+
+
+------------------------------------------------------------------------------
+void edma_link(unsigned from, unsigned to)
+
+ Link one parameter RAM slot to another
+
+    @from: parameter RAM slot originating the link
+    @to: parameter RAM slot which is the link target
+
+The originating slot should not be part of any active DMA transfer.
+
+
+------------------------------------------------------------------------------
+void edma_unlink(unsigned from)
+
+ Cut link from one parameter RAM slot to another
+
+    @from: parameter RAM slot originating the link
+
+The originating slot should not be part of any active DMA transfer. Its link is
+set to 0xffff.
+
+
+------------------------------------------------------------------------------
+void edma_chain(unsigned from, unsigned to)
+
+ Chain one parameter RAM slot to another
+
+    @from: channel originating the link
+    @to: channel which is the link target
+
+The originating channel should not be part of any active DMA transfer.
+
+
+------------------------------------------------------------------------------
+void edma_unchain(unsigned from)
+
+ Unchain one channel from another
+
+    @from: channel slot originating the chain
+
+The originating slot should not be part of any active DMA transfer.
+
+
+------------------------------------------------------------------------------
+void edma_write_slot(unsigned slot, const struct edmacc_param *param)
+
+ Write parameter RAM data for slot
+
+    @slot: number of parameter RAM slot being modified
+    @param: data to be written into parameter RAM slot
+
+Use this to assign all parameters of a transfer at once.  This allows more
+efficient setup of transfers than issuing multiple calls to set up those
+parameters in small pieces, and provides complete control over all transfer
+options.
+
+
+
+------------------------------------------------------------------------------
+void edma_read_slot(unsigned slot, struct edmacc_param *param)
+
+ Read parameter RAM data from slot
+
+    @slot: number of parameter RAM slot being copied
+    @param: where to store copy of parameter RAM data
+
+Use this to read data from a parameter RAM slot, perhaps to save them as a
+template for later reuse.
+
+
+------------------------------------------------------------------------------
+void edma_pause(unsigned channel)
+
+ Pause dma on a channel
+
+    @channel: on which edma_start() has been called
+
+This temporarily disables EDMA hardware events on the specified channel,
+preventing them from triggering new transfers on its behalf
+
+
+------------------------------------------------------------------------------
+void edma_resume(unsigned channel)
+
+ Resumes dma on a paused channel
+
+    @channel: on which edma_pause() has been called
+
+This re-enables EDMA hardware events on the specified channel.
+
+
+------------------------------------------------------------------------------
+int edma_start(unsigned channel)
+
+ Start dma on a channel
+
+    @channel: channel being activated
+
+Channels with event associations will be triggered by their hardware events, and
+channels without such associations will be triggered by software.
+
+Returns zero on success, else negative errno.
+
+
+------------------------------------------------------------------------------
+void edma_stop(unsigned channel)
+
+ Stops dma on the channel passed
+
+    @channel: channel being deactivated
+
+Any active transfer is paused and all pending hardware events are cleared. The
+current transfer may not be resumed, and the channel's Parameter RAM should be
+reinitialized before being reused.
+
