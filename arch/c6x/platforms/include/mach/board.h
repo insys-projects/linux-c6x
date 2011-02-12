@@ -31,5 +31,7 @@
 #ifdef CONFIG_ARCH_BOARD_EVMTCI6616
 #include <mach/board-evmtci6616.h>
 #endif
-
+#ifdef CONFIG_ARCH_BOARD_EVM6678
+#include <mach/board-evm6678.h>
+#endif
 #endif

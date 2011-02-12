@@ -20,3 +20,4 @@ obj-$(CONFIG_ARCH_BOARD_EVM6472)    += board-evm6472.o phy.o
 obj-$(CONFIG_ARCH_BOARD_EVM6474)    += board-evm6474.o phy.o
 obj-$(CONFIG_ARCH_BOARD_EVM6474L)   += board-evm6474lite.o phy.o
 obj-$(CONFIG_ARCH_BOARD_EVMTCI6616) += board-evmtci6616.o
+obj-$(CONFIG_ARCH_BOARD_EVM6678)    += board-evm6678.o

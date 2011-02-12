@@ -169,7 +169,7 @@
 
 #endif   /* CONFIG_SOC_TMS320C6472 */
 
-#if defined(CONFIG_SOC_TMS320C6670)
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
 #define DSCR_JTAGID                  0x02620018
 #define DSCR_DEVSTAT                 0x02620020
 #define DSCR_KICK0                   0x02620038
