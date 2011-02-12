@@ -21,6 +21,8 @@
 #include <mach/irq-c6474.h>
 #elif defined(CONFIG_SOC_TMS320C6670)
 #include <mach/irq-c6670.h>
+#elif defined(CONFIG_SOC_TMS320C6678)
+#include <mach/irq-c6678.h>
 #else
 #error "No machine IRQ definitions"
 #endif

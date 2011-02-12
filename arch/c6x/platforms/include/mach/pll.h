@@ -77,6 +77,9 @@
 #elif defined(CONFIG_SOC_TMS320C6670)
 #define ARCH_PLL1_BASE          0x02310000
 
+#elif defined(CONFIG_SOC_TMS320C6678)
+#define ARCH_PLL1_BASE          0x02310000
+
 /*
  * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
  * PLL has switched to bypass mode. Delay of 1us ensures we are good for
