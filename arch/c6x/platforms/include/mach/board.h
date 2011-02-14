@@ -34,4 +34,7 @@
 #ifdef CONFIG_ARCH_BOARD_EVM6678
 #include <mach/board-evm6678.h>
 #endif
+#ifdef CONFIG_ARCH_BOARD_EVM6670
+#include <mach/board-evm6670.h>
+#endif
 #endif
