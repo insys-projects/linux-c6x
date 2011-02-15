@@ -82,23 +82,23 @@ struct edmacc_param {
 };
 
 /* fields in edmacc_param.opt */
-#define SAM		BIT(0)
-#define DAM		BIT(1)
-#define SYNCDIM		BIT(2)
-#define STATIC		BIT(3)
-#define EDMA_FWID	(0x07 << 8)
-#define TCCMODE		BIT(11)
-#define EDMA_TCC(t)	((t) << 12)
-#define TCINTEN		BIT(20)
-#define ITCINTEN	BIT(21)
-#define TCCHEN		BIT(22)
-#define ITCCHEN		BIT(23)
+#define SAM		        BIT(0)
+#define DAM		        BIT(1)
+#define SYNCDIM		        BIT(2)
+#define STATIC		        BIT(3)
+#define EDMA_FWID	        (0x07 << 8)
+#define TCCMODE		        BIT(11)
+#define EDMA_TCC(t)	        ((t) << 12)
+#define TCINTEN		        BIT(20)
+#define ITCINTEN	        BIT(21)
+#define TCCHEN		        BIT(22)
+#define ITCCHEN		        BIT(23)
 
-#define TRWORD (0x7<<2)
-#define PAENTRY (0x1ff<<5)
+#define TRWORD                  (0x7<<2)
+#define PAENTRY                 (0x1ff<<5)
 
 /*if changing the QDMA_TRWORD do appropriate change in start_edma */
-#define QDMA_TRWORD (7 & 0x7)
+#define QDMA_TRWORD             (7 & 0x7)
 
 
 /*Used by driver*/
@@ -115,36 +115,36 @@ struct edmacc_param {
 #define EDMA_TC5_BASE		0x02a48000
 
 #ifdef MACH_EDMA_REGION
-#define EDMA_REGION               MACH_EDMA_REGION
+#define EDMA_REGION             MACH_EDMA_REGION
 #else
-#define EDMA_REGION               0
+#define EDMA_REGION             0
 #endif
 
-#define EDMA_NUM_DMACH           64
+#define EDMA_NUM_DMACH          64
 
 #ifdef MACH_EDMA_NUM_QDMACH
-#define EDMA_NUM_QDMACH           MACH_EDMA_NUM_QDMACH
+#define EDMA_NUM_QDMACH         MACH_EDMA_NUM_QDMACH
 #else
-#define EDMA_NUM_QDMACH           8
+#define EDMA_NUM_QDMACH         8
 #endif
 
 #define EDMA_NUM_PARAMENTRY     512
 
 #ifdef MACH_EDMA_NUM_EVQUE
-#define EDMA_NUM_EVQUE            MACH_EDMA_NUM_EVQUE
+#define EDMA_NUM_EVQUE          MACH_EDMA_NUM_EVQUE
 #else
-#define EDMA_NUM_EVQUE            6
+#define EDMA_NUM_EVQUE          6
 #endif
 
-#define EDMA_CHMAPEXIST           0
+#define EDMA_CHMAPEXIST         0
 
 #ifdef MACH_EDMA_NUM_REGIONS
-#define EDMA_NUM_REGIONS          MACH_EDMA_NUM_REGIONS
+#define EDMA_NUM_REGIONS        MACH_EDMA_NUM_REGIONS
 #else
-#define EDMA_NUM_REGIONS          4
+#define EDMA_NUM_REGIONS        4
 #endif
 
-#define EDMA_MEMPROTECT           0
+#define EDMA_MEMPROTECT         0
 
 #ifdef MACH_EDMA_IRQ_CCINT
 #define EDMA_IRQ_CCINT		MACH_EDMA_IRQ_CCINT
@@ -154,24 +154,24 @@ struct edmacc_param {
 #define EDMA_IRQ_CCERRINT	MACH_EDMA_IRQ_CCERRINT
 #endif
 
-#define TCC_ANY                  -1
+#define TCC_ANY                 -1
 
-#define EDMA_PARAM_ANY           -2
-#define EDMA_CHANNEL_ANY         -1
-#define EDMA_QDMA0               64
-#define EDMA_QDMA1               65
-#define EDMA_QDMA2               66
-#define EDMA_QDMA3               67
-#define EDMA_QDMA4               68
-#define EDMA_QDMA5               69
-#define EDMA_QDMA6               71
-#define EDMA_QDMA7               72
+#define EDMA_PARAM_ANY          -2
+#define EDMA_CHANNEL_ANY        -1
+#define EDMA_QDMA0              64
+#define EDMA_QDMA1              65
+#define EDMA_QDMA2              66
+#define EDMA_QDMA3              67
+#define EDMA_QDMA4              68
+#define EDMA_QDMA5              69
+#define EDMA_QDMA6              71
+#define EDMA_QDMA7              72
 
 /*ch_status paramater of callback function possible values*/
-#define DMA_COMPLETE 1
-#define DMA_CC_ERROR 2
-#define DMA_TC1_ERROR 3
-#define DMA_TC2_ERROR 4
+#define DMA_COMPLETE            1
+#define DMA_CC_ERROR            2
+#define DMA_TC1_ERROR           3
+#define DMA_TC2_ERROR           4
 
 enum address_mode {
 	INCR = 0,
@@ -179,10 +179,10 @@ enum address_mode {
 };
 
 enum fifo_width {
-	W8BIT = 0,
-	W16BIT = 1,
-	W32BIT = 2,
-	W64BIT = 3,
+	W8BIT   = 0,
+	W16BIT  = 1,
+	W32BIT  = 2,
+	W64BIT  = 3,
 	W128BIT = 4,
 	W256BIT = 5
 };
@@ -198,7 +198,7 @@ enum dma_event_q {
 };
 
 enum sync_dimension {
-	ASYNC = 0,
+	ASYNC  = 0,
 	ABSYNC = 1
 };
 
@@ -253,6 +253,7 @@ int edma_start(unsigned channel);
 void edma_stop(unsigned channel);
 void edma_clean_channel(unsigned channel);
 void edma_clear_event(unsigned channel);
+void edma_trigger_event(unsigned channel);
 void edma_pause(unsigned channel);
 void edma_resume(unsigned channel);
 

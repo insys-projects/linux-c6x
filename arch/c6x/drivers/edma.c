@@ -1460,6 +1460,20 @@ void edma_clear_event(unsigned channel)
 }
 EXPORT_SYMBOL(edma_clear_event);
 
+void edma_trigger_event(unsigned channel)
+{
+	unsigned ctlr;
+	int j;
+	unsigned int mask;
+	
+	ctlr    = EDMA_CTLR(channel);
+	channel = EDMA_CHAN_SLOT(channel);
+	j       = channel >> 5;
+	mask    = BIT(channel & 0x1f);
+
+	edma_shadow_write_array(ctlr, SH_ESR, j, mask);
+}
+
 /*-----------------------------------------------------------------------*/
 
 static int __init edma_probe(struct platform_device *pdev)
