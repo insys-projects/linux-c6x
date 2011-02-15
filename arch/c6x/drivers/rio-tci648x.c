@@ -74,13 +74,14 @@ struct tci648x_rio_data {
 	struct completion	lsu_completion;
 	struct mutex		lsu_lock;
 #ifdef CONFIG_EDMA3
-	int			lsu_edma_ch;   /* LSU load EDMA channel */
-	int			iccr_edma_ch;  /* ICCR load EDMA channel */
-	int			rate_edma_ch;  /* RATE load EDMA channel */
+	int			lsu_edma_ch;    /* LSU load EDMA channel */
+	int			iccr_edma_ch;   /* ICCR load EDMA channel */
+	int			rate_edma_ch;   /* rate load EDMA channel */
+	int			dummy_edma_ch;  /* dummy EDMA for int. gen. */
 	struct edmacc_param	lsu_edma_params;
 	struct edmacc_param	iccr_edma_params;
 	struct edmacc_param	rate_edma_params;
-	int			dummy_edma_ch; /* dummy EDMA for int. gen. */
+	struct edmacc_param	dummy_edma_params;
 	int			iccr_tcc;
 	int			rate_tcc;
 #endif
@@ -513,7 +514,7 @@ static int tci648x_rio_edma_setup(struct platform_device *pdev)
 	}
 	_tci648x_rio.iccr_edma_ch = ch;
 
-	/* Request the RATE load channel */ 
+	/* Request the rate load channel */ 
 	r = platform_get_resource_byname(pdev, IORESOURCE_DMA, "RATE");
 	if (r == NULL) {
 		printk(KERN_INFO "Unable to find DMA resource for sRIO RATE\n");
@@ -527,6 +528,14 @@ static int tci648x_rio_edma_setup(struct platform_device *pdev)
 	}
 	_tci648x_rio.rate_edma_ch = ch;
 
+	/* Request the dummy reload slot to avoid missed events */
+	ch = edma_alloc_slot(EDMA_CTLR(ch), EDMA_SLOT_ANY);
+	if (ch < 0) {
+	        printk("Unable to request EDMA slot for sRIO dummy\n");
+		return -EAGAIN;
+	}
+	_tci648x_rio.dummy_edma_ch = ch;
+    
 	/* Eventually map the sRIO event to the EDMA event */
 	tci648x_map_rio_edma_event();
 
@@ -539,23 +548,36 @@ static int tci648x_rio_edma_setup(struct platform_device *pdev)
 	edma_set_dest_index(_tci648x_rio.lsu_edma_ch, 0, 0);
 	edma_set_src_index(_tci648x_rio.lsu_edma_ch,
 			   sizeof(struct tci648x_rio_lsu_reg), 0);
-
+	
 	edma_set_dest(_tci648x_rio.iccr_edma_ch,
-			     TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU_ICCR,
-			     0, 0);
+		      TCI648X_RIO_REG_BASE + TCI648X_RIO_LSU_ICCR,
+		      0, 0);
 	edma_set_dest_index(_tci648x_rio.iccr_edma_ch, 0, 0);
 	edma_set_src_index(_tci648x_rio.iccr_edma_ch, 0, 0);
-
+	
 	edma_set_dest(_tci648x_rio.rate_edma_ch,
-			     TCI648X_RIO_REG_BASE + TCI648X_RIO_INTDST0_RATE_CNTL
-			     + (TCI648X_EDMA_RIO_INT << 2),
-			     0, 0);
+		      TCI648X_RIO_REG_BASE + TCI648X_RIO_INTDST0_RATE_CNTL
+		      + (TCI648X_EDMA_RIO_INT << 2),
+		      0, 0);
 	edma_set_dest_index(_tci648x_rio.rate_edma_ch, 0, 0);
 	edma_set_src_index(_tci648x_rio.rate_edma_ch, 0, 0);
 
+	edma_set_dest(_tci648x_rio.dummy_edma_ch, 0, 0, 0);
+	edma_set_dest_index(_tci648x_rio.dummy_edma_ch, 0, 0);
+	edma_set_src_index(_tci648x_rio.dummy_edma_ch, 0, 0);
+	edma_set_transfer_params(_tci648x_rio.dummy_edma_ch,
+				 0, /* ACNT */
+				 0, /* BCNT */
+				 1, /* CCNT */    
+				 0, /* BCNTRLD */
+				 ASYNC);
+	
 	/* Setup chaining */
 	edma_chain(_tci648x_rio.iccr_edma_ch, _tci648x_rio.rate_edma_ch);
 	edma_chain(_tci648x_rio.rate_edma_ch, _tci648x_rio.lsu_edma_ch);
+
+	/* Setup linking */
+	edma_link(_tci648x_rio.lsu_edma_ch, _tci648x_rio.dummy_edma_ch);
 
 	/* Add intermediate event generation and set TCCMODE */
 	edma_read_slot(_tci648x_rio.lsu_edma_ch, &_tci648x_rio.lsu_edma_params);
@@ -569,6 +591,12 @@ static int tci648x_rio_edma_setup(struct platform_device *pdev)
 	edma_read_slot(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
 	_tci648x_rio.rate_edma_params.opt |= ITCCHEN;
 	edma_write_slot(_tci648x_rio.rate_edma_ch, &_tci648x_rio.rate_edma_params);
+
+	/* Set dummy slot properties */
+	edma_read_slot(_tci648x_rio.dummy_edma_ch, &_tci648x_rio.dummy_edma_params);
+	_tci648x_rio.dummy_edma_params.opt |= 
+		TCINTEN| STATIC | TCCMODE | EDMA_TCC(_tci648x_rio.lsu_edma_ch);
+	edma_write_slot(_tci648x_rio.dummy_edma_ch, &_tci648x_rio.dummy_edma_params);
 
 	return 0;
 }
@@ -1075,9 +1103,7 @@ retry_transfer:
 	edma_start(_tci648x_rio.lsu_edma_ch);
 
 	/* Launch transfer */
-#if 0 /* FIXME. Is this necessary? Why doesn't above edma_start work? */
-	edma_trigger_evt(_tci648x_rio.lsu_edma_ch);
-#endif
+	edma_trigger_event(_tci648x_rio.lsu_edma_ch);
 
 	/* Wait for EDMA completion */
 	wait_for_completion(&_tci648x_rio.lsu_completion);

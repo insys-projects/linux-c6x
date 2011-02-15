@@ -57,10 +57,32 @@ struct tci648x_rio_board_controller_info evm6474l_rio_controller = {
 	1                            /* large size (16bit)*/
 };
 
+static struct resource evm6474l_rio_resources[] = {
+	{
+		.name	= "LSU",
+		.start	= TCI648X_LSU_CHANNEL_EVENT,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "ICCR",
+		.start	= TCI648X_ICCR_CHANNEL_EVENT,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "RATE",
+		.start	= TCI648X_RATE_CHANNEL_EVENT,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
 static struct platform_device evm6474l_rio_device = {
 	.name           = "tci648x-rapidio",
 	.id             = 1,
-	.dev		= { .platform_data = &evm6474l_rio_controller },
+	.dev		= { 
+		.platform_data = &evm6474l_rio_controller,
+	},
+	.num_resources	= ARRAY_SIZE(evm6474l_rio_resources),
+	.resource	= evm6474l_rio_resources,
 };
 
 static int __init evm_init_rio(void)

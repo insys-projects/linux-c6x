@@ -59,17 +59,17 @@ struct tci648x_rio_board_controller_info evm6474_rio_controller = {
 static struct resource evm6474_rio_resources[] = {
 	{
 		.name	= "LSU",
-		.start	= DMA_CIC_EVT6,
+		.start	= TCI648X_LSU_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
 		.name	= "ICCR",
-		.start	= DMA_CIC_EVT5,
+		.start	= TCI648X_ICCR_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
 		.name	= "RATE",
-		.start	= DMA_CIC_EVT7,
+		.start	= TCI648X_RATE_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -180,12 +180,12 @@ queue_tc_mapping[][2] = {
 static const s8
 queue_priority_mapping[][2] = {
 	/* {event queue no, Priority} */
-	{0, 4},	/* FIXME: what should these priorities be? */
-	{1, 0},
-	{2, 5},
-	{3, 1},
-	{4, 2},
-	{5, 3},
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{4, 4},
+	{5, 5},
 	{-1, -1},
 };
 
@@ -270,7 +270,6 @@ static struct platform_device edma_device = {
 	.num_resources		= ARRAY_SIZE(edma_resources),
 	.resource		= edma_resources,
 };
-
 
 static void __init board_setup_edma(void)
 {
