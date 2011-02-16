@@ -55,59 +55,37 @@ static struct clk pll1_clk = {
 	.flags = CLK_PLL,
 };
 
-static struct clk pll1_sysclk3 = {
-	.name = "pll1_sysclk3",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 2,
-};
-
-static struct clk pll1_sysclk7 = {
-	.name = "pll1_sysclk7",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk pll1_sysclk9 = {
-	.name = "pll1_sysclk9",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 12,
-};
-
-static struct clk pll1_sysclk10 = {
-	.name = "pll1_sysclk10",
+static struct clk pll1_sysclk2 = {
+	.name = "pll1_sysclk2",
 	.parent = &pll1_clk,
 	.flags = CLK_PLL | FIXED_DIV_PLL,
 	.div = 3,
 };
 
-static struct clk pll1_sysclk11 = {
-	.name = "pll1_sysclk11",
+static struct clk pll1_sysclk5 = {
+	.name = "pll1_sysclk5",
 	.parent = &pll1_clk,
 	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
+	.div = 5,
 };
 
-static struct clk i2c_clk = {
-	.name = "i2c",
-	.parent = &pll1_sysclk7,
+static struct clk pll1_sysclk8 = {
+	.name = "pll1_sysclk8",
+	.parent = &pll1_clk,
+	.flags = CLK_PLL | FIXED_DIV_PLL,
+	.div = 64,
 };
 
 static struct clk core_clk = {
 	.name = "core",
-	.parent = &pll1_sysclk3,
+	.parent = &pll1_sysclk2,
 };
 
 static struct clk_lookup evm_clks[] = {
 	CLK(NULL, "pll1", &pll1_clk),
-	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
-	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
-	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
-	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
-	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),
-	CLK("i2c_davinci.1", NULL, &i2c_clk),
+	CLK(NULL, "pll1_sysclk2", &pll1_sysclk2),
+	CLK(NULL, "pll1_sysclk5", &pll1_sysclk5),
+	CLK(NULL, "pll1_sysclk8", &pll1_sysclk8),
 	CLK(NULL, "core", &core_clk),
 	CLK("", NULL, NULL)
 };
@@ -143,7 +121,8 @@ static struct platform_device serial8250_device = {
 
 static int __init evm_init_uart(void)
 {
-	return platform_device_register(&serial8250_device);
+//	return platform_device_register(&serial8250_device);
+	return 0;
 }
 
 core_initcall(evm_init_uart);
