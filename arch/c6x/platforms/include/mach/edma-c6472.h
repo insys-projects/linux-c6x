@@ -49,8 +49,7 @@
 #define DMA_RIOINT5		29
 #define DMA_RIOINT6		30
 #define DMA_RIOINT7		31
-/* 32 - 63 unused */
-
+#define DMA_UNUSED              32 /* 32 - 63 unused */
 
 /* C6472 uses region indexed on core id */
 #define MACH_EDMA_NUM_REGIONS        8

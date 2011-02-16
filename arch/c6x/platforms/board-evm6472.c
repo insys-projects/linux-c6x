@@ -80,7 +80,7 @@ static struct platform_device evm6472_rio_device = {
 	.dev		= {
 		.platform_data = &evm6472_rio_controller,
 	},
-	.num_resources	= ARRAY_SIZE(evm6474_rio_resources),
+	.num_resources	= ARRAY_SIZE(evm6472_rio_resources),
 	.resource	= evm6472_rio_resources,
 };
 
