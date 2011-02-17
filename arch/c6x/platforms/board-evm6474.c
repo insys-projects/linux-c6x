@@ -113,16 +113,46 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 	       .tx_irq      = IRQ_XEVT1},
 };
 
+static struct resource evm6474_mcbsp0_resources[] = {
+	{
+		.name	= "MCBSP0_RX",
+		.start	= DMA_MCBSP0_RX,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "MCBSP0_TX",
+		.start	= DMA_MCBSP0_TX,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
+static struct resource evm6474_mcbsp1_resources[] = {
+	{
+		.name	= "MCBSP1_RX",
+		.start	= DMA_MCBSP1_RX,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "MCBSP1_TX",
+		.start	= DMA_MCBSP1_TX,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
 static struct platform_device evm6474_mcbsp_device0 = {
 	.name           = "mcbsp",
 	.id             = 1,
 	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[0] },
+	.num_resources  = ARRAY_SIZE(evm6474_mcbsp0_resources),
+	.resource	= evm6474_mcbsp0_resources,
 };
 
 static struct platform_device evm6474_mcbsp_device1 = {
 	.name           = "mcbsp",
 	.id             = 2,
 	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[1] },
+	.num_resources  = ARRAY_SIZE(evm6474_mcbsp1_resources),
+	.resource	= evm6474_mcbsp1_resources,
 };
 
 static int __init evm_init_mcbsp(void)
@@ -170,9 +200,9 @@ queue_tc_mapping[][2] = {
 	/* {event queue no, TC no} */
 	{0, 0},
 	{1, 1},
-	{2, 2},
-	{3, 3},
-	{4, 4},
+	{2, 2}, /* sRIO */
+	{3, 3}, /* SPI */
+	{4, 4}, /* UART over McBSP */
 	{5, 5},
 	{-1, -1},
 };
@@ -188,7 +218,6 @@ queue_priority_mapping[][2] = {
 	{5, 5},
 	{-1, -1},
 };
-
 
 static struct edma_soc_info edma_cc0_info = {
 	.n_channel		= EDMA_NUM_DMACH,
@@ -487,3 +516,4 @@ __init int evm_init(void)
 }
 
 arch_initcall(evm_init);
+
