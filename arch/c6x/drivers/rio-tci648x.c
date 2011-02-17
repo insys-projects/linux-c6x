@@ -611,6 +611,8 @@ static int tci648x_rio_edma_release(void)
 	edma_free_channel(_tci648x_rio.iccr_edma_ch);
 	edma_free_channel(_tci648x_rio.rate_edma_ch);
 
+	edma_free_slot(_tci648x_rio.dummy_edma_ch);
+
 	return 0;
 }
 #endif /* CONFIG_EDMA3 */
