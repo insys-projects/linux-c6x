@@ -10,7 +10,6 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -43,32 +42,32 @@
 #define DPRINTK( x... )
 #endif
 
-unsigned int*             mcbsp_tx_buff[MAX_PORT];
-unsigned int*             mcbsp_rx_buff[MAX_PORT][2];
-struct edmacc_param       dma_tx_params[MAX_PORT];
+static unsigned int*       mcbsp_tx_buff[MAX_PORT];
+static unsigned int*       mcbsp_rx_buff[MAX_PORT][2];
+static struct edmacc_param dma_tx_params[MAX_PORT];
 
-static struct uart_driver serialmcbsp_serial_reg;
+static struct uart_driver  serialmcbsp_serial_reg;
 
-extern unsigned int       c6x_early_uart_cons;
+extern unsigned int        c6x_early_uart_cons;
 
 static DEFINE_MUTEX(mcbsp_tx_mutex);
 static DEFINE_MUTEX(mcbsp_mutex);
 
 struct serialmcbsp_port {
-	struct uart_port     port;      /* must be first */
-        unsigned int         id;        /* McBSP ID used for this line */
-	volatile int         stop;    
-        unsigned int         running; 
-        unsigned int         baudrate;
-        unsigned int         rx_buff;
-        struct tty_struct   *tty;
-        struct mcbsp        *mcbsp;
+	struct uart_port   port;      /* must be first */
+        unsigned int       id;        /* McBSP ID used for this line */
+	volatile int       stop;    
+        unsigned int       running; 
+        unsigned int       baudrate;
+        unsigned int       rx_buff;
+        struct tty_struct *tty;
+        struct mcbsp      *mcbsp;
 };
 
-struct serialmcbsp_port serialmcbsp_port[MAX_PORT];
+struct serialmcbsp_port    serialmcbsp_port[MAX_PORT];
 
-#define	LINE(tty)	  ((tty)->index)
-#define	PORT(tty)         ((struct serialmcbsp_port*) ((tty)->driver_data))
+#define	LINE(tty)	   ((tty)->index)
+#define	PORT(tty)          ((struct serialmcbsp_port*) ((tty)->driver_data))
 
 static struct mcbsp_reg_cfg initial_config = {
 	.spcr2 = GRST | FRST | FREE,
@@ -108,7 +107,7 @@ void mcbsp_edma_rx_callback(unsigned lch, u16 ch_status, void *data)
 static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 {
         unsigned int           id = port->id;
-        int                    dma_tx_ch;
+        int                    dma_tx_ch, dma_tx_ch_reload;
         int                    dma_rx_ch, dma_rx_ch_reload;
 	struct edmacc_param    tmp_params;
 	
@@ -124,8 +123,16 @@ static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 	}
 	
 	DPRINTK("Tx DMA on channel %d\n", dma_tx_ch);
+
+	/* Request the dummy reload slot to avoid missed events */
+	dma_tx_ch_reload = edma_alloc_slot(EDMA_CTLR(dma_tx_ch), EDMA_SLOT_ANY);
+	if (dma_tx_ch_reload < 0) {
+	        DPRINTK("Unable to request EDMA slot for McBSP%d Tx\n", id);
+		return -EAGAIN;
+	}
 	
-	mcbsp_ptr[id]->dma_tx_lch = dma_tx_ch;
+	mcbsp_ptr[id]->dma_tx_lch        = dma_tx_ch;
+	mcbsp_ptr[id]->dma_tx_lch_reload = dma_tx_ch_reload;
 
 	edma_stop(dma_tx_ch);
 	
@@ -137,8 +144,25 @@ static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 	
 	edma_set_src_index(dma_tx_ch, 4, 0);
 	edma_set_dest_index(dma_tx_ch, 0, 0);
-	
-	edma_read_slot(dma_tx_ch, &dma_tx_params[id]);
+
+	edma_link(dma_tx_ch, dma_tx_ch_reload);
+
+       	edma_read_slot(dma_tx_ch, &dma_tx_params[id]);
+
+	edma_set_dest(dma_tx_ch_reload, 0, 0, 0);
+	edma_set_dest_index(dma_tx_ch_reload, 0, 0);
+	edma_set_src_index(dma_tx_ch_reload, 0, 0);
+	edma_set_transfer_params(dma_tx_ch_reload,
+				 0, /* ACNT */
+				 0, /* BCNT */
+				 1, /* CCNT */    
+				 0, /* BCNTRLD */
+				 ASYNC);
+
+	/* Set dummy slot properties */
+	edma_read_slot(dma_tx_ch_reload, &tmp_params);
+	tmp_params.opt |= TCINTEN| STATIC | TCCMODE | EDMA_TCC(dma_tx_ch);
+	edma_write_slot(dma_tx_ch_reload, &tmp_params);
 	
 	if (!rx_set)
 	        return 0;
@@ -156,11 +180,11 @@ static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 	
 	DPRINTK("Rx DMA on channel %d\n", dma_rx_ch);
 	
-	/* Request Rx EDMA reload channel */
-	dma_rx_ch_reload = edma_alloc_channel(EDMA_PARAM_ANY, NULL,
-					      0, EVENTQ_4);
+	/* Request Rx EDMA reload param slot */
+	dma_rx_ch_reload = edma_alloc_slot(EDMA_CTLR(dma_rx_ch),
+					   EDMA_SLOT_ANY);
 	if (dma_rx_ch_reload < 0) {
-		DPRINTK("Unable to request DMA channel for McBSP%d Rx reload\n",
+		DPRINTK("Unable to request DMA slot for McBSP%d Rx reload\n",
 			id);
 		return -EINVAL;
 	}
@@ -169,7 +193,6 @@ static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 	mcbsp_ptr[id]->dma_rx_lch_reload = dma_rx_ch_reload;
 
 	edma_stop(dma_rx_ch);
-	edma_stop(dma_rx_ch_reload);
 	
 	edma_set_transfer_params(dma_rx_ch, 4, MCBSP_MAX_RX_BAUD_BITS,
 				 1, 1, ASYNC);
@@ -177,13 +200,16 @@ static int mcbsp_edma_up(struct serialmcbsp_port *port, int rx_set)
 	edma_link(dma_rx_ch, dma_rx_ch_reload);
 
 	edma_set_src(dma_rx_ch, mcbsp_ptr[id]->dma_rx_data, 0, 0);
-	edma_set_dest(dma_rx_ch, (dma_addr_t)mcbsp_rx_buff[id][port->rx_buff],
-		      0, 0);
+	edma_set_dest(dma_rx_ch, 
+		      (dma_addr_t)mcbsp_rx_buff[id][port->rx_buff], 0, 0);
 
 	edma_set_src_index(dma_rx_ch, 0, 0);
 	edma_set_dest_index(dma_rx_ch, 4, 0);
 
+	/* Add transfer completion interrupt and restart of the channel */
 	edma_read_slot(dma_rx_ch, &tmp_params);
+	tmp_params.opt |= TCINTEN | EDMA_TCC(dma_rx_ch);
+	edma_write_slot(dma_rx_ch, &tmp_params);
 	edma_write_slot(dma_rx_ch_reload, &tmp_params);
 
 	edma_set_dest(dma_rx_ch_reload,
@@ -205,7 +231,8 @@ static void mcbsp_edma_down(int id)
 
 	edma_free_channel(mcbsp_ptr[id]->dma_tx_lch);
 	edma_free_channel(mcbsp_ptr[id]->dma_rx_lch);
-	edma_free_channel(mcbsp_ptr[id]->dma_rx_lch_reload);
+	edma_free_slot(mcbsp_ptr[id]->dma_rx_lch_reload);
+	edma_free_slot(mcbsp_ptr[id]->dma_tx_lch_reload);
 
 	mcbsp_ptr[id]->dma_tx_lch = -1;
 	mcbsp_ptr[id]->dma_rx_lch = -1;
@@ -286,7 +313,7 @@ static inline void mcbsp_write(unsigned int id, const char* buf, unsigned int si
 		
 		init_completion(&(mcbsp_ptr[id]->tx_dma_completion));
 
-		edma_read_slot(mcbsp_ptr[id]->dma_tx_lch, &dma_tx_params[id]);
+		edma_write_slot(mcbsp_ptr[id]->dma_tx_lch, &dma_tx_params[id]);
 		edma_set_transfer_params(mcbsp_ptr[id]->dma_tx_lch, 4,
 					 length, 1, 0, ASYNC);
 
