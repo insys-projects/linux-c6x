@@ -320,7 +320,7 @@ static void __init board_setup_edma(void)
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
-       .byte_len       = 0x8000 / 8,
+       .byte_len       = 256 * 1024 / 8, /* 256 Kbits */
        .page_size      = 64,
        .flags          = AT24_FLAG_ADDR16,
 };
