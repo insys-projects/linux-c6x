@@ -415,6 +415,8 @@ void c6x_board_setup_arch(void)
 	mach_progress      = dummy_progress;
 	mach_print_value   = dummy_print_dummy;
 
+	c6x_clk_init(evm_clks);
+
 	mach_progress(1, "End of EVM6474 Lite specific initialization");
 }
 
