@@ -119,7 +119,7 @@ static struct i2c_board_info evm_i2c_info[] = {
 #endif
 };
 
-#define I2C_UART_GPIO 15
+#define I2C_UART_GPIO 12
 
 static void __init board_setup_i2c(void)
 {
@@ -323,7 +323,10 @@ static struct pll_data pll1_data = {
 
 static struct clk clkin1 = {
 	.name = "clkin1",
-	.rate = 61440000,
+	.rate = 50000000,
+	.node = LIST_HEAD_INIT(clkin1.node),
+	.children = LIST_HEAD_INIT(clkin1.children),
+	.childnode = LIST_HEAD_INIT(clkin1.childnode),
 };
 
 static struct clk pll1_clk = {
