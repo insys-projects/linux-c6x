@@ -608,6 +608,8 @@ error:
 	kfree(interp_params.dynamic);
 	kfree(exec_params.extra_segs);
 	kfree(interp_params.extra_segs);
+	kfree(exec_params.loadmap);
+	kfree(interp_params.loadmap);
 	return retval;
 
 	/* unrecoverable error - kill the process */
