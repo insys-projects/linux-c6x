@@ -53,9 +53,9 @@
 #undef  GPIO_NAND_USE_WRITE_PROTECT
 #endif /* defined(CONFIG_ARCH_BOARD_EVM6474) */
 
-#if defined(CONFIG_ARCH_BOARD_EVMTCI6616)
+#if defined(CONFIG_ARCH_BOARD_EVMTCI6616) || defined(CONFIG_ARCH_BOARD_EVM6670)
 /*
- * EVM TCI6616 definitions
+ * EVM TCI6616 & C6670 LC EVM definitions
  */ 
 #define GPIO_NAND_CLE	    8
 #define GPIO_NAND_ALE	    9
@@ -71,7 +71,6 @@
 
 #define GPIO_NAND_USE_READY_BUSY_PIN
 #undef  GPIO_NAND_USE_WRITE_PROTECT
-#endif /* defined(CONFIG_ARCH_BOARD_EVMTCI6616) */
+#endif /* defined(CONFIG_ARCH_BOARD_EVMTCI6616) || defined(CONFIG_ARCH_BOARD_EVM6670) */
 
 #endif /* __ASM_C6X_NAND_GPIO_H */
-
