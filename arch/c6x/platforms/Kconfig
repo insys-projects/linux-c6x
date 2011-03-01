@@ -98,4 +98,8 @@ config ARCH_BOARD_EVM6678
 	bool "EVM6678"
 	select SOC_TMS320C6678
 
+config ARCH_BOARD_EVM6670
+	bool "EVM6670"
+	select SOC_TMS320C6670
+
 endchoice

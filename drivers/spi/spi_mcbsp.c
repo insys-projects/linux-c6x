@@ -10,7 +10,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
@@ -82,8 +81,8 @@ struct spi_mcbsp {
         /* EDMA setup */
 	dma_addr_t rx_dma;
 	dma_addr_t tx_dma;
-        edmacc_paramentry_regs dma_tx_params;
-        edmacc_paramentry_regs dma_rx_params;
+        struct edmacc_param dma_tx_params;
+        struct edmacc_param dma_rx_params;
 };
 
 static inline struct spi_mcbsp* get_spi_mcbsp(struct spi_device *spi) 
@@ -192,7 +191,7 @@ static void *spi_mcbsp_next_transfer(struct spi_mcbsp *spi_mcbsp)
 /*
  * EDMA management
  */
-static void spi_mcbsp_edma_tx_callback(int lch, u16 ch_status, void *data)
+static void spi_mcbsp_edma_tx_callback(unsigned int lch, u16 ch_status, void *data)
 {
         struct spi_mcbsp   *spi_mcbsp = (struct spi_mcbsp *) (data);
 	struct spi_message *msg       = spi_mcbsp->cur_msg;
@@ -213,7 +212,7 @@ static void spi_mcbsp_edma_tx_callback(int lch, u16 ch_status, void *data)
 	}
 }
 
-static void spi_mcbsp_edma_rx_callback(int lch, u16 ch_status, void *data)
+static void spi_mcbsp_edma_rx_callback(unsigned int lch, u16 ch_status, void *data)
 {
         struct spi_mcbsp   *spi_mcbsp = (struct spi_mcbsp *) (data);
 	struct spi_message *msg       = spi_mcbsp->cur_msg;
@@ -346,8 +345,8 @@ static void spi_mcbsp_pump_transfers(unsigned long data)
 	len   = transfer->len / width;
 	
 	/* Write parameters */
-	set_edma_params(mcbsp->dma_tx_lch, &spi_mcbsp->dma_tx_params);
-	set_edma_transfer_params(mcbsp->dma_tx_lch, width, len, 1, 0, ASYNC);
+	edma_write_slot(mcbsp->dma_tx_lch, &spi_mcbsp->dma_tx_params);
+	edma_set_transfer_params(mcbsp->dma_tx_lch, width, len, 1, 0, ASYNC);
 	
 	if (spi_mcbsp->rx) {
 
@@ -355,20 +354,20 @@ static void spi_mcbsp_pump_transfers(unsigned long data)
 
 	        if (spi_mcbsp->tx == NULL) {
 		        /* Fake write */
-			set_edma_src_params(mcbsp->dma_tx_lch, (int)&zero, 0, 0);
-			set_edma_src_index(mcbsp->dma_tx_lch, 0, 0); /* do no increment src */
+			edma_set_src(mcbsp->dma_tx_lch, (int)&zero, 0, 0);
+			edma_set_src_index(mcbsp->dma_tx_lch, 0, 0); /* do no increment src */
 		}
 
 		/* Read parameters */
-		set_edma_params(mcbsp->dma_rx_lch, &spi_mcbsp->dma_rx_params);
-		set_edma_transfer_params(mcbsp->dma_rx_lch, width, len, 1, 0, ASYNC);
-		set_edma_dest_params(mcbsp->dma_rx_lch, spi_mcbsp->rx_dma, 0, 0);
-		set_edma_dest_index(mcbsp->dma_rx_lch, width, 0);
+		edma_write_slot(mcbsp->dma_rx_lch, &spi_mcbsp->dma_rx_params);
+		edma_set_transfer_params(mcbsp->dma_rx_lch, width, len, 1, 0, ASYNC);
+		edma_set_dest(mcbsp->dma_rx_lch, spi_mcbsp->rx_dma, 0, 0);
+		edma_set_dest_index(mcbsp->dma_rx_lch, width, 0);
 		
 		dev_dbg(spi_mcbsp->dev, "starting EDMA RX\n");
 		
 		/* Start EDMA (RX) */
-		start_edma(mcbsp->dma_rx_lch);
+		edma_start(mcbsp->dma_rx_lch);
 		
 		/* Start McBSP RX and wait EDMA ending */
 		mcbsp_start_rx(mcbsp_id);
@@ -379,19 +378,18 @@ static void spi_mcbsp_pump_transfers(unsigned long data)
 	        spi_mcbsp->tx_len = transfer->len;
 
 	        /* Real write */
-	        set_edma_src_params(mcbsp->dma_tx_lch, spi_mcbsp->tx_dma, 0, 0);
-		set_edma_src_index(mcbsp->dma_tx_lch, width, 0);
+	        edma_set_src(mcbsp->dma_tx_lch, spi_mcbsp->tx_dma, 0, 0);
+		edma_set_src_index(mcbsp->dma_tx_lch, width, 0);
 		
 		/* No coherency is assumed between EDMA and L2 cache */
 		L2_cache_block_writeback((u32) spi_mcbsp->tx_dma,
 					 (u32) spi_mcbsp->tx_dma + spi_mcbsp->tx_len);
 
 	}	
-
 	dev_dbg(spi_mcbsp->dev, "starting EDMA TX\n");
 	
 	/* Start EDMA (TX) */
-	start_edma(mcbsp->dma_tx_lch);
+	edma_start(mcbsp->dma_tx_lch);
 	
 	/* Start McBSP TX and wait EDMA ending */
 	mcbsp_start_tx(mcbsp_id);
@@ -480,9 +478,9 @@ static int spi_mcbsp_setup(struct spi_device *spi)
 	unsigned int         mcbsp_id  = get_mcbsp_id(spi);
 	struct spi_mcbsp    *spi_mcbsp = get_spi_mcbsp(spi);
 	struct mcbsp        *mcbsp     = spi_mcbsp->mcbsp;
-	int                  tcc       = -1;
-        int                  dma_tx_ch;
-        int                  dma_rx_ch;
+        int                  dma_tx_ch, dma_tx_ch_reload;
+        int                  dma_rx_ch, dma_rx_ch_reload;
+	struct edmacc_param  tmp_params;
 
 	/* Zero (the default) here means 8 bits */
 	if (!spi->bits_per_word)
@@ -542,42 +540,107 @@ static int spi_mcbsp_setup(struct spi_device *spi)
 	}
 #endif
 	/* Allocate the TX EDMA channel */
-	if (request_edma(mcbsp->dma_tx_sync, "McBSP TX", spi_mcbsp_edma_tx_callback,
-			 spi_mcbsp, &dma_tx_ch, &tcc, EVENTQ_3)) {
-	        dev_dbg(&spi->dev, "Unable to request DMA channel for McBSP%d TX\n",
+	dma_tx_ch = edma_alloc_channel(mcbsp->dma_tx_sync,
+				       spi_mcbsp_edma_tx_callback,
+				       spi_mcbsp,
+				       EVENTQ_3);
+
+	if (dma_tx_ch < 0) {
+	        dev_dbg(&spi->dev, "Unable to request DMA channel for McBSP%d Tx\n",
 			mcbsp_id);
 		return -EAGAIN;
 	}
 
-	mcbsp->dma_tx_lch = (short) dma_tx_ch;
+	/* Request the dummy reload slot to avoid missed events */
+	dma_tx_ch_reload = edma_alloc_slot(EDMA_CTLR(dma_tx_ch), EDMA_SLOT_ANY);
+	if (dma_tx_ch_reload < 0) {
+	        dev_dbg(&spi->dev, "Unable to request EDMA slot for McBSP%d Tx\n", mcbsp_id);
+		return -EAGAIN;
+	}
+	
+	mcbsp->dma_tx_lch        = (short) dma_tx_ch;
+	mcbsp->dma_tx_lch_reload = (short) dma_tx_ch_reload;
 
 	/* EDMA TX dest is McBSP0 */
-	set_edma_dest_params(mcbsp->dma_tx_lch, mcbsp->dma_tx_data, 0, 0);
-	set_edma_dest_index(mcbsp->dma_tx_lch, 0, 0);
+	edma_set_dest(dma_tx_ch, mcbsp->dma_tx_data, 0, 0);
+	edma_set_dest_index(dma_tx_ch, 0, 0);
 		
-	/* Save TX channel parameter set */
-	get_edma_params(mcbsp->dma_tx_lch, &spi_mcbsp->dma_tx_params);
+	edma_link(dma_tx_ch, dma_tx_ch_reload);
 
+	/* Save TX channel parameter set */
+	edma_read_slot(dma_tx_ch, &spi_mcbsp->dma_tx_params);
+
+	/* Add transfer completion interrupt */
+	spi_mcbsp->dma_tx_params.opt |= TCINTEN | EDMA_TCC(dma_tx_ch);
+	edma_write_slot(dma_tx_ch, &spi_mcbsp->dma_tx_params);
+
+	edma_set_dest(dma_tx_ch_reload, 0, 0, 0);
+	edma_set_dest_index(dma_tx_ch_reload, 0, 0);
+	edma_set_src_index(dma_tx_ch_reload, 0, 0);
+	edma_set_transfer_params(dma_tx_ch_reload,
+				 0, /* ACNT */
+				 0, /* BCNT */
+				 1, /* CCNT */    
+				 0, /* BCNTRLD */
+				 ASYNC);
+
+	/* Set dummy slot properties */
+	edma_read_slot(dma_tx_ch_reload, &tmp_params);
+	tmp_params.opt |= TCINTEN| STATIC | TCCMODE | EDMA_TCC(dma_tx_ch);
+	edma_write_slot(dma_tx_ch_reload, &tmp_params);
+	
 	/* Allocate the RX EDMA channel */
-	if (request_edma(mcbsp->dma_rx_sync, "McBSP RX", spi_mcbsp_edma_rx_callback,
-			 spi_mcbsp, &dma_rx_ch, &tcc, EVENTQ_3)) {
-	        dev_dbg(&spi->dev, "Unable to request DMA channel for McBSP%d RX\n",
+	dma_rx_ch = edma_alloc_channel(mcbsp->dma_rx_sync,
+				       spi_mcbsp_edma_rx_callback,
+				       spi_mcbsp,
+				       EVENTQ_3);
+	if (dma_rx_ch < 0) {
+		dev_dbg(&spi->dev, "Unable to request DMA channel for McBSP%d RX\n",
 			mcbsp_id);
 		return -EAGAIN;
 	}
 
-	mcbsp->dma_rx_lch = (short) dma_rx_ch;
+	/* Request the dummy reload slot to avoid missed events */
+	dma_rx_ch_reload = edma_alloc_slot(EDMA_CTLR(dma_rx_ch), EDMA_SLOT_ANY);
+	if (dma_rx_ch_reload < 0) {
+	        dev_dbg(&spi->dev, "Unable to request EDMA slot for McBSP%d Rx\n", mcbsp_id);
+		return -EAGAIN;
+	}
+	
+	mcbsp->dma_rx_lch        = (short) dma_rx_ch;
+	mcbsp->dma_rx_lch_reload = (short) dma_rx_ch_reload;
 
 	/* EDMA RX source is McBSP0 */
-	set_edma_src_params(mcbsp->dma_rx_lch, mcbsp->dma_rx_data, 0, 0);
-	set_edma_src_index(mcbsp->dma_rx_lch, 0, 0);
+	edma_set_src(dma_rx_ch, mcbsp->dma_rx_data, 0, 0);
+	edma_set_src_index(dma_rx_ch, 0, 0);
 		
-	/* Save RX channel parameter set */
-	get_edma_params(mcbsp->dma_rx_lch, &spi_mcbsp->dma_rx_params);
+	edma_link(dma_rx_ch, dma_rx_ch_reload);
 
+	/* Save RX channel parameter set */
+	edma_read_slot(dma_rx_ch, &spi_mcbsp->dma_rx_params);
+
+	/* Add transfer completion interrupt */
+	spi_mcbsp->dma_rx_params.opt |= TCINTEN | EDMA_TCC(dma_rx_ch);
+	edma_write_slot(dma_rx_ch, &spi_mcbsp->dma_rx_params);
+
+	edma_set_dest(dma_rx_ch_reload, 0, 0, 0);
+	edma_set_dest_index(dma_rx_ch_reload, 0, 0);
+	edma_set_src_index(dma_rx_ch_reload, 0, 0);
+	edma_set_transfer_params(dma_rx_ch_reload,
+				 0, /* ACNT */
+				 0, /* BCNT */
+				 1, /* CCNT */    
+				 0, /* BCNTRLD */
+				 ASYNC);
+
+	/* Set dummy slot properties */
+	edma_read_slot(dma_rx_ch_reload, &tmp_params);
+	tmp_params.opt |= TCINTEN| STATIC | TCCMODE | EDMA_TCC(dma_rx_ch);
+	edma_write_slot(dma_rx_ch_reload, &tmp_params);
+	
 	/* Just in case... */
-	stop_edma(mcbsp->dma_tx_lch); 
-	stop_edma(mcbsp->dma_rx_lch); 
+	edma_stop(dma_tx_ch); 
+	edma_stop(dma_rx_ch); 
 
 	spi_mcbsp->first_setup_done = 1;
 
@@ -683,11 +746,11 @@ static void spi_mcbsp_cleanup(struct spi_device *spi)
 		mcbsp_stop(get_mcbsp_id(spi));
 		mcbsp_free(get_mcbsp_id(spi));
 		
-		stop_edma(mcbsp->dma_tx_lch);
-		stop_edma(mcbsp->dma_rx_lch);
+		edma_stop(mcbsp->dma_tx_lch);
+		edma_stop(mcbsp->dma_rx_lch);
 		
-		free_edma(mcbsp->dma_tx_lch);
-		free_edma(mcbsp->dma_rx_lch);
+		edma_free_channel(mcbsp->dma_tx_lch);
+		edma_free_channel(mcbsp->dma_rx_lch);
 		
 		spi_mcbsp->first_setup_done = 0;
 	}

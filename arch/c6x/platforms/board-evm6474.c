@@ -59,17 +59,17 @@ struct tci648x_rio_board_controller_info evm6474_rio_controller = {
 static struct resource evm6474_rio_resources[] = {
 	{
 		.name	= "LSU",
-		.start	= DMA_CIC_EVT6,
+		.start	= TCI648X_LSU_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
 		.name	= "ICCR",
-		.start	= DMA_CIC_EVT5,
+		.start	= TCI648X_ICCR_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
 		.name	= "RATE",
-		.start	= DMA_CIC_EVT7,
+		.start	= TCI648X_RATE_CHANNEL_EVENT,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -113,16 +113,46 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 	       .tx_irq      = IRQ_XEVT1},
 };
 
+static struct resource evm6474_mcbsp0_resources[] = {
+	{
+		.name	= "MCBSP0_RX",
+		.start	= DMA_MCBSP0_RX,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "MCBSP0_TX",
+		.start	= DMA_MCBSP0_TX,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
+static struct resource evm6474_mcbsp1_resources[] = {
+	{
+		.name	= "MCBSP1_RX",
+		.start	= DMA_MCBSP1_RX,
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.name	= "MCBSP1_TX",
+		.start	= DMA_MCBSP1_TX,
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
 static struct platform_device evm6474_mcbsp_device0 = {
 	.name           = "mcbsp",
 	.id             = 1,
 	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[0] },
+	.num_resources  = ARRAY_SIZE(evm6474_mcbsp0_resources),
+	.resource	= evm6474_mcbsp0_resources,
 };
 
 static struct platform_device evm6474_mcbsp_device1 = {
 	.name           = "mcbsp",
 	.id             = 2,
 	.dev		= { .platform_data = (void*) &evm6474_mcbsp_info[1] },
+	.num_resources  = ARRAY_SIZE(evm6474_mcbsp1_resources),
+	.resource	= evm6474_mcbsp1_resources,
 };
 
 static int __init evm_init_mcbsp(void)
@@ -170,9 +200,9 @@ queue_tc_mapping[][2] = {
 	/* {event queue no, TC no} */
 	{0, 0},
 	{1, 1},
-	{2, 2},
-	{3, 3},
-	{4, 4},
+	{2, 2}, /* sRIO */
+	{3, 3}, /* SPI */
+	{4, 4}, /* UART over McBSP */
 	{5, 5},
 	{-1, -1},
 };
@@ -180,15 +210,14 @@ queue_tc_mapping[][2] = {
 static const s8
 queue_priority_mapping[][2] = {
 	/* {event queue no, Priority} */
-	{0, 4},	/* FIXME: what should these priorities be? */
-	{1, 0},
-	{2, 5},
-	{3, 1},
-	{4, 2},
-	{5, 3},
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{4, 4},
+	{5, 5},
 	{-1, -1},
 };
-
 
 static struct edma_soc_info edma_cc0_info = {
 	.n_channel		= EDMA_NUM_DMACH,
@@ -271,7 +300,6 @@ static struct platform_device edma_device = {
 	.resource		= edma_resources,
 };
 
-
 static void __init board_setup_edma(void)
 {
 	int status;
@@ -292,7 +320,7 @@ static void __init board_setup_edma(void)
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
-       .byte_len       = 0x8000 / 8,
+       .byte_len       = 256 * 1024 / 8, /* 256 Kbits */
        .page_size      = 64,
        .flags          = AT24_FLAG_ADDR16,
 };
@@ -392,3 +420,4 @@ __init int evm_init(void)
 }
 
 arch_initcall(evm_init);
+
