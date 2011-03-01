@@ -371,7 +371,7 @@ err_nwp:
 
 static struct platform_driver gpio_nand_driver = {
 	.probe		= gpio_nand_probe,
-	.remove		= gpio_nand_remove,
+	.remove		= __devexit_p(gpio_nand_remove),
 	.driver		= {
 		.name	= NAND_MTD_NAME,
 	},
