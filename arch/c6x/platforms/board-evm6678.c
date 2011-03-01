@@ -45,6 +45,11 @@
 
 SOC_CLK_DEF(100000000); /* SYSCLK is a 100 MHz clock */
 
+static struct clk_lookup evm_clks[] = {
+        SOC_CLK(),
+	CLK("", NULL, NULL)
+};
+
 #if defined(CONFIG_MTD_NAND_DAVINCI)
 static struct mtd_partition evm6678_nand_parts[] = {
 	{
@@ -111,11 +116,6 @@ static void __init evm_setup_nand(void)
 #else
 static inline void evm_setup_nand(void) {}
 #endif
-
-static struct clk_lookup evm_clks[] = {
-	SOC_CLK(),
-	CLK("", NULL, NULL)
-};
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
