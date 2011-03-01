@@ -29,6 +29,12 @@
 #define PLL_DIV8         64
 #define PLL_OUTDIV        2
 
+/* 
+ * I2C bus specs 
+ */
+#define ARCH_I2C_FREQ   100   /* KHz  */
+#define ARCH_I2C_DELAY    0   /* usec */
+
 /*
  * Timer definitions
  */
