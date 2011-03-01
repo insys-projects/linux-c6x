@@ -177,6 +177,14 @@
 #define DSCR_BOOTADDR                0x02620040
 #define DSCR_DEVCFG                  0x0262014c
 #define DSCR_MACID                   0x02620110
+#define DSCR_TINPSEL                 0x02620300
+#define DSCR_TOUTPSEL                0x02620304
+#define DSCR_MAINPLLCTL0             0x02620328
+#define DSCR_MAINPLLCTL1             0x0262032c
+#define DSCR_DDR3PLLCTL0	     0x02620330
+#define DSCR_DDR3PLLCTL1	     0x02620334
+#define DSCR_PAPLLCTL0	             0x02620338
+#define DSCR_OBSCLKCTL               0x026203ac
 #define DSCR_PRI_ALLOC               0x0288091c
 
 #define DSCR_KICK0_KEY               0x83E70B13

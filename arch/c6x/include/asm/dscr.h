@@ -31,4 +31,19 @@ static inline void dscr_set_device(unsigned int w, unsigned int reg)
 }
 #endif
 
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+static inline void dscr_set_device(unsigned int w, unsigned int reg)
+{
+	/* Unlock DSCR boot config */
+	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+
+	dscr_set_reg(reg, w);
+
+	/* Lock DSCR */
+	dscr_set_reg(DSCR_KICK0, 0);
+	dscr_set_reg(DSCR_KICK1, 0);
+}
+#endif
+
 #endif /*__ASM_C6X_DSCR_H */
