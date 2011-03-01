@@ -11,8 +11,8 @@
  *  published by the Free Software Foundation.
  */
 
-#ifndef __MACH_C6X_PLL_C667X_H
-#define __MACH_C6X_PLL_C667X_H
+#ifndef __MACH_C6X_PLL_C6670_H
+#define __MACH_C6X_PLL_C6670_H
 
 #define ARCH_PLL1_BASE          0x02310000
 
@@ -169,4 +169,4 @@
 	CLK(NULL, "uart", &uart_clk),			\
 	CLK("i2c_davinci.1", NULL, &i2c_clk)
 
-#endif /* __MACH_PLL_C667X_H */
+#endif /* __MACH_PLL_C6670_H */

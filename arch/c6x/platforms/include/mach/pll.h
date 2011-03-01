@@ -23,8 +23,10 @@
 #include <mach/pll-c6472.h>
 #elif defined(CONFIG_SOC_TMS320C6474)
 #include <mach/pll-c6474.h>
-#elif defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
-#include <mach/pll-c667x.h>
+#elif defined(CONFIG_SOC_TMS320C6670)
+#include <mach/pll-c6670.h>
+#elif defined(CONFIG_SOC_TMS320C6678)
+#include <mach/pll-c6678.h>
 #else
 #error "No machine PLL definitions"
 #endif
