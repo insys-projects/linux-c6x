@@ -5,6 +5,7 @@
  *
  *  Copyright (C) 2011 Texas Instruments Incorporated
  *  Author: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -21,8 +22,15 @@
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
 #include <linux/init.h>
+#include <linux/i2c.h>
+#include <linux/i2c/at24.h>
+#include <linux/clk.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/nand-gpio-c6x.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -35,82 +43,77 @@
 
 #include <mach/board.h>
 
-static struct pll_data pll1_data = {
-	.num       = 1,
-	.phys_base = ARCH_PLL1_BASE,
-};
-
-static struct clk clkin1 = {
-	.name = "clkin1",
-	.rate = 122880000, /* SYSCLK is a 122.88 MHz clock */
-	.node = LIST_HEAD_INIT(clkin1.node),
-	.children = LIST_HEAD_INIT(clkin1.children),
-	.childnode = LIST_HEAD_INIT(clkin1.childnode),
-};
-
-static struct clk pll1_clk = {
-	.name = "pll1",
-	.parent = &clkin1,
-	.pll_data = &pll1_data,
-	.flags = CLK_PLL,
-};
-
-static struct clk pll1_sysclk3 = {
-	.name = "pll1_sysclk3",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 2,
-};
-
-static struct clk pll1_sysclk7 = {
-	.name = "pll1_sysclk7",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk pll1_sysclk9 = {
-	.name = "pll1_sysclk9",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 12,
-};
-
-static struct clk pll1_sysclk10 = {
-	.name = "pll1_sysclk10",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 3,
-};
-
-static struct clk pll1_sysclk11 = {
-	.name = "pll1_sysclk11",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk i2c_clk = {
-	.name = "i2c",
-	.parent = &pll1_sysclk7,
-};
-
-static struct clk core_clk = {
-	.name = "core",
-	.parent = &pll1_sysclk3,
-};
+SOC_CLK_DEF(122880000); /* SYSCLK is a 122.88 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
-	CLK(NULL, "pll1", &pll1_clk),
-	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
-	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
-	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
-	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
-	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),
-	CLK("i2c_davinci.1", NULL, &i2c_clk),
-	CLK(NULL, "core", &core_clk),
+        SOC_CLK(),
 	CLK("", NULL, NULL)
 };
+
+#ifdef CONFIG_I2C
+static struct at24_platform_data at24_eeprom_data = {
+	.byte_len	= 1024 * 1024 / 8,
+	.page_size	= 256,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
+static struct i2c_board_info evm_i2c_info[] = {
+#ifdef CONFIG_EEPROM_AT24
+	{ I2C_BOARD_INFO("24c1024", 0x50),
+	  .platform_data = &at24_eeprom_data,
+	},
+#endif
+};
+
+static int __init board_setup_i2c(void)
+{
+	return i2c_register_board_info(1, evm_i2c_info, ARRAY_SIZE(evm_i2c_info));
+}
+core_initcall(board_setup_i2c);
+#endif /* CONFIG_I2C */
+
+#if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
+static struct mtd_partition evm_nand_parts[] = {
+	{
+		.name		= "bootloader",
+		.offset		= 0,
+		.size		= 0x00200000,
+		.mask_flags	= MTD_WRITEABLE,
+	},
+	{
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x01000000,
+		.mask_flags	= 0,
+	},
+	{
+		.name		= "filesystem",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.mask_flags	= 0,
+	}	
+};
+
+static struct gpio_nand_platdata evm_nand_platdata = {
+	.parts = evm_nand_parts,
+	.num_parts = ARRAY_SIZE(evm_nand_parts),
+	.chip_delay = 25,
+};
+
+static struct platform_device evm_nand = {
+	.name		= "gpio-nand-c6x",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &evm_nand_platdata,
+	}
+};
+
+static int __init evm_setup_nand(void)
+{
+	return platform_device_register(&evm_nand);
+}
+core_initcall(evm_setup_nand);
+#endif
 
 #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
 #include <linux/serial_8250.h>
@@ -122,11 +125,10 @@ static struct plat_serial8250_port serial8250_platform_data [] = {
         {
                 .membase  = (void *) UART_BASE_ADDR,
                 .mapbase  = UART_BASE_ADDR,
-                .irq      = IRQ_INTC0OUT0,
+                .irq      = IRQ_UART,
                 .flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-                .iotype   = UPIO_MEM,
+                .iotype   = UPIO_MEM32,
                 .regshift = 2,
-                .uartclk  = 163833333, // (983MHz/6, must be get from pll1_sysclk7)
         },
         {
                 .flags          = 0
@@ -141,8 +143,27 @@ static struct platform_device serial8250_device = {
         },
 };
 
+#include <linux/serial_reg.h>
+#define SERIAL_OUT(offset, value) writel(value, UART_BASE_ADDR + ((offset) << 2))
+
 static int __init evm_init_uart(void)
 {
+	struct clk *clk;
+
+	/* 
+	 * Enable UART
+	 */
+	SERIAL_OUT(0xc, 0x6001); /* UTRST | URRST | FREE */
+
+	/*
+	 *  Retrieve the UART clock
+	 */
+	clk = clk_get(NULL, "uart");
+	if (IS_ERR(clk))
+		return -ENODEV;
+	else
+		serial8250_platform_data[0].uartclk = clk_get_rate(clk);
+
 	return platform_device_register(&serial8250_device);
 }
 

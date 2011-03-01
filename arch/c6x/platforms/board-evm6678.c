@@ -5,6 +5,7 @@
  *
  *  Copyright (C) 2011 Texas Instruments Incorporated
  *  Author: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -21,6 +22,9 @@
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
 #include <linux/init.h>
+#include <linux/i2c.h>
+#include <linux/i2c/at24.h>
+#include <linux/clk.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
 
@@ -35,12 +39,34 @@
 
 #include <mach/board.h>
 
-SOC_CLK_DEF(122880000); /* SYSCLK is a 122.88 MHz clock */
+SOC_CLK_DEF(100000000); /* SYSCLK is a 100 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
-    SOC_CLK(),
+	SOC_CLK(),
 	CLK("", NULL, NULL)
 };
+
+#ifdef CONFIG_I2C
+static struct at24_platform_data at24_eeprom_data = {
+	.byte_len	= 1024 * 1024 / 8,
+	.page_size	= 256,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
+static struct i2c_board_info evm_i2c_info[] = {
+#ifdef CONFIG_EEPROM_AT24
+	{ I2C_BOARD_INFO("24c1024", 0x50),
+	  .platform_data = &at24_eeprom_data,
+	},
+#endif
+};
+
+static int __init board_setup_i2c(void)
+{
+	return i2c_register_board_info(1, evm_i2c_info, ARRAY_SIZE(evm_i2c_info));
+}
+core_initcall(board_setup_i2c);
+#endif /* CONFIG_I2C */
 
 #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
 #include <linux/serial_8250.h>
@@ -52,11 +78,10 @@ static struct plat_serial8250_port serial8250_platform_data [] = {
         {
                 .membase  = (void *) UART_BASE_ADDR,
                 .mapbase  = UART_BASE_ADDR,
-                .irq      = IRQ_INTC0OUT0,
+                .irq      = IRQ_UART,
                 .flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
-                .iotype   = UPIO_MEM,
+                .iotype   = UPIO_MEM32,
                 .regshift = 2,
-                .uartclk  = 163833333, // (983MHz/6, must be get from pll1_sysclk7)
         },
         {
                 .flags          = 0
@@ -71,8 +96,27 @@ static struct platform_device serial8250_device = {
         },
 };
 
+#include <linux/serial_reg.h>
+#define SERIAL_OUT(offset, value) writel(value, UART_BASE_ADDR + ((offset) << 2))
+
 static int __init evm_init_uart(void)
 {
+	struct clk *clk;
+
+	/* 
+	 * Enable UART
+	 */
+	SERIAL_OUT(0xc, 0x6001); /* UTRST | URRST | FREE */
+
+	/*
+	 *  Retrieve the UART clock
+	 */
+	clk = clk_get(NULL, "uart");
+	if (IS_ERR(clk))
+		return -ENODEV;
+	else
+		serial8250_platform_data[0].uartclk = clk_get_rate(clk);
+
 	return platform_device_register(&serial8250_device);
 }
 
