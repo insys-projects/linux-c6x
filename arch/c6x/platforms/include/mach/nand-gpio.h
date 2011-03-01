@@ -53,5 +53,25 @@
 #undef  GPIO_NAND_USE_WRITE_PROTECT
 #endif /* defined(CONFIG_ARCH_BOARD_EVM6474) */
 
+#if defined(CONFIG_ARCH_BOARD_EVMTCI6616)
+/*
+ * EVM TCI6616 definitions
+ */ 
+#define GPIO_NAND_CLE	    8
+#define GPIO_NAND_ALE	    9
+#define GPIO_NAND_NWE	    12
+#define GPIO_NAND_RDY	    13
+#define GPIO_NAND_NRE	    15
+#define GPIO_NAND_NCE	    14
+#undef  GPIO_NAND_NWP       /* not used */
+
+#define GPIO_NAND_DATA_MASK 0xff
+
+#define xdelay()            ndelay(15)
+
+#define GPIO_NAND_USE_READY_BUSY_PIN
+#undef  GPIO_NAND_USE_WRITE_PROTECT
+#endif /* defined(CONFIG_ARCH_BOARD_EVMTCI6616) */
+
 #endif /* __ASM_C6X_NAND_GPIO_H */
 
