@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,6 @@
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
 #elif defined(CONFIG_SOC_TMS320C6457)
 #define RAM_EMIFA_CE2     0xa0000000
 #define RAM_EMIFA_CE3     0xb0000000
@@ -36,7 +35,6 @@
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
@@ -70,7 +68,11 @@
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
+#ifdef CONFIG_C66X_USE_MSM
 #define RAM_MEMORY_START  RAM_MSM_BASE
+#else
+#define RAM_MEMORY_START  RAM_DDR2_CE0
+#endif
 #elif defined(CONFIG_SOC_TMS320C6678)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000

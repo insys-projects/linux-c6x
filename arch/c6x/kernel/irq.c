@@ -91,8 +91,8 @@ void __init init_IRQ(void)
 		set_irq_chip_and_handler(i, &core_irq_chip, handle_level_irq);
 	}
 
-#ifdef CONFIG_PIC_C64XPLUS
-	init_pic_c64xplus();
+#ifdef CONFIG_INTC_C64XPLUS
+	init_intc_c64xplus();
 #endif
 	if (mach_init_IRQ != NULL)
 		mach_init_IRQ();

@@ -43,7 +43,7 @@ void __init unmask_eexception(void)
 #if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	/* Unmask events number 119 to 127 */
 	__dint();
-	IC_EXPMASK[3] &= 0x00ffffff;
+	INTC_EXPMASK[3] &= 0x00ffffff;
 	__rint();
 
 	/* 
@@ -332,10 +332,10 @@ static void process_eexcept(struct pt_regs *regs)
 	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	for (i = 0; i <= 3; i++) {
-		while (IC_MEXPMASK[i]) {
+		while (INTC_MEXPMASK[i]) {
 			__dint();
-			eexcept_num = __ffs(IC_MEXPMASK[i]);
-			IC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
+			eexcept_num = __ffs(INTC_MEXPMASK[i]);
+			INTC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
 			__rint();
 			do_trap(&eexcept_table[eexcept_num + (bank << 5)], regs);
 		}

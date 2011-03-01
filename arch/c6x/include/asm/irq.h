@@ -4,7 +4,7 @@
  *  Port on Texas Instruments TMS320C6x architecture
  *
  *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -13,6 +13,7 @@
 #ifndef __ASM_C6X_IRQ_H_
 #define __ASM_C6X_IRQ_H_
 
+#include <linux/types.h>
 #include <asm/hardware.h>
 #include <asm/percpu.h>
 
@@ -20,7 +21,7 @@
 
 #define irq_canonicalize(irq)  (irq)
 
-#ifdef CONFIG_PIC_C64XPLUS
+#ifdef CONFIG_INTC_C64XPLUS
 #define NR_IRQS (NR_SOC_IRQS + NR_BOARD_IRQS)
 #else
 #define NR_IRQS (NR_SYS_IRQS + NR_BOARD_IRQS)
@@ -63,11 +64,42 @@
 #define INT14		    14   /* level 14 interrupt */
 #define INT15		    15   /* level 15 interrupt */
 
-#ifdef CONFIG_PIC_C64XPLUS
+#ifdef CONFIG_INTC_C64XPLUS
+
+#ifndef NR_SOC_COMBINERS
+/* By default, do not use more additional SoC combiners that the intc ones */
+#define NR_SOC_COMBINERS     0
+#endif
+#define NR_MEGAMOD_COMBINERS 4
+#define NR_COMBINERS         (NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS)
+
 /* holds mapping of hw interrupt number to kernel IRQ number */
 extern uint16_t prio_to_irq[];
 
-#define hw_to_kernel_irq(hw) prio_to_irq[(hw)]
+#define hw_to_kernel_irq(hw)    prio_to_irq[(hw)]
+#define c6x_irq_to_chip(i)      ((struct c6x_irq_chip *)irq_to_desc((i))->chip)
+#define c6x_irq_desc_to_chip(d) ((struct c6x_irq_chip *)(d)->chip)
+
+struct combiner_handler_info {
+	volatile uint32_t *mevtflag;
+	volatile uint32_t *evtclr;
+	uint16_t irqmap[32];
+};
+
+struct combiner_mask_info {
+	int irq_base;
+	volatile uint32_t *evtmask;
+	volatile uint32_t *evtclr;
+	volatile uint32_t *evtset;
+};
+
+#define __CHIP(namestr, i, m, u)		\
+    {						\
+		.chip = { .name = namestr #i,	\
+			  .mask = m,		\
+			  .unmask = u,		\
+		},				\
+	}
 
 /*
  * Functions used to map/unmap interrupts from one level to another.
@@ -78,28 +110,11 @@ extern uint16_t prio_to_irq[];
  *
  * For irq_unmap:
  *    irq_src is a kernel IRQ number corresponding to megamodule combiner event
- *
- * For irq_cic_map:
- *    irq_src is a kernel IRQ number corresponding to CIC combiner event
- *    irq_dst is a kernel IRQ number corresponding to megamodule combiner event
- *
- * For irq_cic_unmap:
- *    irq_src is a kernel IRQ number corresponding to CIC combiner event
- *
- *
- * In order to map a CIC event directly to a core hardware interrupt, it must
- * first be mapped to a megamodule event with irq_cic_map(). Then the megamodule
- * event can be mapped to a core hardware interrupt with irq_map(). To unmap,
- * first unmap the megamodule event, then the CIC event.
- *
  */
 extern void irq_map(unsigned int irq_src, unsigned int irq_dst);
 extern void irq_unmap(unsigned int irq_src);
-extern void irq_cic_map(unsigned int irq_src, unsigned int irq_dst);
-extern void irq_cic_unmap(unsigned int irq_src);
-extern void cic_raw_map(unsigned int src, unsigned int dst, int core);
+extern void __init init_intc_c64xplus(void);
 
-extern void __init init_pic_c64xplus(void);
 #endif
 
 #endif /* __ASM_C6X_IRQ_H_ */

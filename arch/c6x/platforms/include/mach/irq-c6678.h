@@ -10,8 +10,8 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-#ifndef __MACH_IRQ_C6670_H
-#define __MACH_IRQ_C6670_H
+#ifndef __MACH_IRQ_C6678_H
+#define __MACH_IRQ_C6678_H
 
 #define IRQ_EVT0        0   /* combined events */
 #define IRQ_EVT1        1
@@ -115,4 +115,4 @@
 
 #define NR_SOC_IRQS	128
 
-#endif /* __MACH_IRQ_C6670_H */
+#endif /* __MACH_IRQ_C6678_H */
