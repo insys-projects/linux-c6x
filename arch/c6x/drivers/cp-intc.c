@@ -53,13 +53,6 @@ static uint8_t cpintc_host_irq_map[] = {
 	IRQ_INTC0OUT6,
 	IRQ_INTC0OUT7,
 	IRQ_INTC0OUT8,
-	IRQ_INTC0OUT9,
-	IRQ_INTC0OUT10,
-	IRQ_INTC0OUT11,
-	IRQ_INTC0OUT12,
-	IRQ_INTC0OUT13,
-	IRQ_INTC0OUT14,
-	IRQ_INTC0OUT15
 };
 
 /* Lock protecting irq mappings */
