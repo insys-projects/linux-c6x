@@ -35,80 +35,10 @@
 
 #include <mach/board.h>
 
-static struct pll_data pll1_data = {
-	.num       = 1,
-	.phys_base = ARCH_PLL1_BASE,
-};
-
-static struct clk clkin1 = {
-	.name = "clkin1",
-	.rate = 122880000, /* SYSCLK is a 122.88 MHz clock */
-	.node = LIST_HEAD_INIT(clkin1.node),
-	.children = LIST_HEAD_INIT(clkin1.children),
-	.childnode = LIST_HEAD_INIT(clkin1.childnode),
-};
-
-static struct clk pll1_clk = {
-	.name = "pll1",
-	.parent = &clkin1,
-	.pll_data = &pll1_data,
-	.flags = CLK_PLL,
-};
-
-static struct clk pll1_sysclk3 = {
-	.name = "pll1_sysclk3",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 2,
-};
-
-static struct clk pll1_sysclk7 = {
-	.name = "pll1_sysclk7",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk pll1_sysclk9 = {
-	.name = "pll1_sysclk9",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 12,
-};
-
-static struct clk pll1_sysclk10 = {
-	.name = "pll1_sysclk10",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 3,
-};
-
-static struct clk pll1_sysclk11 = {
-	.name = "pll1_sysclk11",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk i2c_clk = {
-	.name = "i2c",
-	.parent = &pll1_sysclk7,
-};
-
-static struct clk core_clk = {
-	.name = "core",
-	.parent = &pll1_sysclk3,
-};
+SOC_CLK_DEF(122880000); /* SYSCLK is a 122.88 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
-	CLK(NULL, "pll1", &pll1_clk),
-	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
-	CLK(NULL, "pll1_sysclk7", &pll1_sysclk7),
-	CLK(NULL, "pll1_sysclk9", &pll1_sysclk9),
-	CLK(NULL, "pll1_sysclk10", &pll1_sysclk10),
-	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),
-	CLK("i2c_davinci.1", NULL, &i2c_clk),
-	CLK(NULL, "core", &core_clk),
+    SOC_CLK(),
 	CLK("", NULL, NULL)
 };
 

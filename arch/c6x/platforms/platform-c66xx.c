@@ -34,6 +34,7 @@
 #include <asm/pll.h>
 #include <asm/setup.h>
 #include <asm/irq.h>
+#include <asm/dscr.h>
 
 #include <mach/board.h>
 
@@ -80,6 +81,76 @@ static struct platform_device c6x_platram_device = {
 
 static void init_pll(void)
 {
+	unsigned int val;
+
+	/* Unlock DSCR boot config */
+	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+
+	/* Set ENSAT */
+	val = dscr_get_reg(DSCR_MAINPLLCTL1) | 0x40;
+	dscr_set_reg(DSCR_MAINPLLCTL1, val);
+
+	/* Set OUTPUT_DIVIDE and Main PLL Bypass enabled */
+	pll1_set_reg(SECCTL, 0x810000 | ((PLL_OUTDIV - 1) << 19));
+
+	udelay(10);
+	
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLENSRC);
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLEN);
+
+	udelay(10);
+
+	/* Reset PLL */
+	pll1_setbit_reg(PLLCTL, PLLCTL_PLLRST);
+	if (pll1_get_reg(PLLCTL & 0x2) != 0) {
+		val = pll1_get_reg(PLLCTL) & 0xfffffffd;
+		pll1_setbit_reg(PLLCTL, val);
+
+		/* Wait PLL stabilization time */
+		udelay(150);
+	}
+	
+	/* Set PLL multiplier * 2 in PLLM */
+	pll1_set_reg(PLLM, PLLM_VAL(PLL_MUL*2));
+
+	/* program Main PLL BWADJ field */
+	val  = dscr_get_reg(DSCR_MAINPLLCTL0);
+	val |= (((PLL_MUL + 1)/2  - 1) << 24) & 0xff000000;
+	dscr_set_reg(DSCR_MAINPLLCTL0, val);
+
+	/*
+	 * This can't be right. There is no previder here...
+	 * pll1_set_reg(PLLPREDIV, PLLPREDIV_VAL(10) | PLLPREDIV_EN);
+	 */
+	pll1_wait_gostat();
+
+	/*  Set divider */
+	pll1_set_reg(PLLDIV2, PLLDIV_RATIO(PLL_DIV2) | PLLDIV_EN);
+	pll1_set_reg(PLLDIV5, PLLDIV_RATIO(PLL_DIV5) | PLLDIV_EN);
+	pll1_set_reg(PLLDIV8, PLLDIV_RATIO(PLL_DIV8) | PLLDIV_EN);
+	
+	/* Adjust modified related sysclk align */
+	pll1_set_reg(PLLALNCTL, pll1_get_reg(PLLDCHANGE));
+
+	pll1_setbit_reg(PLLCMD, PLLCMD_GOSTAT);
+
+	pll1_wait_gostat();
+
+	/* Wait for PLL to lock */
+	udelay(5);
+
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLRST);
+
+	udelay(40);
+
+	/* Main PLL Bypass disabled, set OUTPUT_DIVIDE */
+	pll1_set_reg(SECCTL, 0x10000 | ((PLL_OUTDIV - 1) << 19)); 
+	pll1_setbit_reg(PLLCTL, PLLCTL_PLLEN);
+
+	/* Lock DSCR */
+	dscr_set_reg(DSCR_KICK0, 0);
+	dscr_set_reg(DSCR_KICK1, 0);
 }
 
 static void init_power(void)
