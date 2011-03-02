@@ -161,11 +161,6 @@ void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 		n = __ffs(events);
 		irq = info->irqmap[n]; /* irq to handle */
 
-//AJ
-//		if (irq == 292)
-//			printk("Yeeaaahh!!!\n");
-//AK
-
 		if (PRE_ACK(irq))
 			*info->evtclr = (1 << n);
 
