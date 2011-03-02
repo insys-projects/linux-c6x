@@ -27,6 +27,9 @@
 #include <linux/clk.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -38,13 +41,81 @@
 #include <asm/clock.h>
 
 #include <mach/board.h>
+#include <mach/nand.h>
 
 SOC_CLK_DEF(100000000); /* SYSCLK is a 100 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
-	SOC_CLK(),
+        SOC_CLK(),
 	CLK("", NULL, NULL)
 };
+
+#if defined(CONFIG_MTD_NAND_DAVINCI)
+static struct mtd_partition evm6678_nand_parts[] = {
+	{
+		.name		= "bootloader",
+		.offset		= 0,
+		.size		= 0x00200000,
+		.mask_flags	= MTD_WRITEABLE,
+	},
+	{
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x01000000,
+		.mask_flags	= 0,
+	},
+	{
+		.name		= "filesystem",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.mask_flags	= 0,
+	}
+};
+
+static struct davinci_nand_pdata evmc6678_nand_data = {
+	.mask_cle 		= 0x4000,
+	.mask_ale 		= 0x2000,
+	.parts			= evm6678_nand_parts,
+	.nr_parts		= ARRAY_SIZE(evm6678_nand_parts),
+	.ecc_mode		= NAND_ECC_HW,
+	.ecc_bits		= 4,
+	.options		= 0,
+};
+
+#define ASYNC_EMIF_CONTROL_BASE		0x20C00000
+#define ASYNC_EMIF_DATA_CE0_BASE	0x70000000
+
+static struct resource evmc6678_nand_resources[] = {
+	{
+		.start		= ASYNC_EMIF_DATA_CE0_BASE,
+		.end		= ASYNC_EMIF_DATA_CE0_BASE + 0x3FFFFFF,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= ASYNC_EMIF_CONTROL_BASE,
+		.end		= ASYNC_EMIF_CONTROL_BASE + 0xFF,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device evmc6678_nand_device = {
+	.name			= "davinci_nand",
+	.id			= 0,
+
+	.num_resources		= ARRAY_SIZE(evmc6678_nand_resources),
+	.resource		= evmc6678_nand_resources,
+
+	.dev			= {
+		.platform_data	= &evmc6678_nand_data,
+	},
+};
+
+static void __init evm_setup_nand(void)
+{
+	platform_device_register(&evmc6678_nand_device);
+}
+#else
+static inline void evm_setup_nand(void) {}
+#endif
 
 #ifdef CONFIG_I2C
 static struct at24_platform_data at24_eeprom_data = {
@@ -141,6 +212,8 @@ void c6x_board_setup_arch(void)
 
 __init int evm_init(void)
 {
+	evm_setup_nand();
+
 	return 0;
 }
 
