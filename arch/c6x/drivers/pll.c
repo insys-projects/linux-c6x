@@ -274,7 +274,7 @@ static unsigned long clk_pllclk_recalc(struct clk *clk)
 	if (clk->flags & FIXED_RATE_PLL)
 		return rate;
 
-	pll->base = (void *) IO_ADDRESS(pll->phys_base);
+	pll->base = (void *) ioremap(pll->phys_base, PAGE_SIZE);
 	ctrl = __raw_readl(pll->base + PLLCTL);
 	rate = pll->input_rate = clk->parent->rate;
 

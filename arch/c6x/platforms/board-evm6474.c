@@ -96,7 +96,7 @@ core_initcall(evm_init_rio);
 #include <asm/mcbsp.h>
 
 static const struct mcbsp_info evm6474_mcbsp_info[] = {
-	[0] = {.phys_base   = IO_ADDRESS(MCBSP0_BASE_ADDR),
+	[0] = {.phys_base   = MCBSP0_BASE_ADDR,
 	       .dma_rx_sync = DMA_MCBSP0_RX,
 	       .dma_tx_sync = DMA_MCBSP0_TX,
 	       .dma_rx_data = MCBSP0_EDMA_RX_DATA,
@@ -104,7 +104,7 @@ static const struct mcbsp_info evm6474_mcbsp_info[] = {
 	       .rx_irq      = IRQ_REVT0,
 	       .tx_irq      = IRQ_XEVT0},
 
-	[1] = {.phys_base   = IO_ADDRESS(MCBSP1_BASE_ADDR),
+	[1] = {.phys_base   = MCBSP1_BASE_ADDR,
 	       .dma_rx_sync = DMA_MCBSP1_RX,
 	       .dma_tx_sync = DMA_MCBSP1_TX,
 	       .dma_rx_data = MCBSP1_EDMA_RX_DATA,
