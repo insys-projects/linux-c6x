@@ -39,8 +39,7 @@
 #include <asm/pgtable.h>
 #include <asm/pm.h>
 #include <asm/string.h>
-
-#include <mach/board.h>  /* for c6x_arch_idle_led() */
+#include <asm/leds.h>
 
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
