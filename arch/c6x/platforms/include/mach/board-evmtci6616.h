@@ -40,3 +40,23 @@
  */
 #define LINUX_TIMER_SRC (TIMER_0 + get_coreid())
 #define LINUX_TIMER_IRQ IRQ_TINT
+
+/*
+ * EVM FPGA and LED definitions
+ */
+#define EVM_LED_OFF       0
+#define EVM_LED_RED       1
+#define EVM_LED_GREEN     2
+#define EVM_LED_YELLOW    3
+
+#define EVM_FPGA_LED_REG  0x02
+#define EVM_FPGA_DSP_REG  0x0f
+
+#define EVM_FPGA_LED1_S   0  /* LED 1 */
+#define EVM_FPGA_LED2_S   2  /* LED 2 */
+#define EVM_FPGA_LEDO_S   4  /* LED override */
+#define EVM_FPGA_LED3_S   5  /* DSP LED */
+
+#define EVM_LED_IDLE_NUM  0  /* idle is using LED1 */
+#define EVM_LED_TIMER_NUM 1  /* timer is using LED2 */
+

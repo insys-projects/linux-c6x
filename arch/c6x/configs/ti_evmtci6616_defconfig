@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Tue Mar  1 15:59:21 2011
+# Fri Mar  4 11:08:55 2011
 #
 CONFIG_TMS320C6X=y
 # CONFIG_MMU is not set
@@ -164,7 +164,7 @@ CONFIG_TMS320C6X_CACHES_ON=y
 CONFIG_PAGE_OFFSET=0x0C000000
 CONFIG_CONTIGUOUS_PAGE_ALLOC=y
 # CONFIG_PGCACHE_LIMIT is not set
-# CONFIG_IDLE_LED is not set
+CONFIG_IDLE_LED=y
 CONFIG_SELECT_MEMORY_MODEL=y
 CONFIG_FLATMEM_MANUAL=y
 # CONFIG_DISCONTIGMEM_MANUAL is not set
@@ -227,17 +227,10 @@ CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_CMDLINE_PARTS is not set
 # CONFIG_MTD_AR7_PARTS is not set
 
-##
+#
 # User Modules And Translation Layers
 #
 CONFIG_MTD_CHAR=y
-CONFIG_MTD_BLKDEVS=y
-CONFIG_MTD_BLOCK=y
-# CONFIG_FTL is not set
-# CONFIG_NFTL is not set
-# CONFIG_INFTL is not set
-# CONFIG_RFD_FTL is not set
-# CONFIG_SSFDC is not set
 # CONFIG_MTD_OOPS is not set
 
 #
@@ -389,7 +382,7 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 # CONFIG_TCG_TPM is not set
 CONFIG_I2C=y
 CONFIG_I2C_BOARDINFO=y
-CONFIG_I2C_COMPAT=y
+# CONFIG_I2C_COMPAT is not set
 # CONFIG_I2C_CHARDEV is not set
 CONFIG_I2C_HELPER_AUTO=y
 
@@ -502,14 +495,7 @@ CONFIG_SSB_POSSIBLE=y
 #
 # CONFIG_DISPLAY_SUPPORT is not set
 # CONFIG_SOUND is not set
-CONFIG_HID_SUPPORT=y
-CONFIG_HID=y
-# CONFIG_HIDRAW is not set
-# CONFIG_HID_PID is not set
-
-#
-# Special HID drivers
-#
+# CONFIG_HID_SUPPORT is not set
 # CONFIG_USB_SUPPORT is not set
 # CONFIG_MMC is not set
 # CONFIG_MEMSTICK is not set

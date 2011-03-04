@@ -57,6 +57,7 @@ static struct at24_platform_data at24_eeprom_data = {
 };
 
 static struct i2c_board_info evm_i2c_info[] = {
+	{ I2C_BOARD_INFO("FPGA", 0x40), },
 #ifdef CONFIG_EEPROM_AT24
 	{ I2C_BOARD_INFO("24c512", 0x57),
 	  .platform_data = &at24_eeprom_data,
@@ -69,6 +70,212 @@ static int __init board_setup_i2c(void)
 	return i2c_register_board_info(1, evm_i2c_info, ARRAY_SIZE(evm_i2c_info));
 }
 core_initcall(board_setup_i2c);
+
+/*
+ * FPGA support
+ */
+static struct workqueue_struct *fpga_wq         = NULL;
+static struct i2c_client       *fpga_i2c_client = NULL;
+
+static const struct i2c_device_id evm_fpga_ids[] = {
+	{ "FPGA", 1 },
+	{ }
+};
+
+static inline int fpga_i2c_write_reg(u8 reg, u8 data)
+{
+	struct i2c_client *client = fpga_i2c_client;
+	int ret;
+	u8 buf[] = { reg, data };
+	struct i2c_msg msg = {
+		.addr = client->addr, .flags = 0, .buf = buf, .len = 2
+	};
+
+	if (!client)
+		return -ENODEV;
+       
+
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret != 1)
+		printk(KERN_ERR "fpga_i2c_write_reg: error reg=0x%x, data=0x%x, ret=%i\n",
+		       reg, data, ret);
+
+	return (ret != 1) ? -EIO : 0;
+}
+
+static inline int fpga_i2c_read_reg(u8 reg, u8 *p_data)
+{
+	struct i2c_client *client = fpga_i2c_client;
+	int ret;
+	u8 b0[] = { reg };
+	u8 b1[] = { 0 };
+	struct i2c_msg msg[] = {
+		{
+			.addr = client->addr, .flags = 0,
+			.buf = b0, .len = 1
+		},
+		{
+			.addr = client->addr, .flags = I2C_M_RD,
+			.buf = b1, .len = 1
+		},
+	};
+
+	if (!client)
+		return -ENODEV;
+
+	ret = i2c_transfer(client->adapter, msg, 2);
+	if (ret != 2) {
+		printk(KERN_ERR "fpga_i2c_read_reg: error reg=0x%x, ret=%i\n",
+			reg, ret);
+		return -EIO;
+	}
+
+	*p_data = b1[0];
+
+	return 0;
+}
+
+static int __devinit evm_fpga_probe(struct i2c_client *client,
+				    const struct i2c_device_id *id)
+{
+	fpga_i2c_client = client;
+
+	return 0;
+}
+
+static struct i2c_driver evm_fpga_driver = {
+	.driver = {
+		.name = "FPGA",
+		.owner = THIS_MODULE,
+	},
+	.probe    = evm_fpga_probe,
+	.id_table = evm_fpga_ids,
+};
+
+/*
+ * LEDs management
+ */
+static struct work_struct leds_work;
+static u8                 evm_leds_state[3]    = { -1, -1, -1 };
+static u8                 evm_leds_started     = 0;
+static u8                 evm_leds_initialized = 0;
+
+static inline void evm_leds_set(unsigned int state, u8 reg, u8 shift)
+{
+	u8  val = 0;
+	int res;
+
+	res = fpga_i2c_read_reg(reg, &val);
+	if (res) {
+		return;
+	}
+
+	val &= ~(0x3 << shift);
+	val |= state << shift;
+
+	(void) fpga_i2c_write_reg(reg, val);
+}
+
+static void evm_leds_work(struct work_struct *work)
+{
+	if (unlikely(!evm_leds_initialized)) {
+		/* Override LEDs */
+		evm_leds_set(1, EVM_FPGA_LED_REG, EVM_FPGA_LEDO_S);
+
+		/* Set initial LED settings */
+		evm_leds_set(EVM_LED_YELLOW, EVM_FPGA_LED_REG, EVM_FPGA_LED1_S);
+		evm_leds_set(EVM_LED_YELLOW, EVM_FPGA_LED_REG, EVM_FPGA_LED2_S);
+		evm_leds_set(EVM_LED_GREEN,  EVM_FPGA_DSP_REG, EVM_FPGA_LED3_S);
+		
+		/* Intialization finished */
+		evm_leds_initialized = 1;
+
+	} else {
+		/* Set hw LEDs status */
+		if (evm_leds_state[0] != -1)
+			evm_leds_set(evm_leds_state[0], EVM_FPGA_LED_REG, EVM_FPGA_LED1_S);
+
+		if (evm_leds_state[1] != -1)
+			evm_leds_set(evm_leds_state[1], EVM_FPGA_LED_REG, EVM_FPGA_LED2_S);
+		
+		if (evm_leds_state[2] != -1)
+			evm_leds_set(evm_leds_state[2], EVM_FPGA_DSP_REG, EVM_FPGA_LED3_S);
+	}
+}
+
+#ifdef CONFIG_IDLE_LED
+#include <linux/timer.h>
+static struct timer_list leds_timer;
+
+/*
+ * Timer LED
+ */
+static void evm_leds_timer(unsigned long dummy) 
+{
+	static unsigned char leds = 0;
+
+	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+
+	leds = (~leds) & 1;
+	if (leds)
+		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_GREEN;
+	else
+		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_OFF;
+
+	if (likely(evm_leds_started))
+		queue_work(fpga_wq, &leds_work);
+}
+
+/*
+ * Idle LED blink
+ */
+void c6x_arch_idle_led(int state)
+{
+	if (state)
+		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_RED;
+	else
+		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_GREEN;
+
+	if (likely(evm_leds_started))
+		queue_work(fpga_wq, &leds_work);
+}
+
+#endif /* CONFIG_IDLE_LED */
+
+static int __init evm_init_leds(void)
+{
+	INIT_WORK(&leds_work, evm_leds_work);
+
+	/* LEDs can be used now  */
+	evm_leds_started = 1;
+
+#ifdef CONFIG_IDLE_LED
+	init_timer(&leds_timer);
+	leds_timer.function = evm_leds_timer;
+	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+#endif
+
+	return 0;
+}
+
+static int __init evm_init_fpga(void)
+{
+	int res;
+
+	fpga_wq = create_singlethread_workqueue("FPGA");
+	if (!fpga_wq) {
+		printk(KERN_ERR "FPGA: workqueue creation failed\n");
+		return -ESRCH;
+	}
+
+	res = i2c_add_driver(&evm_fpga_driver);
+	if (res < 0)
+		return res;
+
+	/* Initialize LEDs support */
+	return evm_init_leds();
+}
+device_initcall(evm_init_fpga);
 #endif /* CONFIG_I2C */
 
 #if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
@@ -165,7 +372,6 @@ static int __init evm_init_uart(void)
 
 	return platform_device_register(&serial8250_device);
 }
-
 core_initcall(evm_init_uart);
 #endif
 
