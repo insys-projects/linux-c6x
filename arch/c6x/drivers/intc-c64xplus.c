@@ -129,9 +129,8 @@ static struct c6x_irq_chip megamod_chips[] = {
 	MEGAMOD_CHIP(3),
 };
 
-//static
-struct irqaction combiner_actions[NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS];
-static char combiner_actions_name[20][NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS];
+static struct irqaction combiner_actions[NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS];
+static char combiner_actions_name[NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS][20];
 
 #if NR_SOC_COMBINERS > 0
 #define PRE_ACK(irq) IRQ_SOC_COMBINER_PRE_ACK(irq)
@@ -140,7 +139,7 @@ static char combiner_actions_name[20][NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS];
 #define PRE_ACK(irq) 1
 #endif
 
-//static 
+static 
 void handle_combined_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct combiner_handler_info *info = get_irq_desc_data(desc);
@@ -370,7 +369,7 @@ void __init init_intc_c64xplus(void)
 	/* initialize combiner actions based on the total amount of combiners  */
 	nr_combiners = NR_MEGAMOD_COMBINERS + NR_SOC_COMBINERS;
 	for (i = 0; i < nr_combiners; i++) {
-		combiner_actions[i].name = &combiner_actions_name[0][i];
+		combiner_actions[i].name = &combiner_actions_name[i][0];
 		sprintf((char *) combiner_actions[i].name,
 			"combined-%d-%d", i << 5, (i << 5) + 32 - 1);
 	}
