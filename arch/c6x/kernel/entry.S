@@ -1074,15 +1074,15 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_time
 	SYSCALL_ENTRY	sys_mknod
 	SYSCALL_ENTRY	sys_chmod
-	SYSCALL_ENTRY	sys_chown16
+	SYSCALL_ENTRY	sys_chown
 	SYSCALL_NI
 	SYSCALL_ENTRY	sys_newstat
 	SYSCALL_ENTRY	sys_lseek
 	SYSCALL_ENTRY	sys_getpid		; 20
 	SYSCALL_ENTRY	sys_mount
 	SYSCALL_ENTRY	sys_oldumount
-	SYSCALL_ENTRY	sys_setuid16
-	SYSCALL_ENTRY	sys_getuid16
+	SYSCALL_ENTRY	sys_setuid
+	SYSCALL_ENTRY	sys_getuid
 	SYSCALL_ENTRY	sys_stime
 	SYSCALL_ENTRY	sys_ptrace
 	SYSCALL_ENTRY	sys_alarm
@@ -1104,11 +1104,11 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_times
 	SYSCALL_NI
 	SYSCALL_ENTRY	sys_brk
-	SYSCALL_ENTRY	sys_setgid16
-	SYSCALL_ENTRY	sys_getgid16
+	SYSCALL_ENTRY	sys_setgid
+	SYSCALL_ENTRY	sys_getgid
 	SYSCALL_ENTRY	sys_signal
-	SYSCALL_ENTRY	sys_geteuid16
-	SYSCALL_ENTRY	sys_getegid16		; 50
+	SYSCALL_ENTRY	sys_geteuid
+	SYSCALL_ENTRY	sys_getegid		; 50
 	SYSCALL_ENTRY	sys_acct
 	SYSCALL_ENTRY	sys_umount
 	SYSCALL_NI
@@ -1128,8 +1128,8 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_sigaction
 	SYSCALL_ENTRY	sys_sgetmask
 	SYSCALL_ENTRY	sys_ssetmask
-	SYSCALL_ENTRY	sys_setreuid16		; 70
-	SYSCALL_ENTRY	sys_setregid16
+	SYSCALL_ENTRY	sys_setreuid		; 70
+	SYSCALL_ENTRY	sys_setregid
 	SYSCALL_LOCAL	sys_sigsuspend
 	SYSCALL_ENTRY	sys_sigpending
 	SYSCALL_ENTRY	sys_sethostname
@@ -1138,8 +1138,8 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_getrusage
 	SYSCALL_ENTRY	sys_gettimeofday
 	SYSCALL_ENTRY	sys_settimeofday
-	SYSCALL_ENTRY	sys_getgroups16		; 80
-	SYSCALL_ENTRY	sys_setgroups16
+	SYSCALL_ENTRY	sys_getgroups		; 80
+	SYSCALL_ENTRY	sys_setgroups
 	SYSCALL_ENTRY	old_select
 	SYSCALL_ENTRY	sys_symlink
 	SYSCALL_ENTRY	sys_newlstat
@@ -1153,7 +1153,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_truncate
 	SYSCALL_ENTRY	sys_ftruncate
 	SYSCALL_ENTRY	sys_fchmod
-	SYSCALL_ENTRY	sys_fchown16
+	SYSCALL_ENTRY	sys_fchown
 	SYSCALL_ENTRY	sys_getpriority
 	SYSCALL_ENTRY	sys_setpriority
 	SYSCALL_NI
@@ -1196,8 +1196,8 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_sysfs
 	SYSCALL_ENTRY	sys_personality
 	SYSCALL_NI
-	SYSCALL_ENTRY	sys_setfsuid16
-	SYSCALL_ENTRY	sys_setfsgid16
+	SYSCALL_ENTRY	sys_setfsuid
+	SYSCALL_ENTRY	sys_setfsgid
 	SYSCALL_ENTRY	sys_llseek		; 140
 	SYSCALL_ENTRY	sys_getdents
 	SYSCALL_ENTRY	sys_select
@@ -1222,14 +1222,14 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_sched_rr_get_interval
 	SYSCALL_ENTRY	sys_nanosleep
 	SYSCALL_NI
-	SYSCALL_ENTRY	sys_setresuid16
-	SYSCALL_ENTRY	sys_getresuid16
+	SYSCALL_ENTRY	sys_setresuid
+	SYSCALL_ENTRY	sys_getresuid
 	SYSCALL_ENTRY	sys_getpagesize
 	SYSCALL_NI
 	SYSCALL_ENTRY	sys_poll
 	SYSCALL_ENTRY	sys_nfsservctl
-	SYSCALL_ENTRY	sys_setresgid16		; 170
-	SYSCALL_ENTRY	sys_getresgid16
+	SYSCALL_ENTRY	sys_setresgid		; 170
+	SYSCALL_ENTRY	sys_getresgid
 	SYSCALL_ENTRY	sys_prctl
 	SYSCALL_LOCAL	sys_rt_sigreturn
 	SYSCALL_ENTRY	sys_rt_sigaction
@@ -1240,7 +1240,7 @@ _sys_call_table:
 	SYSCALL_LOCAL	sys_rt_sigsuspend
 	SYSCALL_LOCAL	sys_pread_c6x		; 180
 	SYSCALL_LOCAL	sys_pwrite_c6x
-	SYSCALL_ENTRY	sys_lchown16
+	SYSCALL_ENTRY	sys_lchown
 	SYSCALL_ENTRY	sys_getcwd
 	SYSCALL_ENTRY	sys_capget
 	SYSCALL_ENTRY	sys_capset
