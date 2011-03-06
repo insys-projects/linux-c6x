@@ -1076,7 +1076,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_chmod
 	SYSCALL_ENTRY	sys_chown16
 	SYSCALL_NI
-	SYSCALL_ENTRY	sys_stat
+	SYSCALL_ENTRY	sys_newstat
 	SYSCALL_ENTRY	sys_lseek
 	SYSCALL_ENTRY	sys_getpid		; 20
 	SYSCALL_ENTRY	sys_mount
@@ -1086,7 +1086,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_stime
 	SYSCALL_ENTRY	sys_ptrace
 	SYSCALL_ENTRY	sys_alarm
-	SYSCALL_ENTRY	sys_fstat
+	SYSCALL_ENTRY	sys_newfstat
 	SYSCALL_ENTRY	sys_pause
 	SYSCALL_ENTRY	sys_utime		; 30
 	SYSCALL_NI
@@ -1142,7 +1142,7 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_setgroups16
 	SYSCALL_ENTRY	old_select
 	SYSCALL_ENTRY	sys_symlink
-	SYSCALL_ENTRY	sys_lstat
+	SYSCALL_ENTRY	sys_newlstat
 	SYSCALL_ENTRY	sys_readlink
 	SYSCALL_ENTRY	sys_uselib
 	SYSCALL_ENTRY	sys_swapon
