@@ -35,7 +35,12 @@
 /*
  * We want 8-byte alignment for the slab caches.
  */
-#define ARCH_SLAB_MINALIGN 8
+#define ARCH_SLAB_MINALIGN    8
+
+/*
+ * Current C6x architecture does not support hw cache coherency
+ */
+#define arch_is_coherent()    0
 
 /*
  * Align a physical address to MAR regions

@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <aurelien.jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -84,6 +84,16 @@ static inline void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int 
 static inline int dma_get_cache_alignment(void)
 {
 	return L2_CACHE_BYTES;
+}
+
+extern int __dma_is_coherent(struct device *dev, dma_addr_t handle);
+
+static inline int dma_is_consistent(struct device *dev, dma_addr_t handle)
+{
+	if (arch_is_coherent() || __dma_is_coherent(dev, handle))
+		return 1;
+	else
+		return 0;
 }
 
 /*
@@ -199,8 +209,9 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
  * After this call, reads by the CPU to the buffer are guaranteed to see
  * whatever the device wrote there.
  */
-static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
-		size_t size, enum dma_data_direction dir)
+static inline void
+dma_unmap_single(struct device *dev, dma_addr_t handle,
+		 size_t size, enum dma_data_direction dir)
 {
 	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
 }

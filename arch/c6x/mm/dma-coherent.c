@@ -42,10 +42,57 @@
 unsigned long dma_memory_start = 0; /* by default at the end of the Linux physical memory */
 unsigned long dma_memory_size  = 0; /* none by default */
 
-static u32    dma_page_heap;
-static u32    dma_page_top;
+static u32    dma_page_heap = 0;
+static u32    dma_page_top  = 0;
 
 DEFINE_SPINLOCK(dma_mem_lock);
+
+/*
+ * Return a DMA coherent and contiguous memory chunk from the DMA memory
+ */
+static inline u32 __dma_alloc_coherent(size_t size, gfp_t gfp)
+{
+	u32 paddr;
+		
+	if ((dma_page_heap + size) > dma_page_top)
+		return -1;
+
+	paddr          = dma_page_heap;
+	dma_page_heap += size;
+
+	return paddr;
+}
+
+/*
+ * Return a standard contigous memory chunk
+ */
+static inline u32 __dma_alloc_coherent_stdmem(size_t size, gfp_t gfp)
+{
+	void *virt;
+#ifndef CONFIG_CONTIGUOUS_PAGE_ALLOC
+	struct page *page;
+	unsigned long order;
+#endif
+
+#ifdef CONFIG_CONTIGUOUS_PAGE_ALLOC
+	virt = kmalloc(size, gfp);
+	if (!virt)
+		return -1;
+#else
+	order = get_order(size);
+
+	page = alloc_pages(gfp, order);
+	if (!page)
+		return -1;
+
+	/*
+	 * We could do with a page_to_phys and page_to_bus here.
+	 */
+	virt = page_address(page);
+#endif
+
+	return virt_to_phys(virt);
+}
 
 /*
  * Allocate DMA-coherent memory space and return both the kernel remapped
@@ -59,23 +106,28 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
 	u32 paddr;
 	u32 virt;
 
+	if (in_interrupt())
+		BUG();
+
 	/* Round up to a page */
 	size = PAGE_ALIGN(size);
 
 	spin_lock_irq(&dma_mem_lock);
-	
-	if ((dma_page_heap + size) > dma_page_top) {
-		spin_unlock_irq(&dma_mem_lock);
-		goto no_page;
-	}
-	
-	paddr          = dma_page_heap;
-	dma_page_heap += size;
+
+	/* Check if we have a DMA memory */
+	if (dma_page_heap)
+		paddr = __dma_alloc_coherent(size, gfp);
+	else
+		/* Otherwise do an allocation using standard allocator */
+		paddr =__dma_alloc_coherent_stdmem(size, gfp);
 	
 	spin_unlock_irq(&dma_mem_lock);
 
+	if (paddr == -1)
+		return NULL;
+
 	if (handle)
-		*handle = paddr;
+		*handle = __phys_to_bus(paddr);
 
 	/*
 	 * In a near future we can expect having a partial MMU with 
@@ -83,7 +135,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
 	 */
 	virt = (u32) ioremap_nocache(paddr, size);
 	if (!virt)
-		goto no_remap;
+		return NULL;
 
 	/*
 	 * We need to ensure that there are no cachelines in use, or
@@ -92,31 +144,91 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
 	L2_cache_block_invalidate(paddr, paddr + size);
 
 	return (void *) virt;
-
-no_remap:
-
-no_page:
-	return NULL;
 }
 EXPORT_SYMBOL(dma_alloc_coherent);
+
+/*
+ * Free a DMA coherent and contiguous memory chunk from the DMA memory
+ */
+static inline void __dma_free_coherent(size_t size, dma_addr_t dma_handle)
+{
+	/* Do nothing (we do not have real memory alloctor here) */
+	return;
+}
+
+/*
+ * Free a standard contigous memory chunk
+ */ 
+static inline void __dma_free_coherent_stdmem(size_t size, dma_addr_t dma_handle)
+{
+#ifndef CONFIG_CONTIGUOUS_PAGE_ALLOC
+	struct page *page, *end;
+#endif
+	void *virt = bus_to_virt(dma_handle);
+
+#ifdef CONFIG_CONTIGUOUS_PAGE_ALLOC
+	kfree(virt);
+#else
+	/*
+	 * More messing around with the MM internals. This is
+	 * sick, but then so is remap_page_range().
+	 */
+	size = PAGE_ALIGN(size);
+	page = virt_to_page(virt);
+	end  = page + (size >> PAGE_SHIFT);
+
+	for (; page < end; page++) {
+		ClearPageReserved(page);
+		__free_page(page);
+	}
+#endif
+
+	return;
+}
 
 /*
  * Free a page as defined by the above mapping.
  * Must not be called with IRQs disabled.
  */
-void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr_t handle)
+void
+dma_free_coherent(struct device *dev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
-	void *virt;
-
 	if (in_interrupt())
 		BUG();
 	
-	/* Do nothing */
-	virt = bus_to_virt(handle);
-	
-	iounmap(cpu_addr);
+	/* Check if we have a DMA memory */
+	if (dma_page_heap)
+		__dma_free_coherent(size, dma_handle);
+	else
+		/* Otherwise use standard allocator */
+		__dma_free_coherent_stdmem(size, dma_handle);
+
+	iounmap(vaddr);
 }
 EXPORT_SYMBOL(dma_free_coherent);
+
+int
+__dma_is_coherent(struct device *dev, dma_addr_t handle)
+{
+	u32 paddr;
+
+	/* If we do not have DMA memory */
+	if (!dma_page_heap)
+		return 0;
+
+	paddr = __bus_to_phys(handle);
+
+	/* 
+	 * If the address is in the DMA memory range, the memory
+	 * is coherent.
+	 */
+	if ((paddr >= dma_memory_start) && 
+	    (paddr < dma_page_top))
+		return 1;
+
+	return 0;
+}
+EXPORT_SYMBOL(__dma_is_coherent);
 
 /*
  * Make an area consistent for devices.
