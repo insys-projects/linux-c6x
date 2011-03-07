@@ -20,3 +20,5 @@ obj-$(CONFIG_EDMA3)            += edma.o
 
 obj-$(CONFIG_MCBSP)            += mcbsp.o
 obj-$(CONFIG_MCBSP_UART)       += mcbsp-uart.o
+
+obj-$(CONFIG_IPC)              += ipc/

@@ -38,6 +38,7 @@ extern void free_initmem(void);
 #ifdef CONFIG_PGCACHE_LIMIT
 extern unsigned long pgcache_limit;
 #endif
+
 /*
  * BAD_PAGE is the page that is used for page faults when linux
  * is out-of-memory. Older versions of linux just did a
@@ -55,12 +56,6 @@ static unsigned long empty_bad_page_table;
 static unsigned long empty_bad_page;
 unsigned long empty_zero_page;
 unsigned long rom_length;
-
-/*
- * DMA zone management, can be redefined using the memdma= kernel command line
- */
-unsigned long zone_dma_start = 0; /* at the end of the physical memory */
-unsigned long zone_dma_size  = 0; /* none by default */
 
 void show_mem(void)
 {
@@ -97,7 +92,7 @@ void paging_init(void)
 	unsigned long zones_size[MAX_NR_ZONES] = {0, };
 
 	/*
-	 * initialize the bad page table and bad page to point
+	 * Initialize the bad page table and bad page to point
 	 * to a couple of allocated pages
 	 */
 	empty_bad_page_table = (unsigned long) alloc_bootmem_pages(PAGE_SIZE);
@@ -111,36 +106,10 @@ void paging_init(void)
 	set_fs(KERNEL_DS);
 
 	/*
-	 * Define the DMA and non-DMA zones
+	 * Define zones
 	 */
-	if (zone_dma_size != 0) {
-		zone_dma_start = zone_dma_start ? zone_dma_start :
-			(memory_end - zone_dma_size) & ~(IMCR_MAR_SIZE - 1);
-
-		zone_dma_size  = (memory_end - zone_dma_start);
-		printk(KERN_INFO "Zone DMA start=0x%x size=0x%x\n", 
-		       (unsigned int) zone_dma_start,
-		       (unsigned int) zone_dma_size);
-		
-		disable_caching((unsigned int *) zone_dma_start,
-				(unsigned int *) (zone_dma_start + 
-						  (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
-						   & ~(IMCR_MAR_SIZE - 1))) - 1);
-		
-		printk(KERN_INFO "disabling caching for 0x%x to 0x%x\n",
-		       (unsigned int) zone_dma_start,
-		       (unsigned int) (zone_dma_start + (((zone_dma_size) + IMCR_MAR_SIZE - 1) 
-							 & ~(IMCR_MAR_SIZE - 1)) - 1));
-		       }
-
-	zones_size[ZONE_DMA]     = zone_dma_size >> PAGE_SHIFT;
-	zones_size[ZONE_NORMAL]  = 
-		(memory_end - PAGE_OFFSET - zone_dma_size) >> PAGE_SHIFT;
-
-	pgdat->node_zones[ZONE_DMA].zone_start_pfn =
-		zone_dma_start >> PAGE_SHIFT;
-	pgdat->node_zones[ZONE_NORMAL].zone_start_pfn = 
-		__pa(PAGE_OFFSET) >> PAGE_SHIFT;
+	zones_size[ZONE_NORMAL] = (memory_end - PAGE_OFFSET) >> PAGE_SHIFT;
+	pgdat->node_zones[ZONE_NORMAL].zone_start_pfn = __pa(PAGE_OFFSET) >> PAGE_SHIFT;
 
 	free_area_init(zones_size);
 }

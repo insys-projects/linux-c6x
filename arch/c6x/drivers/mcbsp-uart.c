@@ -311,7 +311,7 @@ static inline void mcbsp_write(unsigned int id, const char* buf, unsigned int si
 		
 		length = len * MCBSP_TX_BITS_PER_CHAR;
 		
-		init_completion(&(mcbsp_ptr[id]->tx_dma_completion));
+		INIT_COMPLETION(mcbsp_ptr[id]->tx_dma_completion);
 
 		edma_write_slot(mcbsp_ptr[id]->dma_tx_lch, &dma_tx_params[id]);
 		edma_set_transfer_params(mcbsp_ptr[id]->dma_tx_lch, 4,
