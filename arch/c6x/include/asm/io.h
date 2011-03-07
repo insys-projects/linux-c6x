@@ -72,6 +72,14 @@ static inline void put_user_byte_io(char val,volatile char *addr)
 #define iowrite16(v, addr)	writew((v), (addr))
 #define iowrite32(v, addr)	writel((v), (addr))
 
+#define ioread8_rep(p,d,c)      __raw_readsb(p,d,c)
+#define ioread16_rep(p,d,c)     __raw_readsw(p,d,c)
+#define ioread32_rep(p,d,c)     __raw_readsl(p,d,c)
+
+#define iowrite8_rep(p,s,c)     __raw_writesb(p,s,c)
+#define iowrite16_rep(p,s,c)    __raw_writesw(p,s,c)
+#define iowrite32_rep(p,s,c)    __raw_writesl(p,s,c)
+
 #define IO_SPACE_LIMIT 0xffffffff
 
 /* Values for nocacheflag and cmode */
