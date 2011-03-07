@@ -24,6 +24,7 @@ struct sgmii_config_s {
 
 extern int sgmii_reset(void);
 extern int sgmii_config(struct sgmii_config_s *);
+extern int c66x_sgmii_config(int port, struct sgmii_config_s *);
 
 #ifdef __KERNEL__
 #include <asm/hardware.h>
