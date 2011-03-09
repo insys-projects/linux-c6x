@@ -1,9 +1,9 @@
 /*
- *  linux/arch/c6x/drivers/ipc/ipc-tci648x.c
+ *  linux/arch/c6x/drivers/ipc/ipc-int.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -42,7 +42,7 @@ static spinlock_t      ipc_lock;
 /*
  * Request an inter-core interrupt rx handler
  */
-static int tci648x_ipc_request(void (*handler)(u32, void*),
+static int ipc_int_request(void (*handler)(u32, void*),
 			       u32 iflags,
 			       u32 ipc_num,
 			       void *data)
@@ -69,7 +69,7 @@ static int tci648x_ipc_request(void (*handler)(u32, void*),
 /*
  * Free an inter-core interrupt rx handler
  */
-static int tci648x_ipc_free(u32 ipc_num)
+static int ipc_int_free(u32 ipc_num)
 {
 	unsigned long flags;
 
@@ -90,7 +90,7 @@ static int tci648x_ipc_free(u32 ipc_num)
 /*
  * Trigger an inter-core interrupt to a given core
  */
-static int tci648x_ipc_send(int core_id, int ipc_num)
+static int ipc_int_send(int core_id, int ipc_num)
 {
 	volatile u32 *reg_ipcgr;
 
@@ -110,7 +110,7 @@ static int tci648x_ipc_send(int core_id, int ipc_num)
 /*
  * Wait a given inter-core interrupt
  */
-static int tci648x_ipc_wait(int ipc_num)
+static int ipc_int_wait(int ipc_num)
 {
 	unsigned long flags;
 
@@ -140,7 +140,7 @@ static int tci648x_ipc_wait(int ipc_num)
 /*
  * Handle the receive of an inter-core interrupt
  */
-static irqreturn_t tci648x_ipc_rx_interrupt(int irq, void * dummy)
+static irqreturn_t ipc_int_rx_interrupt(int irq, void * dummy)
 {
 	volatile u32 *reg_ipcgr = ((u32 *) IPCGR_BASE) + get_coreid();
 	volatile u32 *reg_ipcar = ((u32 *) IPCAR_BASE) + get_coreid();
@@ -172,7 +172,7 @@ static irqreturn_t tci648x_ipc_rx_interrupt(int irq, void * dummy)
 	return IRQ_HANDLED;
 }
 
-static int __init tci648x_ipc_init(void)
+static int __init ipc_int_init(void)
 {
 	int res;
 	int i;
@@ -186,7 +186,7 @@ static int __init tci648x_ipc_init(void)
 	}
 
 	res = request_irq(IRQ_IPCLOCAL,
-			  tci648x_ipc_rx_interrupt,
+			  ipc_int_rx_interrupt,
 			  IRQF_DISABLED,
 			  "IPC",
 			  NULL);
@@ -194,12 +194,12 @@ static int __init tci648x_ipc_init(void)
 		return res;
 
 	/* Set our IPC interrupt methods */
-	ipc_core->ipc_request = tci648x_ipc_request;
-	ipc_core->ipc_free    = tci648x_ipc_free;
-	ipc_core->ipc_send    = tci648x_ipc_send;
-	ipc_core->ipc_wait    = tci648x_ipc_wait;
+	ipc_core->ipc_request = ipc_int_request;
+	ipc_core->ipc_free    = ipc_int_free;
+	ipc_core->ipc_send    = ipc_int_send;
+	ipc_core->ipc_wait    = ipc_int_wait;
 
 	return 0;
 }
 
-module_init(tci648x_ipc_init);
+module_init(ipc_int_init);
