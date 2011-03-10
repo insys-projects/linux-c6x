@@ -339,11 +339,16 @@ setup_dma_interrupt(unsigned lch,
 
 static int irq2ctlr(int irq)
 {
-	if (irq >= edma_cc[0]->irq_res_start && irq <= edma_cc[0]->irq_res_end)
-		return 0;
-	else if (irq >= edma_cc[1]->irq_res_start &&
-		irq <= edma_cc[1]->irq_res_end)
-		return 1;
+	int ctlr;
+
+	for (ctlr = 0; ctlr < arch_num_cc; ctlr++) {
+		/*
+		 * irq_res_end is used for the error irq (CCERRINT)
+		 */
+		if ((irq == edma_cc[ctlr]->irq_res_start)
+		    || (irq == edma_cc[ctlr]->irq_res_end))
+			return ctlr;
+	}
 
 	return -1;
 }
@@ -666,7 +671,7 @@ int edma_alloc_channel(int channel,
 		/*
 		 * Scan all the platform devices to find out the EDMA channels
 		 * used and clear them in the unused list, making the rest
-		 * available for ARM usage.
+		 * available for core usage.
 		 */
 		ret = bus_for_each_dev(&platform_bus_type, NULL, NULL,
 				prepare_unused_channel_list);
@@ -1498,7 +1503,7 @@ static int __init edma_probe(struct platform_device *pdev)
 	for (j = 0; j < EDMA_MAX_CC; j++) {
 		sprintf(res_name, "edma_cc%d", j);
 		r[j] = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-						res_name);
+						    res_name);
 		if (!r[j] || !info[j]) {
 			if (found)
 				break;
@@ -1532,11 +1537,11 @@ static int __init edma_probe(struct platform_device *pdev)
 		memset(edma_cc[j], 0, sizeof(struct edma));
 
 		edma_cc[j]->num_channels = min_t(unsigned, info[j]->n_channel,
-							EDMA_MAX_DMACH);
+						 EDMA_MAX_DMACH);
 		edma_cc[j]->num_slots = min_t(unsigned, info[j]->n_slot,
-							EDMA_MAX_PARAMENTRY);
+					      EDMA_MAX_PARAMENTRY);
 		edma_cc[j]->num_cc = min_t(unsigned, info[j]->n_cc,
-							EDMA_MAX_CC);
+					   EDMA_MAX_CC);
 
 		edma_cc[j]->default_queue = info[j]->default_queue;
 		if (!edma_cc[j]->default_queue)
