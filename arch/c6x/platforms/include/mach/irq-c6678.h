@@ -119,10 +119,10 @@
 #define IRQ_CPINTC0_START    128
 #define IRQ_TPCC1ERRINT      (IRQ_CPINTC0_START)      /* TPCC1 error */
 #define IRQ_TPCC1MPINT       (IRQ_CPINTC0_START + 1)  /* TPCC1 mem protect */
-#define IRQ_TPCC1ERRINT0     (IRQ_CPINTC0_START + 2)  /* TPCC1 TPTC0 error */
-#define IRQ_TPCC1ERRINT1     (IRQ_CPINTC0_START + 3)  /* TPCC1 TPTC1 error */
-#define IRQ_TPCC1ERRINT2     (IRQ_CPINTC0_START + 4)  /* TPCC1 TPTC2 error */
-#define IRQ_TPCC1ERRINT3     (IRQ_CPINTC0_START + 5)  /* TPCC1 TPTC3 error */
+#define IRQ_TPTC1ERRINT0     (IRQ_CPINTC0_START + 2)  /* TPCC1 TPTC0 error */
+#define IRQ_TPTC1ERRINT1     (IRQ_CPINTC0_START + 3)  /* TPCC1 TPTC1 error */
+#define IRQ_TPTC1ERRINT2     (IRQ_CPINTC0_START + 4)  /* TPCC1 TPTC2 error */
+#define IRQ_TPTC1ERRINT3     (IRQ_CPINTC0_START + 5)  /* TPCC1 TPTC3 error */
 #define IRQ_TPCC1GINT        (IRQ_CPINTC0_START + 6)  /* TPCC1 GINT */
 #define IRQ_TPCC1INT0        (IRQ_CPINTC0_START + 8)  /* TPCC1 completion interrupts */
 #define IRQ_TPCC1INT1        (IRQ_CPINTC0_START + 9)
@@ -134,10 +134,10 @@
 #define IRQ_TPCC1INT7        (IRQ_CPINTC0_START + 15)
 #define IRQ_TPCC2ERRINT      (IRQ_CPINTC0_START + 16)  /* TPCC2 error */
 #define IRQ_TPCC2MPINT       (IRQ_CPINTC0_START + 17)  /* TPCC2 mem protect */
-#define IRQ_TPCC2ERRINT0     (IRQ_CPINTC0_START + 18)  /* TPCC2 TPTC0 error */
-#define IRQ_TPCC2ERRINT1     (IRQ_CPINTC0_START + 19)  /* TPCC2 TPTC1 error */
-#define IRQ_TPCC2ERRINT2     (IRQ_CPINTC0_START + 20)  /* TPCC2 TPTC2 error */
-#define IRQ_TPCC2ERRINT3     (IRQ_CPINTC0_START + 21)  /* TPCC2 TPTC3 error */
+#define IRQ_TPTC2ERRINT0     (IRQ_CPINTC0_START + 18)  /* TPCC2 TPTC0 error */
+#define IRQ_TPTC2ERRINT1     (IRQ_CPINTC0_START + 19)  /* TPCC2 TPTC1 error */
+#define IRQ_TPTC2ERRINT2     (IRQ_CPINTC0_START + 20)  /* TPCC2 TPTC2 error */
+#define IRQ_TPTC2ERRINT3     (IRQ_CPINTC0_START + 21)  /* TPCC2 TPTC3 error */
 #define IRQ_TPCC2GINT        (IRQ_CPINTC0_START + 22)  /* TPCC2 GINT */
 #define IRQ_TPCC2INT0        (IRQ_CPINTC0_START + 24)  /* TPCC2 completion interrupts */
 #define IRQ_TPCC2INT1        (IRQ_CPINTC0_START + 25)
@@ -149,8 +149,8 @@
 #define IRQ_TPCC2INT7        (IRQ_CPINTC0_START + 31)
 #define IRQ_TPCC0ERRINT      (IRQ_CPINTC0_START + 32)  /* TPCC0 error */
 #define IRQ_TPCC0MPINT       (IRQ_CPINTC0_START + 33)  /* TPCC0 mem protect */
-#define IRQ_TPCC0ERRINT0     (IRQ_CPINTC0_START + 34)  /* TPCC0 TPTC0 error */
-#define IRQ_TPCC0ERRINT1     (IRQ_CPINTC0_START + 35)  /* TPCC0 TPTC1 error */
+#define IRQ_TPTC0ERRINT0     (IRQ_CPINTC0_START + 34)  /* TPCC0 TPTC0 error */
+#define IRQ_TPTC0ERRINT1     (IRQ_CPINTC0_START + 35)  /* TPCC0 TPTC1 error */
 #define IRQ_TPCC0GINT        (IRQ_CPINTC0_START + 36)  /* TPCC0 GINT */
 #define IRQ_TPCC0INT0        (IRQ_CPINTC0_START + 38)  /* TPCC0 completion interrupts */
 #define IRQ_TPCC0INT1        (IRQ_CPINTC0_START + 39)

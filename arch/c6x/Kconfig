@@ -151,9 +151,6 @@ config C66X_USE_MSM
 config GPIO_C6X
 	bool
 
-config EDMA3
-	bool
-
 source "arch/c6x/platforms/Kconfig"
 
 config USE_RT_TIMER
@@ -177,6 +174,10 @@ config TMS320C64X_GEMAC_1
 	bool "Second Ethernet interface"
 	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
 	default n
+
+config EDMA3
+       bool "EDMA3 support"
+       default y
 
 config MCBSP
 	bool "McBSP support"

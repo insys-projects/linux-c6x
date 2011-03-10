@@ -27,10 +27,6 @@
 #include <linux/clk.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
-#include <linux/mtd/mtd.h>
-#include <linux/mtd/map.h>
-#include <linux/mtd/partitions.h>
-#include <linux/mtd/nand-gpio-c6x.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -50,12 +46,246 @@ static struct clk_lookup evm_clks[] = {
 	CLK("", NULL, NULL)
 };
 
+
+#ifdef CONFIG_EDMA3
+#include <asm/edma.h>
+
+static const s8
+queue_tc_mapping0[][2] = {
+	/* {event queue no, TC no} */
+	{0, 0},
+	{1, 1},
+	{-1, -1},
+};
+
+static const s8
+queue_priority_mapping0[][2] = {
+	/* {event queue no, Priority} */
+	{0, 0},
+	{1, 1},
+	{-1, -1},
+};
+
+static const s8
+queue_tc_mapping1[][2] = {
+	/* {event queue no, TC no} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static const s8
+queue_priority_mapping1[][2] = {
+	/* {event queue no, Priority} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static const s8
+queue_tc_mapping2[][2] = {
+	/* {event queue no, TC no} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static const s8
+queue_priority_mapping2[][2] = {
+	/* {event queue no, Priority} */
+	{0, 0},
+	{1, 1},
+	{2, 2},
+	{3, 3},
+	{-1, -1},
+};
+
+static struct edma_soc_info edma_cc0_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA0_NUM_PARAMENTRY,
+	.n_tc			= EDMA0_NUM_EVQUE,
+	.n_cc			= 3,
+	.queue_tc_mapping	= queue_tc_mapping0,
+	.queue_priority_mapping	= queue_priority_mapping0,
+};
+
+static struct edma_soc_info edma_cc1_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA1_NUM_PARAMENTRY,
+	.n_tc			= EDMA1_NUM_EVQUE,
+	.n_cc			= 3,
+	.queue_tc_mapping	= queue_tc_mapping1,
+	.queue_priority_mapping	= queue_priority_mapping1,
+};
+
+static struct edma_soc_info edma_cc2_info = {
+	.n_channel		= EDMA_NUM_DMACH,
+	.n_region		= EDMA_NUM_REGIONS,
+	.n_slot			= EDMA2_NUM_PARAMENTRY,
+	.n_tc			= EDMA2_NUM_EVQUE,
+	.n_cc			= 3,
+	.queue_tc_mapping	= queue_tc_mapping2,
+	.queue_priority_mapping	= queue_priority_mapping2,
+};
+
+static struct edma_soc_info *edma_info[] = {
+	&edma_cc0_info,
+	&edma_cc1_info,
+	&edma_cc2_info,
+};
+
+static struct resource edma_resources[] = {
+	{
+		.name	= "edma0",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma1",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma2",
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma0_err",
+		.start	= EDMA0_IRQ_CCERRINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma1_err",
+		.start	= EDMA1_IRQ_CCERRINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma2_err",
+		.start	= EDMA2_IRQ_CCERRINT,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "edma_cc0",
+		.start	= EDMA0_REGISTER_BASE,
+		.end	= EDMA0_REGISTER_BASE + 0x7fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_cc1",
+		.start	= EDMA1_REGISTER_BASE,
+		.end	= EDMA1_REGISTER_BASE + 0x7fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma_cc2",
+		.start	= EDMA2_REGISTER_BASE,
+		.end	= EDMA2_REGISTER_BASE + 0x7fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma0_tc0",
+		.start	= EDMA0_TC0_BASE,
+		.end	= EDMA0_TC0_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma0_tc1",
+		.start	= EDMA0_TC1_BASE,
+		.end	= EDMA0_TC1_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma1_tc0",
+		.start	= EDMA1_TC0_BASE,
+		.end	= EDMA1_TC0_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma1_tc1",
+		.start	= EDMA1_TC1_BASE,
+		.end	= EDMA1_TC1_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma1_tc2",
+		.start	= EDMA1_TC2_BASE,
+		.end	= EDMA1_TC2_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma1_tc3",
+		.start	= EDMA1_TC3_BASE,
+		.end	= EDMA1_TC3_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma2_tc0",
+		.start	= EDMA2_TC0_BASE,
+		.end	= EDMA2_TC0_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma2_tc1",
+		.start	= EDMA2_TC1_BASE,
+		.end	= EDMA2_TC1_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma2_tc2",
+		.start	= EDMA2_TC2_BASE,
+		.end	= EDMA2_TC2_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "edma2_tc3",
+		.start	= EDMA2_TC3_BASE,
+		.end	= EDMA2_TC3_BASE + 0x03ff,
+		.flags	= IORESOURCE_MEM,
+	},
+	/* not using TC*_ERR */
+};
+
+static struct platform_device edma_device = {
+	.name			= "edma",
+	.id			= 0,
+	.dev.platform_data	= edma_info,
+	.num_resources		= ARRAY_SIZE(edma_resources),
+	.resource		= edma_resources,
+};
+
+static int __init evm_init_edma(void)
+{
+	int status;
+
+	/* This is based on coreid, so must be calculated at runtime */
+	edma_resources[0].start = EDMA0_IRQ_CCINT;
+	edma_resources[1].start = EDMA1_IRQ_CCINT;
+	edma_resources[2].start = EDMA2_IRQ_CCINT;
+
+	status = platform_device_register(&edma_device);
+	if (status != 0)
+		pr_debug("setup_edma --> %d\n", status);
+
+	return status;
+
+}
+arch_initcall(evm_init_edma);
+#endif /* CONFIG_EDMA3 */
+
 #ifdef CONFIG_I2C
+#ifdef CONFIG_EEPROM_AT24
 static struct at24_platform_data at24_eeprom_data = {
 	.byte_len	= 1024 * 1024 / 8,
 	.page_size	= 256,
 	.flags		= AT24_FLAG_ADDR16,
 };
+#endif
 
 static struct i2c_board_info evm_i2c_info[] = {
 #ifdef CONFIG_EEPROM_AT24
@@ -73,6 +303,10 @@ core_initcall(board_setup_i2c);
 #endif /* CONFIG_I2C */
 
 #if defined(CONFIG_MTD_NAND_GPIO_C6X) || defined(CONFIG_MTD_NAND_GPIO_C6X_MODULE)
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/nand-gpio-c6x.h>
 static struct mtd_partition evm_nand_parts[] = {
 	{
 		.name		= "bootloader",
