@@ -161,6 +161,10 @@ config SGMII
 	bool "Ethernet SGMII support"
 	default n
 
+config SGMII_C66X
+	bool "Ethernet SGMII support for C66x"
+	depends on TMS320C66X
+
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
 	default n
