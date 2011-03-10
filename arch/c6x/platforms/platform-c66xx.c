@@ -114,13 +114,13 @@ static void init_pll(void)
 	/* Set PLL multiplier * 2 in PLLM */
 	pll1_set_reg(PLLM, PLLM_VAL(PLL_MUL*2));
 
-	/* program Main PLL BWADJ field */
-	val  = dscr_get_reg(DSCR_MAINPLLCTL0);
-	val |= (((PLL_MUL + 1)/2  - 1) << 24) & 0xff000000;
+	/* Program main PLL BWADJ field */
+	val = dscr_get_reg(DSCR_MAINPLLCTL0);
+	val = (((PLL_MUL + 1)/2  - 1) << 24) & 0xff000000;
 	dscr_set_reg(DSCR_MAINPLLCTL0, val);
 
 	/*
-	 * This can't be right. There is no previder here...
+	 * This can't be right. There is no predivider here...
 	 * pll1_set_reg(PLLPREDIV, PLLPREDIV_VAL(10) | PLLPREDIV_EN);
 	 */
 	pll1_wait_gostat();
