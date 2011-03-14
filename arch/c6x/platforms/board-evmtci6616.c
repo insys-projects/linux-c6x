@@ -276,6 +276,84 @@ static int __init evm_init_edma(void)
 arch_initcall(evm_init_edma);
 #endif /* CONFIG_EDMA3 */
 
+#ifdef CONFIG_SPI
+#include <linux/spi/spi.h>
+#include <linux/spi/eeprom.h>
+#include <mach/spi.h>
+
+static struct spi_eeprom at25640b = {
+	.byte_len	= 0x10000 / 8, /* 64Kbit 20Mhz EEPROM */
+	.name		= "AT25640B",
+	.page_size	= 32,
+	.flags		= EE_ADDR2,    /* 16bit address */
+};
+
+static struct spi_board_info evm_spi_info[] __initconst = {
+	{
+		.modalias	= "at25",
+		.platform_data	= &at25640b,
+		.max_speed_hz	= 10 * 1000 * 1000,	/* 10 MHz at 3v3 */
+		.bus_num	= 0,
+		.chip_select	= 0,
+		.mode		= SPI_MODE_0,
+	},
+};
+
+static struct resource evm_spi0_resources[] = {
+	{
+		.start = SPI_REGISTER_BASE,
+		.end   = SPI_REGISTER_END,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = IRQ_SPIINT0,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = EDMA_CTLR_CHAN(EDMA1_CTLR, DMA1_SPI_RX), /* Rx event */
+		.flags = IORESOURCE_DMA,
+	},
+	{
+		.start = EDMA_CTLR_CHAN(EDMA1_CTLR, DMA1_SPI_TX), /* Tx event */
+		.flags = IORESOURCE_DMA,
+	},
+	{
+		.start = EVENTQ_1,
+		.flags = IORESOURCE_DMA,
+	},
+};
+
+static struct davinci_spi_platform_data evm_spi0_pdata = {
+	.version 	= SPI_VERSION_1,
+	.num_chipselect = 1,
+	.clk_internal	= 1,
+	.cs_hold	= 1,
+	.intr_level	= 0,
+	.poll_mode	= 1, /* 0 -> interrupt mode, 1-> polling mode */
+	.c2tdelay	= 0,
+	.t2cdelay	= 0,
+	.use_dma        = 0, /* do not use EDMA */
+};
+
+static struct platform_device evm_spi0_device = {
+	.name = "spi_davinci",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &evm_spi0_pdata,
+	},
+	.num_resources = ARRAY_SIZE(evm_spi0_resources),
+	.resource      = evm_spi0_resources,
+};
+
+static int __init board_setup_spi(void)
+{
+	platform_device_register(&evm_spi0_device);
+
+	return spi_register_board_info(evm_spi_info, ARRAY_SIZE(evm_spi_info));
+}
+core_initcall(board_setup_spi);
+#endif /* CONFIG_SPI */
+
 #ifdef CONFIG_I2C
 #ifdef CONFIG_EEPROM_AT24
 static struct at24_platform_data at24_eeprom_data = {
