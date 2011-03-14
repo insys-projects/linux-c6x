@@ -180,8 +180,8 @@ config TMS320C64X_GEMAC_1
 	default n
 
 config EDMA3
-       bool "EDMA3 support"
-       default y
+	bool "EDMA3 support"
+	default y
 
 config MCBSP
 	bool "McBSP support"
@@ -229,6 +229,22 @@ config RAPIDIO
 
 if RAPIDIO_TCI648X
 source "drivers/rapidio/Kconfig"
+endif
+
+config IPC
+	bool "Inter Processor Communication low-level driver"
+	default y
+	depends on (SOC_TMS320C6472 || SOC_TMS320C6474)
+
+config VIRTIO_IPC
+	bool "IPC driver for virtio devices"
+	depends on IPC
+	select VIRTIO
+        select VIRTIO_RING
+	default y
+
+if VIRTIO_IPC
+	source "drivers/virtio/Kconfig"
 endif
 
 config TMS320C6X_CACHES_ON

@@ -55,7 +55,9 @@
 #include "tags.h"
 
 extern unsigned int  _stext, _etext, _edata, _bss_start, _bss_end;
-extern unsigned long zone_dma_start, zone_dma_size;
+extern unsigned long dma_memory_start, dma_memory_size;
+
+extern int coherent_mem_init(void);
 
 unsigned int memory_start, memory_end; 
 unsigned int c6x_early_uart_cons = 0;
@@ -95,6 +97,9 @@ void (*mach_progress) (unsigned int, char *) = NULL;
 void (*mach_print_value) (char *, unsigned long) = NULL;
 void (*mach_set_wdt_mode) (int mode, int delay);
 void (*mach_nmi_handler)(struct pt_regs *regs);
+
+/* beginning of the kernel text */
+#define TEXT_START PAGE_OFFSET
 
 struct tag_header *c6x_tags_pointer __initdata;
 
@@ -240,7 +245,13 @@ static void cache_init(void)
 
 static void cache_set(unsigned int start, unsigned int end)
 {
-	/* Set whole external memory cacheable */
+	/* Set the whole external memory as non-cacheable */
+	disable_caching((unsigned int *) RAM_MEMORY_START,
+			(unsigned int *) (RAM_MEMORY_START + BOARD_RAM_SIZE - 1));
+	/* 
+	 * Then set the external memory used by this Linux instance cacheable.
+	 * DMA coherent memory region will be set as non-cacheable later.
+	 */
 	enable_caching((unsigned int *) start, (unsigned int *) (end - 1));
 }
 
@@ -270,7 +281,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			 */
 			
 			mem_size = (unsigned long) memparse(from + 4, &from);
-			memory_end = PAGE_ALIGN(REGION_START(&_stext) + mem_size);
+			memory_end = PAGE_ALIGN(TEXT_START + mem_size);
 
 			userdef = 1;
 		}
@@ -279,9 +290,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (to != c6x_command_line)
 				to--;
 			
-			zone_dma_size = (unsigned long) memparse(from + 7, &from);
+			dma_memory_size = (unsigned long) memparse(from + 7, &from);
 			if (*from == '@') {
-				zone_dma_start = memparse(from + 1, &from);
+				dma_memory_start = memparse(from + 1, &from);
 				userdef = 1;
 			}
 		} else if (!memcmp(from, "console=ttyS", 12)) {
@@ -385,9 +396,11 @@ void __init setup_arch(char **cmdline_p)
 	/* interrupts must be masked */
 	local_irq_disable();
 
-	/* Set the Interrupt Service Table (IST) at the beginning of the 
-	   external memory */
-	set_ist(REGION_START(&_stext));
+	/* 
+	 * Set the Interrupt Service Table (IST) at the beginning of the 
+	 * kernel text which contains the vector table.
+	 */
+	set_ist(TEXT_START);
 
 #ifdef CONFIG_TMS320C6X_CACHES_ON
 	/* Perform caches initialization */
@@ -427,7 +440,7 @@ void __init setup_arch(char **cmdline_p)
 	memory_start = PAGE_ALIGN((unsigned int) &_bss_end);
 #endif  
 
-	memory_end   = PAGE_ALIGN((unsigned int) REGION_START(&_stext) + BOARD_RAM_SIZE);
+	memory_end   = PAGE_ALIGN(TEXT_START + BOARD_RAM_SIZE);
 	memory_size  = (memory_end - memory_start);
 
 	mach_print_value("memory_start:", memory_start);
@@ -463,10 +476,13 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline_early(cmdline_p);
 
 	/* Set caching of external RAM used by Linux */
-	cache_set((unsigned long) REGION_START(&_stext), memory_end);
+	cache_set(PAGE_OFFSET, memory_end);
+
+	/* Initialize the coherent memory */
+	coherent_mem_init();
 
 	/*
-	 * give all the memory to the bootmap allocator,  tell it to put the
+	 * Give all the memory to the bootmap allocator,  tell it to put the
 	 * boot mem_map at the start of memory
 	 */
 	mach_progress(5, "Initialize bootmap allocator");
@@ -476,7 +492,7 @@ void __init setup_arch(char **cmdline_p)
 					 memory_end >> PAGE_SHIFT);
 
 	/*
-	 * free the usable memory,  we have to make sure we do not free
+	 * Free the usable memory,  we have to make sure we do not free
 	 * the bootmem bitmap so we then reserve it after freeing it :-)
 	 */
 	mach_progress(6, "Free usable memory");
@@ -515,9 +531,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-	/*
-	 * get kmalloc into gear
-	 */
+	/* Get kmalloc into gear */
 	mach_progress(7, "Initializing paging");
 	paging_init();
 

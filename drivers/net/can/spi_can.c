@@ -336,7 +336,7 @@ static struct platform_device *spi_can_platform_device;
 static struct spi_driver spi_can = {
 	.driver = {
 		/* Name must match modalias in the spi_board_info definition */
-		.name  =        "spi3",
+		.name  =        "spi_lm3s",
 		.owner =	THIS_MODULE,
 		.bus   =        &spi_bus_type,
 	},

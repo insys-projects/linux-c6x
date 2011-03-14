@@ -35,12 +35,18 @@
 /*
  * We want 8-byte alignment for the slab caches.
  */
-#define ARCH_SLAB_MINALIGN 8
+#define ARCH_SLAB_MINALIGN    8
 
 /*
- * Align an address on the beginning of a MAR region
+ * Current C6x architecture does not support hw cache coherency
  */
-#define REGION_START(v)       (((u32) (v)) & ~(IMCR_MAR_SIZE - 1))
+#define arch_is_coherent()    0
+
+/*
+ * Align a physical address to MAR regions
+ */
+#define CACHE_REGION_START(v) (((u32) (v)) & ~(IMCR_MAR_SIZE - 1))
+#define CACHE_REGION_END(v)   (((u32) (v) + (IMCR_MAR_SIZE - 1)) & ~(IMCR_MAR_SIZE - 1))
 
 /*
  * CCFG register values and bits
@@ -90,9 +96,22 @@ static inline void cache_block_operation(unsigned int *start,
 	unsigned int wc = 0;
 	
 	for (; wcnt; wcnt -= wc, start += wc) {
-
+loop:		
 		save_global_flags(flags);
 		global_cli();
+
+		/*
+		 * If another cache operation is occuring
+		 */
+	        if(unlikely(*((volatile unsigned int *) wc_reg))) {
+		    restore_global_flags(flags);
+
+		    /* Wait for previous operation completion */
+		    while (*((volatile unsigned int *) wc_reg));
+
+		    /* Try again */
+		    goto loop;
+		}
 
 		*((volatile unsigned int *) bar_reg) =
 			L2_CACHE_ALIGN_LOW((unsigned int) start);
@@ -101,7 +120,7 @@ static inline void cache_block_operation(unsigned int *start,
 			wc = 0xffff;
 		else
 			wc = wcnt;
-		
+
 		/* Set word count value in the WC register */
 		*((volatile unsigned int *) wc_reg) = wc & 0xffff;
 

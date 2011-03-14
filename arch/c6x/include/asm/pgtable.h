@@ -66,8 +66,4 @@ extern unsigned long get_fb_unmapped_area(struct file *, unsigned long,
 
 #define arch_start_context_switch(prev)	do {} while (0)
 
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
-extern void consistent_sync(void *vaddr, size_t size, int direction);
-
 #endif /* __ASM_C6X_PGTABLE_H */

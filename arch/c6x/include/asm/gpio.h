@@ -18,7 +18,6 @@
 #include <asm-generic/gpio.h>
 #include <mach/gpio.h>
 
-
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_C6X_GPIO_H */
