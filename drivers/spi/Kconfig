@@ -111,8 +111,8 @@ config SPI_COLDFIRE_QSPI
 	  will be called coldfire_qspi.
 
 config SPI_DAVINCI
-	tristate "SPI controller driver for DaVinci/DA8xx SoC's"
-	depends on SPI_MASTER && ARCH_DAVINCI
+	tristate "SPI controller driver for DaVinci/DA8xx and C66x SoC's"
+	depends on SPI_MASTER && (ARCH_DAVINCI || SOC_TMS320C6670 || SOC_TMS320C6678)
 	select SPI_BITBANG
 	help
 	  SPI master controller for DaVinci and DA8xx SPI modules.

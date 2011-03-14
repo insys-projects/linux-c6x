@@ -167,4 +167,12 @@ static inline void dma_sync_sg_for_device(struct device *dev,
 			   sg->length, dir);
 }
 
+/*
+ * DMA errors are defined by all-bits-set in the DMA address.
+ */
+static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+{
+        return dma_addr == ~0;
+}
+
 #endif  /* _C6X_DMA_MAPPING_H */
