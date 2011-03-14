@@ -1,7 +1,7 @@
 /*
  *  linux/arch/c6x/drivers/cp-intc.c
  *
- *  Support for C66x CorePac Interrupt Controller (CP_INTC)
+ *  Support for C66x Communication Port Interrupt Controller (CP_INTC)
  *
  *  Copyright (C) 2011 Texas Instruments Incorporated
  *  Contributed by: Aurelien Jacquiot <a-jacquiot@ti.com>
@@ -296,7 +296,7 @@ static void cpintc_mask_combined(unsigned int irq)
 {
 	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
 
-	*chip->minfo->evtclr |= (1 << (irq - chip->minfo->irq_base));
+	*chip->minfo->evtclr = (1 << (irq - chip->minfo->irq_base));
 	DPRINTK("masking irq %d\n", irq);
 }
 
@@ -304,7 +304,7 @@ static void cpintc_unmask_combined(unsigned int irq)
 {
 	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
 
-	*chip->minfo->evtset |= (1 << (irq - chip->minfo->irq_base));
+	*chip->minfo->evtset = (1 << (irq - chip->minfo->irq_base));
 	DPRINTK("unmasking irq %d\n", irq);
 }
 
