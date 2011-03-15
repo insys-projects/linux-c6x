@@ -381,9 +381,7 @@ core_initcall(board_setup_i2c);
 /*
  * FPGA support
  */
-static struct workqueue_struct *fpga_wq         = NULL;
-static struct i2c_client       *fpga_i2c_client = NULL;
-
+static struct i2c_client         *fpga_i2c_client = NULL;
 static const struct i2c_device_id evm_fpga_ids[] = {
 	{ "FPGA", 1 },
 	{ }
@@ -462,6 +460,7 @@ static struct i2c_driver evm_fpga_driver = {
 /*
  * LEDs management
  */
+static struct mutex	  leds_lock;
 static struct work_struct leds_work;
 static u8                 evm_leds_state[3]    = { -1, -1, -1 };
 static u8                 evm_leds_started     = 0;
@@ -472,8 +471,11 @@ static inline void evm_leds_set(unsigned int state, u8 reg, u8 shift)
 	u8  val = 0;
 	int res;
 
+	mutex_lock(&leds_lock);
+
 	res = fpga_i2c_read_reg(reg, &val);
 	if (res) {
+		mutex_unlock(&leds_lock);
 		return;
 	}
 
@@ -481,6 +483,8 @@ static inline void evm_leds_set(unsigned int state, u8 reg, u8 shift)
 	val |= state << shift;
 
 	(void) fpga_i2c_write_reg(reg, val);
+
+	mutex_unlock(&leds_lock);
 }
 
 static void evm_leds_work(struct work_struct *work)
@@ -493,7 +497,7 @@ static void evm_leds_work(struct work_struct *work)
 		evm_leds_set(EVM_LED_YELLOW, EVM_FPGA_LED_REG, EVM_FPGA_LED1_S);
 		evm_leds_set(EVM_LED_YELLOW, EVM_FPGA_LED_REG, EVM_FPGA_LED2_S);
 		evm_leds_set(EVM_LED_GREEN,  EVM_FPGA_DSP_REG, EVM_FPGA_LED3_S);
-		
+
 		/* Intialization finished */
 		evm_leds_initialized = 1;
 
@@ -524,13 +528,14 @@ static void evm_leds_timer(unsigned long dummy)
 	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
 
 	leds = (~leds) & 1;
+
 	if (leds)
 		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_GREEN;
 	else
 		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_OFF;
 
 	if (likely(evm_leds_started))
-		queue_work(fpga_wq, &leds_work);
+		schedule_work(&leds_work);
 }
 
 /*
@@ -538,13 +543,15 @@ static void evm_leds_timer(unsigned long dummy)
  */
 void c6x_arch_idle_led(int state)
 {
+#if 0
 	if (state)
 		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_RED;
 	else
-		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_GREEN;
+		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_OFF;
 
 	if (likely(evm_leds_started))
-		queue_work(fpga_wq, &leds_work);
+		schedule_work(&leds_work);
+#endif
 }
 
 #endif /* CONFIG_IDLE_LED */
@@ -552,6 +559,8 @@ void c6x_arch_idle_led(int state)
 static int __init evm_init_leds(void)
 {
 	INIT_WORK(&leds_work, evm_leds_work);
+
+	mutex_init(&leds_lock);
 
 	/* LEDs can be used now  */
 	evm_leds_started = 1;
@@ -568,12 +577,6 @@ static int __init evm_init_leds(void)
 static int __init evm_init_fpga(void)
 {
 	int res;
-
-	fpga_wq = create_singlethread_workqueue("FPGA");
-	if (!fpga_wq) {
-		printk(KERN_ERR "FPGA: workqueue creation failed\n");
-		return -ESRCH;
-	}
 
 	res = i2c_add_driver(&evm_fpga_driver);
 	if (res < 0)
