@@ -24,6 +24,8 @@
 #define IRQ_TETBUNFL    8
 #define IRQ_EMUDTDMA    9   /* emulator events */
 #define IRQ_MSMC        10  /* MSMC */
+#define IRQ_RTDXRX      11  /* RTDX */
+#define IRQ_RTDXTX      12
 #define IRQ_IDMAINT0    13  /* IDMA channel 0 interrupt */
 #define IRQ_IDMAINT1    14  /* IDMA channel 1 interrupt */
 #define IRQ_SEMERR      15  /* semaphores */
@@ -32,23 +34,19 @@
 #define IRQ_TSIP0	18
 #define IRQ_TSIP1	19
 #define IRQ_RIOINT16    20  /* RapidIO interrupts */
-#define IRQ_INTC0OUT0   21  /* INTC output */
-#define IRQ_INTC0OUT1   22
-#define IRQ_INTC0OUT2   23
-#define IRQ_INTC0OUT3   24
-#define IRQ_INTC0OUT4   25
-#define IRQ_INTC0OUT5   26
-#define IRQ_INTC0OUT6   27
-#define IRQ_INTC0OUT7   28
-#define IRQ_INTC0OUT8   29
-#define IRQ_INTC0OUT9   30
-#define IRQ_INTC0OUT10  31
+#define IRQ_INTC0OUT32  21  /* CP_INTC outputs: 21 to 31  */
 #define IRQ_QML         32  /* QM low: 32 to 47 */
 #define IRQ_QMH         48  /* QM high: 48 to 55 */
-#define IRQ_TSIP0RFS	52  
+#define IRQ_TSIP0RFS	52
 #define IRQ_TSIP0RSF	53
 #define IRQ_TSIP0XFS	54
 #define IRQ_TSIP0XSF	55
+#define IRQ_TSIP1RFS	56
+#define IRQ_TSIP1RSF	57
+#define IRQ_TSIP1XFS	58
+#define IRQ_TSIP1XSF	59
+#define IRQ_INTC0OUT2   62  /* CP_INTC outputs */
+#define IRQ_INTC0OUT3   63
 #define IRQ_TINT        64  /* timer interrupts */
 #define IRQ_TINTLO      64
 #define IRQ_TINTHI      65
@@ -87,10 +85,18 @@
 #define IRQ_GPIO15      89
 #define IRQ_GPIOINT     90  /* local GPIO */
 #define IRQ_IPCLOCAL    91  /* inter DSP interrupt from IPCGR */
+#define IRQ_INTC0OUT4   92  /* INTC outputs */
+#define IRQ_INTC0OUT5   93
+#define IRQ_INTC0OUT6   94
+#define IRQ_INTC0OUT7   95
 #define IRQ_INTERR      96  /* irq controller dropped CPU interrupt event */
 #define IRQ_EMCIDMAERR  97  /* EMC invalid IDMA parameters */
 #define IRQ_EFINTA      100 /* EFI interrupt from side A */
 #define IRQ_EFINTB      101 /* EFI interrupt from side B */
+#define IRQ_INTC0OUT0   102 /* INTC outputs */
+#define IRQ_INTC0OUT1   103
+#define IRQ_INTC0OUT8   104
+#define IRQ_INTC0OUT9   105
 #define IRQ_INTC0OUT16	106
 #define IRQ_INTC0OUT17	107
 #define IRQ_INTC0OUT24	108
@@ -269,7 +275,6 @@
 #define IRQ_QMPEND24         (IRQ_CPINTC0_START + 158)
 #define IRQ_QMPEND25         (IRQ_CPINTC0_START + 159)
 
-#define IRQ_CPINTC0_MAPBASE  (IRQ_INTC0OUT0)/* start of system events from CP_INTC0 */
 #define IRQ_CPINTC0_MAPLEN   8              /* number of (usable) events from CP_INTC0 */
 
 #define NR_CPINTC0_IRQS      160            /* number of source events */
