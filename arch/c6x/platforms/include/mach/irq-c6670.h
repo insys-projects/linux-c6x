@@ -31,7 +31,7 @@
 #define IRQ_PCIEMSI0    17  /* PCIe MSI */
 #define IRQ_RIOINT16    20  /* RapidIO interrupts */
 #define IRQ_RIOINT20    21
-#define IRQ_INTC0OUT64  22  /* INTC output: 22 to 31 */
+#define IRQ_INTC0OUT64  22  /* INTC outputs: 22 to 31 */
 #define IRQ_QML         32  /* QM low: 32 to 47 */
 #define IRQ_QMH         48  /* QM high: 48 to 55 */
 #define IRQ_INTC0OUT0   56  /* CP_INTC outputs */
@@ -285,7 +285,6 @@
 #define IRQ_FFTCBINT2        (IRQ_CPINTC0_START + 198)
 #define IRQ_FFTCBINT3        (IRQ_CPINTC0_START + 199)
 
-#define IRQ_CPINTC0_MAPBASE  (IRQ_INTC0OUT0)/* start of system events from CP_INTC0 */
 #define IRQ_CPINTC0_MAPLEN   8              /* number of (usable) events from CP_INTC0 */
 
 #define NR_CPINTC0_IRQS      200            /* number of source events */
