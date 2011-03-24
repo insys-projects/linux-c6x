@@ -141,7 +141,7 @@ config INTC_C64XPLUS
 	bool "C64x+ Megamodule Interrupt Controller"
 
 config CP_INTC
-	bool "CorePac Interrupt Controller"
+	bool "Communication Port Interrupt Controller"
 	depends on TMS320C66X
 
 config C66X_USE_MSM
