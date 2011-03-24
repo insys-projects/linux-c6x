@@ -301,11 +301,9 @@ extern int cpintc_irq(unsigned int irq);
 extern int cpintc_combined_irq(unsigned int irq);
 
 /* 
- * This macros return 1 if ack must be performed before handling irq.
- * When handling IRQs through the CP INTC0, ack after the handler runs.
+ * When handling IRQs through either INTC or CP_INTC, always ack before handling irq.
  */
-#define IRQ_SOC_COMBINER_PRE_ACK(irq) \
-	((irq) < IRQ_CPINTC0_START || (irq) >= (IRQ_CPINTC0_START + NR_CPINTC0_IRQS))
+#define IRQ_SOC_COMBINER_PRE_ACK(irq)  1
 
 /*
  * This macro return 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
