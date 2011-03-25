@@ -15,6 +15,7 @@
 
 #include <linux/types.h>
 
+#ifndef __ASSEMBLY__
 /* Avoid too many header ordering problems.  */
 struct siginfo;
 
@@ -39,6 +40,7 @@ typedef struct {
 typedef unsigned long sigset_t;
 
 #endif /* __KERNEL__ */
+#endif /* __ASSEMBLY__ */
 
 #define SIGHUP		 1
 #define SIGINT		 2
@@ -124,6 +126,7 @@ typedef unsigned long sigset_t;
 
 #include <asm-generic/signal-defs.h>
 
+#ifndef __ASSEMBLY__
 #ifdef __KERNEL__
 struct old_sigaction {
 	__sighandler_t sa_handler;
@@ -334,4 +337,5 @@ static inline void siginitsetinv(sigset_t *set, unsigned long mask)
 #endif /* __GNU__ */
 
 #endif /* __KERNEL__ */
+#endif /* __ASSEMBLY__ */
 #endif /* __ASM_C6X_ */
