@@ -411,9 +411,12 @@ static int __init evm_init_uart(void)
 	struct clk *clk;
 
 	/* 
-	 * Enable UART
+	 * Reset and enable the UART peripheral
 	 */
-	SERIAL_OUT(0xc, 0x6001); /* UTRST | URRST | FREE */
+	SERIAL_OUT(0xc, 0x0000);    /* Reset the UART */
+	udelay(100);
+	SERIAL_OUT(0xc, 0x6001);    /* UTRST | URRST | FREE */
+	SERIAL_OUT(UART_FCR, 0x8);  /* DMAMODE1 */
 
 	/*
 	 *  Retrieve the UART clock
