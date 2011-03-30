@@ -27,6 +27,9 @@
 #include <linux/clk.h>
 #include <linux/kernel_stat.h>
 #include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -278,11 +281,8 @@ static int __init evm_init_edma(void)
 arch_initcall(evm_init_edma);
 #endif /* CONFIG_EDMA3 */
 
-#if defined(CONFIG_MTD_NAND_DAVINCI)
-#include <linux/mtd/mtd.h>
-#include <linux/mtd/map.h>
-#include <linux/mtd/partitions.h>
-
+#if defined(CONFIG_MTD_NAND_DAVINCI) || defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
+#include <mach/emif.h>
 #include <mach/nand.h>
 
 static struct mtd_partition evm6678_nand_parts[] = {
@@ -312,21 +312,19 @@ static struct davinci_nand_pdata evmc6678_nand_data = {
 	.parts			= evm6678_nand_parts,
 	.nr_parts		= ARRAY_SIZE(evm6678_nand_parts),
 	.ecc_mode		= NAND_ECC_HW,
-	.ecc_bits		= 4,
-	.options		= 0,
+	.ecc_bits               = 1,
+	.options	        = NAND_USE_FLASH_BBT,
 };
-
-#define ASYNC_EMIF_CONTROL_BASE		0x20C00000
-#define ASYNC_EMIF_DATA_CE0_BASE	0x70000000
 
 static struct resource evmc6678_nand_resources[] = {
 	{
-		.start		= ASYNC_EMIF_DATA_CE0_BASE,
-		.end		= ASYNC_EMIF_DATA_CE0_BASE + 0x3FFFFFF,
+		.start		= RAM_EMIFA_CE2,
+		.end		= RAM_EMIFA_CE2 + 0x3FFFFFF,
 		.flags		= IORESOURCE_MEM,
-	}, {
-		.start		= ASYNC_EMIF_CONTROL_BASE,
-		.end		= ASYNC_EMIF_CONTROL_BASE + 0xFF,
+	},
+	{
+		.start		= EMIFA_BASE,
+		.end		= EMIFA_BASE + 0xFF,
 		.flags		= IORESOURCE_MEM,
 	},
 };
@@ -343,12 +341,11 @@ static struct platform_device evmc6678_nand_device = {
 	},
 };
 
-static void __init evm_setup_nand(void)
+static int __init evm_init_nand(void)
 {
-	platform_device_register(&evmc6678_nand_device);
+	return platform_device_register(&evmc6678_nand_device);
 }
-#else
-static inline void evm_setup_nand(void) {}
+core_initcall(evm_init_nand);
 #endif
 
 #ifdef CONFIG_I2C
@@ -391,7 +388,7 @@ static struct plat_serial8250_port serial8250_platform_data [] = {
                 .regshift = 2,
         },
         {
-                .flags          = 0
+                .flags    = 0,
         },
 };
 
@@ -451,8 +448,6 @@ void c6x_board_setup_arch(void)
 
 __init int evm_init(void)
 {
-	evm_setup_nand();
-
 	return 0;
 }
 
