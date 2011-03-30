@@ -155,6 +155,11 @@
 	static struct clk spi_clk = {				\
 		.name = "spi",					\
 		.parent = &pll1_sysclk7,			\
+	};                                                      \
+								\
+	static struct clk aemif_clk = {				\
+		.name = "aemif",				\
+		.parent = &pll1_sysclk7,			\
 	}
 
 #define SOC_CLK()					\
@@ -172,6 +177,7 @@
 	CLK(NULL, "pll1_sysclk11", &pll1_sysclk11),	\
 	CLK(NULL, "core", &core_clk),			\
 	CLK(NULL, "uart", &uart_clk),			\
+	CLK(NULL, "aemif", &aemif_clk),                 \
 	CLK("i2c_davinci.1", NULL, &i2c_clk),           \
 	CLK("spi_davinci.0", NULL, &spi_clk)
 
