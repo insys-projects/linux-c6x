@@ -7,6 +7,9 @@ obj-$(CONFIG_MDIO) += mdio.o
 obj-$(CONFIG_PHYLIB) += phy/
 
 obj-$(CONFIG_TI_DAVINCI_EMAC) += davinci_emac.o
+obj-$(CONFIG_TI_KEYSTONE_PKTDMA) += keystone_pktdma.o
+obj-$(CONFIG_TI_KEYSTONE_PA) += keystone_pa.o
+obj-$(CONFIG_TI_KEYSTONE_QM) += keystone_qmss.o
 
 obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_E1000E) += e1000e/
