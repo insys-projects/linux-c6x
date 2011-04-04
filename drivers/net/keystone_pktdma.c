@@ -32,6 +32,8 @@
 
 #include "keystone_pktdma.h"
 
+#define EMAC_ARCH_HAS_MAC_ADDR
+
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "NETCP: [%s] " fmt, __FUNCTION__, ## args)
 
 #define DEVICE_NUM_RX_DESCS	64
@@ -473,7 +475,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	struct keystone_platform_data	*data = pdev->dev.platform_data;
 	struct net_device		*ndev;
 	struct keystone_cpsw_priv	*priv;
-	int                             ret = 0; 
+	int                             i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	char				hw_emac_addr[6];
 #endif
@@ -522,6 +524,11 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 
 	cpdma_rx_config(rx_cfg);
 	cpdma_tx_config(tx_cfg);
+
+
+	/* Streaming switch configuration */
+	__raw_writel(DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0,
+			DEVICE_PSTREAM_CFG_REG_ADDR);
 	
 	q_cfg->link_ram_base		= 0x2a800000;
 	q_cfg->link_ram_size		= 0x2000;
