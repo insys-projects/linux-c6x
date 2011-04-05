@@ -401,13 +401,13 @@ int cpmac_drv_start(void)
 
 	return (0);
 }
-#if 0
+
 int cpmac_drv_stop(void)
 {
 	mac_sl_reset(0);
 	return (0);
 }
-
+#if 0
 int target_mac_rcv(u8 *buffer)
 {
 	Int32           pktSizeBytes; 
@@ -453,6 +453,8 @@ static int  keystone_ndo_open(struct net_device *dev)
 static int keystone_ndo_stop(struct net_device *dev)
 {
 	netif_stop_queue(dev);
+	
+	cpmac_drv_stop();
 
 	return 0;
 }
