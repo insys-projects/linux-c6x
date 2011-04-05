@@ -365,12 +365,6 @@ jiffies = jiffies_64;
 
 SECTIONS
 {
-  . = 0x1081bd00;
-  .linkram : { *(.linkram) }
-  . = 0x1081bf00;
-  .cppi : { *(.cppi) }
-  . = 0x1081c100;
-  .mac_buffer : { *(.mac_buffer) }
   . = PAGE_OFFSET_RAW;
   .vectors : { *(.vectors) }
 

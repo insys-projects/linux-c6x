@@ -32,6 +32,10 @@
 
 #include "keystone_pktdma.h"
 
+#define EMAC_ARCH_HAS_MAC_ADDR
+
+#define DPRINTK(fmt, args...) printk(KERN_DEBUG "NETCP: [%s] " fmt, __FUNCTION__, ## args)
+
 #define DEVICE_NUM_RX_DESCS	64
 #define DEVICE_NUM_TX_DESCS	64
 #define DEVICE_NUM_DESCS	(DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
@@ -144,7 +148,6 @@ void target_init_qs(struct net_device *ndev)
 static int keystone_ndo_start_xmit(struct sk_buff *skb,
 				   struct net_device *ndev)
 {
-	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
 	int ret, i;
 	struct qm_host_desc		*hd;
 
@@ -398,13 +401,13 @@ int cpmac_drv_start(void)
 
 	return (0);
 }
-#if 0
+
 int cpmac_drv_stop(void)
 {
 	mac_sl_reset(0);
 	return (0);
 }
-
+#if 0
 int target_mac_rcv(u8 *buffer)
 {
 	Int32           pktSizeBytes; 
@@ -434,9 +437,31 @@ static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
 		dev_err(&ndev->dev, "multicast traffic cannot be filtered!\n");
 }
 
+/*
+ * Open the device
+ */
+static int  keystone_ndo_open(struct net_device *dev)
+{
+	netif_start_queue(dev);
+
+	return 0;
+}
+
+/*
+ * Close the device
+ */
+static int keystone_ndo_stop(struct net_device *dev)
+{
+	netif_stop_queue(dev);
+	
+	cpmac_drv_stop();
+
+	return 0;
+}
+
 static const struct net_device_ops keystone_netdev_ops = {
-//	.ndo_open		= keystone_ndo_open,
-//	.ndo_stop		= keystone_ndo_stop,
+	.ndo_open		= keystone_ndo_open,
+	.ndo_stop		= keystone_ndo_stop,
 	.ndo_start_xmit		= keystone_ndo_start_xmit,
 	.ndo_change_rx_flags	= keystone_ndo_change_rx_flags,
 	.ndo_set_mac_address	= eth_mac_addr,
@@ -452,17 +477,16 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	struct keystone_platform_data	*data = pdev->dev.platform_data;
 	struct net_device		*ndev;
 	struct keystone_cpsw_priv	*priv;
-	void __iomem			*regs;
-	int ret = 0, i;
+	int                             i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	char				hw_emac_addr[6];
 #endif
-	struct resource			*cur_res;
-	static int			ndevs = 0;
-	int				irq   = 0;
-	struct cpdma_rx_cfg		*rx_cfg;
-	struct cpdma_tx_cfg		*tx_cfg;
-	struct qm_config		*q_cfg;
+	struct cpdma_rx_cfg		c_rx_cfg;
+	struct cpdma_tx_cfg		c_tx_cfg;
+	struct qm_config		c_q_cfg;
+	struct cpdma_rx_cfg		*rx_cfg = &c_rx_cfg;
+	struct cpdma_tx_cfg		*tx_cfg = &c_tx_cfg;
+	struct qm_config		*q_cfg  = &c_q_cfg; 
 
 	if (!data) {
 		pr_err("keystone cpsw: platform data missing\n");
@@ -502,10 +526,15 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 
 	cpdma_rx_config(rx_cfg);
 	cpdma_tx_config(tx_cfg);
+
+
+	/* Streaming switch configuration */
+	__raw_writel(DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0,
+			DEVICE_PSTREAM_CFG_REG_ADDR);
 	
 	q_cfg->link_ram_base		= 0x2a800000;
 	q_cfg->link_ram_size		= 0x2000;
-	q_cfg->mem_region_base		= 0x10860000;
+	q_cfg->mem_region_base		= RAM_MSM_BASE + 0x100000; //  0x10860000;
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
 	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
 
@@ -552,7 +581,6 @@ clean_ndev_ret:
 static int __devexit pktdma_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
-	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
 	
 	platform_set_drvdata(pdev, NULL);
 

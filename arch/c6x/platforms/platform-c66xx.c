@@ -157,6 +157,27 @@ static void init_power(void)
 {
 }
 
+#ifdef CONFIG_TI_KEYSTONE_PKTDMA
+#include <mach/netcp.h>
+
+struct keystone_platform_data c6x_pktdma_data;
+
+static struct platform_device pktdma_dev0 = {
+        .name           = "keystone_pktdma",
+        .id             = 0,
+	.dev = {
+		.platform_data = &c6x_pktdma_data,
+	},
+};
+
+static void setup_pa(void)
+{
+        platform_device_register(&pktdma_dev0);
+}
+#else
+static void setup_pa(void) { }
+#endif
+
 void c6x_soc_setup_arch(void)
 {
  	/* Initialize C66x IRQs */          	
@@ -175,6 +196,8 @@ void c6x_soc_setup_arch(void)
 static int __init platform_arch_init(void)
 {
 	int status = 0;
+
+	setup_pa();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {

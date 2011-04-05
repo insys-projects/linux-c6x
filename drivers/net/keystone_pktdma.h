@@ -404,6 +404,9 @@ int cpdma_tx_disable(struct cpdma_tx_cfg *cfg);
 
 #define DEVICE_RX_CDMA_TIMEOUT_COUNT		1000
 
+#define DEVICE_PSTREAM_CFG_REG_ADDR             0x2000604
+#define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
+
 /*
  * MAC Configuration information
  */
