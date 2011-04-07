@@ -652,6 +652,7 @@ ret_from_fork:
 	ADDKPC	.S2	ret_from_fork_2,B3,4
 ret_from_fork_2:
 	;; return 0 for child process
+	GET_THREAD_INFO A12
 	MVK	.L2	0,B0
  ||	MVKL	.S2	syscall_exit,B1
 	STW	.D2T2	B0,*+SP(REGS_A4+8)
