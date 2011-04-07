@@ -26,7 +26,7 @@
 #include <mach/pa.h>
 #include <mach/keystone_qmss.h>
 
-int sgmii_init(void)
+static int sgmii_init(void)
 {
 	struct sgmii_config_s sgmiic0, sgmiic1;
 
@@ -53,7 +53,7 @@ int sgmii_init(void)
 	return 0;
 }
 
-int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
+static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 {
 	u32 i;
 
@@ -62,40 +62,30 @@ int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 	
 	/* Control register */
 	__raw_writel(ctl, (DEVICE_CPSW_BASE + CPSW_REG_CTL));
-
+	
 	/* All statistics enabled by default */
 	__raw_writel(CPSW_REG_VAL_STAT_ENABLE_ALL, (DEVICE_CPSW_BASE +
-				CPSW_REG_STAT_PORT_EN));
-
+						    CPSW_REG_STAT_PORT_EN));
+	
 	/* Reset and enable the ALE */
 	__raw_writel(CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE, (DEVICE_CPSW_BASE
-				+ CPSW_REG_ALE_CONTROL));
+							     + CPSW_REG_ALE_CONTROL));
     
 	/* All ports put into forward mode */
 	for (i = 0; i < DEVICE_CPSW_NUM_PORTS; i++)
 		__raw_writel(CPSW_REG_VAL_PORTCTL_FORWARD_MODE,
-				(DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
-
+			     (DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
+	
 	return 0;
-
 }
 
 int evm_pa_ss_init(void)
 {
-	int i;
-	
+	/* Configure the SGMII */
 	sgmii_init();
 
+	/* Enable port 0 with max pkt size to 9000 */
 	hw_cpsw_config(CPSW_CTL_P0_ENABLE, 9000);
-
-//	hw_qm_setup((struct qm_config *)(target_get_qm_config()));
-//	target_init_qs();
-
-	i = target_pa_config();
-	if (i != 0) {
-		printk("\n PA init failed \n");
-		return -1;
-	}
 
 	return 0;
 }

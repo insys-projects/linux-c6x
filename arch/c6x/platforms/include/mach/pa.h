@@ -15,8 +15,6 @@
 #ifndef __MACH_C6X_PA_H
 #define __MACH_C6X_PA_H
 
-extern unsigned int pdsp_code[];
-
 #define DEVICE_PA_BASE				0x02000000
 #define DEVICE_PA_RUN_CHECK_COUNT		100
 #define DEVICE_PA_NUM_PDSPS			6
@@ -52,11 +50,6 @@ struct pa_config {
 	/* Buffer used to create PA command */
 	u8   *cmd_buf;
 };
-
-/* API */
-int hw_pa_enable(struct pa_config *cfg);
-int hw_pa_disable(void);
-int target_pa_config(void);
 
 #endif /* __MACH_C6X_PA_H */
 

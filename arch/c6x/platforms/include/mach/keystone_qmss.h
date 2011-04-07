@@ -11,6 +11,8 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#ifndef __MACH_C6X_KEYSTONE_QMSS_H
+#define __MACH_C6X_KEYSTONE_QMSS_H
 
 #define QMSS_LOW_PRIORITY_QUEUE_BASE       	0
 #define QMSS_MAX_LOW_PRIORITY_QUEUE         	512
@@ -191,21 +193,45 @@ struct qm_host_desc {
 /* Maximum linking RAM size mask */
 #define QM_REG_LINKRAM_SIZE_MAX_MASK	0x7ffff
 
-#define DEVICE_QM_FREE_Q		910
-#define DEVICE_QM_LNK_BUF_Q		911
-#define DEVICE_QM_RCV_Q			912
-#define DEVICE_QM_TX_Q			913
-#define DEVICE_QM_PA_CFG_Q		640
-#define DEVICE_QM_ETH_TX_Q		648
+#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
+#define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
+#define DEVICE_QM_RX_Q		        911 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_Q		912 /* Ethernet Rx queue (filled by PA) */
+#define DEVICE_QM_TX_Q	         	913 /* Ethernet Tx completion queue */
+#define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
 
-/*  prototypes */
+/* Prototypes */
 struct qm_host_desc *hw_qm_queue_pop(u32 qnum);
-void hw_qm_queue_push(struct qm_host_desc *hd, u32 qnum, u32 desc_size);
-int hw_qm_setup(struct qm_config *cfg);
-u32  hw_qm_queue_count(u32 qnum);
-void hw_qm_teardown(void);
-int hw_qm_init_threshold(u32 qnum);
-int address_is_local(u32 addr);
-u32 device_local_addr_to_global(u32 addr);
+void                 hw_qm_queue_push(struct qm_host_desc *hd, u32 qnum, u32 desc_size);
+int                  hw_qm_setup(struct qm_config *cfg);
+u32                  hw_qm_queue_count(u32 qnum);
+void                 hw_qm_teardown(void);
+int                  hw_qm_init_threshold(u32 qnum);
 
+/* Helper functions */
+static inline int address_is_local(u32 addr)
+{
+	/* L2 */
+	if ((addr >= RAM_SRAM) && (addr < (RAM_SRAM + RAM_SRAM_SIZE)))
+		return 1;
+    
+	/* L1P */
+	if ((addr >= 0x00e00000) && (addr < 0x00e08000))
+		return 1;
+	
+	/* L1D */
+	if ((addr >= 0x00f00000) && (addr < 0x00f08000))
+		return 1;
+
+	return 0;
+}
+
+static inline u32 device_local_addr_to_global(u32 addr)
+{
+	if (address_is_local (addr))
+		addr = (1 << 28) | (get_coreid() << 24) | addr;
+	
+	return addr;
+}
+#endif /* __MACH_C6X_KEYSTONE_QMSS_H */
 

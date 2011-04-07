@@ -212,28 +212,6 @@ struct pktdma_rx_flow_cfg
 	u16	rx_fdq0_sz2_qmgr;
 };
 
-#if 0
-/* Exported functions */
-extern pktdma_Result pktdma_init (pktdma_GlobalConfigParams *cppiGblCfgParams);
-extern pktdma_Result pktdma_exit (void);
-extern pktdma_Handle pktdma_open (pktdma_CpDmaInitCfg *initCfg);
-extern pktdma_Result pktdma_close (pktdma_Handle hnd);
-extern pktdma_ChHnd pktdma_txChannelOpen (pktdma_Handle hnd, pktdma_TxChInitCfg *cfg, u8 *isAllocated);
-extern pktdma_ChHnd pktdma_rxChannelOpen (pktdma_Handle hnd, pktdma_RxChInitCfg *cfg, u8 *isAllocated);
-extern pktdma_Result pktdma_channelEnable (pktdma_ChHnd hnd);
-extern pktdma_Result pktdma_channelDisable (pktdma_ChHnd hnd);
-extern pktdma_Result pktdma_channelTeardown (pktdma_ChHnd hnd, pktdma_Wait wait);
-extern pktdma_Result pktdma_channelClose (pktdma_ChHnd hnd);
-extern pktdma_Result pktdma_channelPause (pktdma_ChHnd hnd);
-extern pktdma_Result pktdma_channelStatus (pktdma_ChHnd hnd);
-extern pktdma_FlowHnd pktdma_configureRxFlow (pktdma_Handle hnd, pktdma_RxFlowCfg *cfg, u8 *isAllocated);
-extern pktdma_Result pktdma_closeRxFlow (pktdma_FlowHnd hnd);
-extern u32 pktdma_getChannelNumber (pktdma_ChHnd hnd);
-extern u32 pktdma_getFlowId (pktdma_FlowHnd hnd);
-extern pktdma_Result pktdma_setCpdmaLoopback (pktdma_Handle hnd, u8 loopback);
-extern pktdma_Result pktdma_getCpdmaLoopback (pktdma_Handle hnd);
-#endif
-
 /* Emulation control register */
 #define CPDMA_REG_EMU_CTL		0x08
 
@@ -389,52 +367,13 @@ int cpdma_tx_disable(struct cpdma_tx_cfg *cfg);
 #define GMACSL_RET_WARN_MAXLEN_TOO_BIG		-3
 #define GMACSL_RET_CONFIG_FAIL_RESET_ACTIVE	-4
 
-#define DEVICE_PA_CDMA_GLOBAL_CFG_BASE		0x02004000
-#define DEVICE_PA_CDMA_TX_CHAN_CFG_BASE		0x02004400
-#define DEVICE_PA_CDMA_RX_CHAN_CFG_BASE		0x02004800
-#define DEVICE_PA_CDMA_RX_FLOW_CFG_BASE		0x02005000
-
-#define DEVICE_PA_CDMA_RX_NUM_CHANNELS		24
-#define DEVICE_PA_CDMA_RX_NUM_FLOWS		32
-#define DEVICE_PA_CDMA_TX_NUM_CHANNELS		9
-
-#define DEVICE_EMACSL_BASE(x)			(0x02090900 + (x)*0x040)
-#define DEVICE_N_GMACSL_PORTS			2
-#define DEVICE_EMACSL_RESET_POLL_COUNT		100
-
-#define DEVICE_RX_CDMA_TIMEOUT_COUNT		1000
-
-#define DEVICE_PSTREAM_CFG_REG_ADDR             0x2000604
-#define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
-
 /*
  * MAC Configuration information
  */
 struct emac_config {
 	u32 flags;
-	u32 enetaddr[6];
+	u8  enetaddr[6];
 };
-
-#define EFUSE_REG_MAC_ADDR	0x2620110
-#define emac_arch_get_mac_addr	emac_arch_get_mac_addr_from_efuse
-
-/* Read the e-fuse value as 32 bit values to be endian independent */
-static int inline emac_arch_get_mac_addr_from_efuse(char *x)
-{
-	unsigned int addr0, addr1;
-
-	addr1 = __raw_readl(EFUSE_REG_MAC_ADDR + 4);
-	addr0 = __raw_readl(EFUSE_REG_MAC_ADDR);
-
-	x[0] = (addr1 & 0x0000ff00) >> 8;
-	x[1] = addr1 & 0x000000ff;
-	x[2] = (addr0 & 0xff000000) >> 24;
-	x[3] = (addr0 & 0x00ff0000) >> 16;
-	x[4] = (addr0 & 0x0000ff00) >> 8;
-	x[5] = addr0 & 0x000000ff;
-
-	return 0;
-}
 
 struct mac_sliver {
     u32 max_rx_len;	/* Maximum receive packet length */
@@ -444,5 +383,6 @@ struct mac_sliver {
 int mac_sl_reset(u16 port);
 int mac_sl_config(u16 port, struct mac_sliver *cfg);
 
-
-
+int keystone_pa_enable(struct pa_config *cfg);
+int keystone_pa_disable(void);
+int keystone_pa_config(u8 *mac_addr);

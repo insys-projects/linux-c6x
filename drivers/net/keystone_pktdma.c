@@ -20,9 +20,11 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/if_ether.h>
+#include <linux/if_vlan.h>
 #include <linux/etherdevice.h>
 #include <linux/netdevice.h>
 #include <linux/phy.h>
+#include <linux/timer.h>
 
 #include <mach/pa.h>
 #include <mach/netcp.h>
@@ -32,19 +34,20 @@
 
 #include "keystone_pktdma.h"
 
-#define EMAC_ARCH_HAS_MAC_ADDR
+#define DPRINTK(fmt, args...)           printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
 
-#define DPRINTK(fmt, args...) printk(KERN_DEBUG "NETCP: [%s] " fmt, __FUNCTION__, ## args)
+#define DEVICE_NUM_RX_DESCS	        64
+#define DEVICE_NUM_TX_DESCS	        64
+#define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
 
-#define DEVICE_NUM_RX_DESCS	64
-#define DEVICE_NUM_TX_DESCS	64
-#define DEVICE_NUM_DESCS	(DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
+#define KEYSTONE_CPSW_MIN_PACKET_SIZE	VLAN_ETH_ZLEN
+#define KEYSTONE_CPSW_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
-#define KEYSTONE_CPSW_MIN_PACKET_SIZE	64
-#define KEYSTONE_CPSW_MAX_PACKET_SIZE	(1500 + 14 + 4 + 4)
 static int rx_packet_max = KEYSTONE_CPSW_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
 MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
+
+static struct timer_list poll_timer;
 
 struct pktdma_private {
 	struct net_device *dev;
@@ -58,9 +61,6 @@ struct keystone_cpsw_priv {
 	struct napi_struct		napi;
 	struct device			*dev;
 	struct keystone_platform_data	data;
-//	struct cpsw_regs __iomem	*regs;
-//	struct cpsw_hw_stats __iomem	*hw_stats;
-//	struct cpsw_host_regs __iomem	*host_port_regs;
 	u32				msg_enable;
 	struct net_device_stats		stats;
 	int				rx_packet_max;
@@ -76,7 +76,7 @@ u8 qm_cppi_buf[QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS];
 
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
 
-inline long _hex_chartol (char c)
+static inline long _hex_chartol (char c)
 {
 	if ((c >= '0') && (c <= '9')) return (c - '0');
 	if ((c >= 'A') && (c <= 'F')) return (c - 'A') + 10;
@@ -85,7 +85,7 @@ inline long _hex_chartol (char c)
 	return -1;
 }
 
-static unsigned long _hex_strtoul (const char* str, const char** end)
+static u8 _hex_strtoul (const char* str, const char** end)
 {
 	unsigned long ul = 0;
 	long          ud;
@@ -94,7 +94,7 @@ static unsigned long _hex_strtoul (const char* str, const char** end)
 		str++;
 	}
 	*end = str;
-	return ul;
+	return (u8) ul;
 }
 
 static int __init get_mac_addr_from_cmdline(char *str)
@@ -116,7 +116,10 @@ static int __init get_mac_addr_from_cmdline(char *str)
 
 __setup("emac_addr=", get_mac_addr_from_cmdline);
 
-void target_init_qs(struct net_device *ndev)
+/*
+ * Initialize queues used by the PKTDMA
+ */
+static void cpdma_init_qs(struct net_device *ndev)
 {
 	u32 i;
 	struct qm_host_desc *hd;
@@ -130,56 +133,13 @@ void target_init_qs(struct net_device *ndev)
 		hd->buff_ptr        = (u32)skb->data;
 		hd->next_bdptr      = 0;
 		hd->orig_buff_ptr   = (u32)skb;
-		hw_qm_queue_push (hd, DEVICE_QM_LNK_BUF_Q, QM_DESC_SIZE_BYTES);
+#if 0
+		QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, skb_tailroom(skb));
+		DPRINTK("Filling Rx ring packets of len %d (skb=0x%x, hd=0x%x)\n",
+			skb_tailroom(skb), skb, hd);
+#endif
+		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
 	}
-
-	for (i = 0; i < DEVICE_NUM_TX_DESCS; i++) {
-		hd		    = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
-		hd->buff_len        = 0;
-		hd->buff_ptr        = 0;
-		hd->next_bdptr      = 0;
-		hd->orig_buffer_len = 0;
-		hd->orig_buff_ptr   = 0;
-	
-		hw_qm_queue_push(hd, DEVICE_QM_TX_Q, QM_DESC_SIZE_BYTES);
-	}
-}
-
-static int keystone_ndo_start_xmit(struct sk_buff *skb,
-				   struct net_device *ndev)
-{
-	int ret, i;
-	struct qm_host_desc		*hd;
-
-	ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
-	if (unlikely(ret < 0)) {
-		printk("packet pad failed");
-		goto fail;
-	}
-
-	for (i = 0, hd = NULL; hd == NULL; i++, udelay(1000))
-		hd = hw_qm_queue_pop(DEVICE_QM_TX_Q);
-
-	if (hd == NULL)
-		return (-1);
-
-	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, skb->len);
-	
-	hd->buff_len		= skb->len;
-	hd->orig_buffer_len	= skb->len;
-	hd->buff_ptr		= (u32)skb->data;
-	hd->orig_buff_ptr	= (u32)skb;
-    
-	/* Return the descriptor back to the transmit queue */
-	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_TX_Q);
-	
-	hw_qm_queue_push (hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
-
-	return NETDEV_TX_OK;
-fail:
-	netif_stop_queue(ndev);
-	return NETDEV_TX_BUSY;
 }
 
 /* 
@@ -198,7 +158,7 @@ int cpdma_rx_disable(struct cpdma_rx_cfg *cfg)
 		v = __raw_readl(cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
 		if ((v & CPDMA_REG_VAL_RCHAN_A_RX_ENABLE) == CPDMA_REG_VAL_RCHAN_A_RX_ENABLE ) {
 			v = v | CPDMA_REG_VAL_RCHAN_A_RX_TDOWN;
-			__raw_writel(cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i), v);
+			__raw_writel(v, cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
 		}
 	}
 
@@ -212,28 +172,25 @@ int cpdma_rx_disable(struct cpdma_rx_cfg *cfg)
 	}
 
 	if (done == 0)
-		return (-1);
+		return -1;
 
 	/* Clear all of the flow registers */
 	for (i = 0; i < cfg->nrx_flows; i++)  {
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, i), 0);
-        __raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, i), 0);
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, i));
+		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, i));
 	}
 
-	return (0);
+	return 0;
 }
 
 /*
- * Configure the cpdma receive direction for boot loader
- * The receive configuration for boot consists of a single flow configuration
- * which is stored as flow configuration 0. All extended info and psinfo
- * is stripped
+ * Configure the CPDMA receive
  */
 int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 {
@@ -259,40 +216,39 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
                                          cfg->queue_rx);        /* Rx packet destination queue */
 
 
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, 0),
-			v);
+	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, 0));
 
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, 0),
-			CPDMA_REG_VAL_RX_FLOW_B_DEFAULT);
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, 0),
-			CPDMA_REG_VAL_RX_FLOW_C_DEFAULT);
+	__raw_writel(CPDMA_REG_VAL_RX_FLOW_B_DEFAULT,
+		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, 0));
+
+	__raw_writel(CPDMA_REG_VAL_RX_FLOW_C_DEFAULT,
+		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, 0));
 
 	v = CPDMA_REG_VAL_MAKE_RX_FLOW_D(cfg->qmnum_free_buf,
-                                        cfg->queue_free_buf,
-                                        cfg->qmnum_free_buf,
-                                        cfg->queue_free_buf);
+					 cfg->queue_free_buf,
+					 cfg->qmnum_free_buf,
+					 cfg->queue_free_buf);
 
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, 0), v);
-  
+	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, 0));
     
 	/* Register E uses the same setup as D */
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, 0), v);
-
-
-
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, 0),
-			CPDMA_REG_VAL_RX_FLOW_F_DEFAULT);
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, 0),
-			CPDMA_REG_VAL_RX_FLOW_G_DEFAULT);
-	__raw_writel(cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, 0),
-			CPDMA_REG_VAL_RX_FLOW_H_DEFAULT);
-
+	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, 0));
+	
+	__raw_writel(CPDMA_REG_VAL_RX_FLOW_F_DEFAULT,
+		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, 0));
+	
+	__raw_writel(CPDMA_REG_VAL_RX_FLOW_G_DEFAULT,
+		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, 0));
+	
+	__raw_writel(CPDMA_REG_VAL_RX_FLOW_H_DEFAULT,
+		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, 0));
+	
 	/* Enable the rx channels */
 	for (i = 0; i < cfg->n_rx_chans; i++) 
-		__raw_writel(cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i),
-				CPDMA_REG_VAL_RCHAN_A_RX_ENABLE);
+		__raw_writel(CPDMA_REG_VAL_RCHAN_A_RX_ENABLE,
+			     cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
 
-	return (ret);
+	return ret;
 }
 
 /*
@@ -303,17 +259,17 @@ int cpdma_tx_config(struct cpdma_tx_cfg *cfg)
 	u32 i;
 
 	/* Disable loopback in the tx direction */
-	__raw_writel(cfg->gbl_ctl_base + CPDMA_REG_EMU_CTL,
-			CPDMA_REG_VAL_EMU_CTL_NO_LOOPBACK);
+	__raw_writel(CPDMA_REG_VAL_EMU_CTL_NO_LOOPBACK,
+		     cfg->gbl_ctl_base + CPDMA_REG_EMU_CTL);
 
 	/* Enable all channels. The current state isn't important */
 	for (i = 0; i < cfg->n_tx_chans; i++) {
-		__raw_writel(cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_B(i), 0);  /* Priority */
-		__raw_writel(cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i),
-				CPDMA_REG_VAL_TCHAN_A_TX_ENABLE);
+		__raw_writel(0, cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_B(i));  /* Priority */
+		__raw_writel(CPDMA_REG_VAL_TCHAN_A_TX_ENABLE,
+			     cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
 	}
 
-	return (0);
+	return 0;
 }
 
 /*
@@ -325,15 +281,15 @@ int cpdma_tx_disable(struct cpdma_tx_cfg *cfg)
 
 	for (i = 0; i < cfg->n_tx_chans; i++) {
 		v = __raw_readl(cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
-
+		
 		if ((v & CPDMA_REG_VAL_TCHAN_A_TX_ENABLE) ==
-				CPDMA_REG_VAL_TCHAN_A_TX_ENABLE) {
+		    CPDMA_REG_VAL_TCHAN_A_TX_ENABLE) {
 			v = v | CPDMA_REG_VAL_TCHAN_A_TX_TDOWN;
-			__raw_writel(cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i), v);
-		 }
+			__raw_writel(v, cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
+		}
 	}
 
-	return (0);
+	return 0;
 }
 
 /*
@@ -345,18 +301,18 @@ int mac_sl_reset(u16 port)
 	u32 i, v;
 
 	/* Set the soft reset bit */
-	__raw_writel(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET,
-			CPGMAC_REG_RESET_VAL_RESET);
+	__raw_writel(CPGMAC_REG_RESET_VAL_RESET, 
+		     DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
 
 	/* Wait for the bit to clear */
 	for (i = 0; i < DEVICE_EMACSL_RESET_POLL_COUNT; i++) {
 		v = __raw_readl(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
 		if ((v & CPGMAC_REG_RESET_VAL_RESET_MASK) != CPGMAC_REG_RESET_VAL_RESET)
-			return (0);
+			return 0;
 	}
 
 	/* Timeout on the reset */
-	return (GMACSL_RET_WARN_RESET_INCOMPLETE);
+	return GMACSL_RET_WARN_RESET_INCOMPLETE;
 }
 
 /*
@@ -380,18 +336,18 @@ int mac_sl_config(u16 port, struct mac_sliver *cfg)
 	}
 
 	if (i == DEVICE_EMACSL_RESET_POLL_COUNT)
-		return (GMACSL_RET_CONFIG_FAIL_RESET_ACTIVE);
+		return GMACSL_RET_CONFIG_FAIL_RESET_ACTIVE;
 
-	__raw_writel(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_MAXLEN,
-			cfg->max_rx_len);
-	__raw_writel(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_CTL, cfg->ctl);
+	__raw_writel(cfg->max_rx_len, DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_MAXLEN);
+	__raw_writel(cfg->ctl, DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_CTL);
 
-	return (ret);
+	return ret;
 }
 
-int cpmac_drv_start(void)
+static int cpmac_drv_start(void)
 {
 	struct mac_sliver cfg;
+	int i;
 
 	cfg.max_rx_len	= MAX_SIZE_STREAM_BUFFER;
 	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL;
@@ -399,35 +355,177 @@ int cpmac_drv_start(void)
         mac_sl_reset(0);
         mac_sl_config(0, &cfg);
 
-	return (0);
+#if 0
+	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
+		mac_sl_reset(i);
+		mac_sl_config(i, &cfg);
+        }
+#endif
+
+	return 0;
 }
 
-int cpmac_drv_stop(void)
+static int cpmac_drv_stop(void)
 {
 	mac_sl_reset(0);
-	return (0);
+	return 0;
 }
-#if 0
-int target_mac_rcv(u8 *buffer)
+ 
+/*
+ * Pop an incoming packet
+ */
+static int pktdma_rx(struct net_device *ndev)
 {
-	Int32           pktSizeBytes; 
-	qmHostDesc_t   *hd;
+	int                  pkt_size;
+	struct qm_host_desc *hd;
+	struct sk_buff      *skb;
+	struct sk_buff      *skb_rcv;
 
-	hd = hwQmQueuePop (DEVICE_QM_RCV_Q);
+	hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q);
 	if (hd == NULL)
-		return (0);
+		return 0;
 
-	pktSizeBytes = QM_DESC_DESCINFO_GET_PKT_LEN(hd->descInfo);
-	iblMemcpy ((void *)buffer, (void *)hd->buffPtr, pktSizeBytes);
-	
-	hd->buffLen = hd->origBufferLen;
-	hd->buffPtr = hd->origBuffPtr;
+	pkt_size = QM_DESC_DESCINFO_GET_PKT_LEN(hd->desc_info);
 
-	hwQmQueuePush (hd, DEVICE_QM_LNK_BUF_Q, QM_DESC_SIZE_BYTES);
+	/* Get the incoming skbuff */
+	skb_rcv = (struct sk_buff *) hd->orig_buff_ptr;
 
-	return (pktSizeBytes);
+	DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) packet_info = 0x%x\n",
+		pkt_size, skb_rcv, hd, hd->desc_info);
+
+	/* Cache sync here */
+	L2_cache_block_invalidate((u32) hd->buff_ptr,
+				  (u32) hd->buff_ptr + pkt_size);
+			
+	/* Allocate a new skb */
+	skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
+	if (skb != NULL) {
+		/* Attach the new one */
+		hd->buff_len        = skb_tailroom(skb);
+		hd->orig_buffer_len = skb_tailroom(skb);
+		hd->buff_ptr        = (u32)skb->data;
+		hd->next_bdptr      = 0;
+		hd->orig_buff_ptr   = (u32)skb;
+		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
+	}
+
+        /* Give back old sk_buff */
+	netif_rx(skb_rcv);
+
+	return pkt_size;
 }
-#endif
+
+/*
+ * Release a transmitted packet
+ */
+static int pktdma_tx(struct net_device *ndev)
+{	
+	struct qm_host_desc *hd;
+	
+	hd = hw_qm_queue_pop(DEVICE_QM_TX_Q);
+	if (hd != NULL) {
+		DPRINTK("Tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
+			hd->orig_buff_ptr, hd);
+
+		if (hd->orig_buff_ptr)
+			/* Free the skbuff associated to this packet */
+			dev_kfree_skb_irq((struct sk_buff*) hd->orig_buff_ptr);
+
+		if (netif_running(ndev))
+			netif_wake_queue(ndev);
+
+		/* Send packet back to available free buffer queue */
+		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
+	}
+}
+
+/*
+ * PKTDMA interrupt handling functions
+ */
+static irqreturn_t pktdma_rx_interrupt(int irq, void * netdev_id)
+{
+	struct net_device *ndev = (struct net_device *) netdev_id;
+
+	(void) pktdma_rx(ndev);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t pktdma_tx_interrupt(int irq, void * netdev_id)
+{
+	struct net_device         *ndev = (struct net_device *) netdev_id;
+
+	(void) pktdma_tx(ndev);
+	
+	return IRQ_HANDLED;
+}
+
+/*
+ * Poll the device
+ */
+static void keystone_ndo_poll_controller(struct net_device *ndev)
+{
+	// disable_netcp_irq()
+
+	pktdma_rx_interrupt(0, ndev);
+	pktdma_tx_interrupt(0, ndev);
+
+	// enable_netcp_irq();
+
+	/* Ugly hack */
+	mod_timer(&poll_timer, jiffies + msecs_to_jiffies(250));
+}
+
+/*
+ * Push an outcoming packet
+ */
+static int keystone_ndo_start_xmit(struct sk_buff *skb,
+				   struct net_device *ndev)
+{
+	int                  ret;
+	struct qm_host_desc *hd;
+
+	ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
+	if (unlikely(ret < 0)) {
+		printk("packet pad failed");
+		goto fail;
+	}
+
+	hd  = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
+	if (hd == NULL) {
+		DPRINTK("no packet retrieved\n");
+		return -1;
+	}
+
+	/* No coherency is assumed between PKTDMA and L2 cache */
+	L2_cache_block_writeback((u32) skb->data,
+				 (u32) skb->data + skb->len);
+
+	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, skb->len);
+	
+	hd->buff_len		= skb->len;
+	hd->orig_buffer_len	= skb->len;
+	hd->buff_ptr		= (u32)skb->data;
+	hd->orig_buff_ptr	= (u32)skb;
+    
+	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x)\n",
+		skb->len, skb, hd);
+
+	/* Return the descriptor back to the transmit queue */
+	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_TX_Q);
+	
+	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
+
+	return NETDEV_TX_OK;
+fail:
+	netif_stop_queue(ndev);
+	return NETDEV_TX_BUSY;
+}
+
+/*
+ * Change receive flags
+ */
 static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
 {
 	if ((flags & IFF_PROMISC) && (ndev->flags & IFF_PROMISC))
@@ -440,9 +538,20 @@ static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
 /*
  * Open the device
  */
-static int  keystone_ndo_open(struct net_device *dev)
+static int keystone_ndo_open(struct net_device *ndev)
 {
-	netif_start_queue(dev);
+	/* Start CPMAC */
+	cpmac_drv_start();
+
+	netif_start_queue(ndev);
+
+	DPRINTK("starting to poll\n");
+
+	/* Ugly hack: use timeout to poll */
+	init_timer(&poll_timer);
+	poll_timer.function = keystone_ndo_poll_controller;
+	poll_timer.data     = (unsigned long) ndev;
+	mod_timer(&poll_timer, jiffies + msecs_to_jiffies(250));
 
 	return 0;
 }
@@ -450,13 +559,25 @@ static int  keystone_ndo_open(struct net_device *dev)
 /*
  * Close the device
  */
-static int keystone_ndo_stop(struct net_device *dev)
+static int keystone_ndo_stop(struct net_device *ndev)
 {
-	netif_stop_queue(dev);
+	netif_stop_queue(ndev);
 	
 	cpmac_drv_stop();
 
 	return 0;
+}
+
+/*
+ * Called by the kernel to send a packet out into the void
+ * of the net.
+ */
+static void keystone_ndo_tx_timeout(struct net_device *ndev)
+{
+	printk(KERN_WARNING "%s: transmit timed out\n", ndev->name);
+	ndev->stats.tx_errors++;
+	ndev->trans_start = jiffies;
+	netif_wake_queue(ndev);
 }
 
 static const struct net_device_ops keystone_netdev_ops = {
@@ -466,9 +587,9 @@ static const struct net_device_ops keystone_netdev_ops = {
 	.ndo_change_rx_flags	= keystone_ndo_change_rx_flags,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
-//	.ndo_tx_timeout		= keystone_ndo_tx_timeout,
+	.ndo_tx_timeout		= keystone_ndo_tx_timeout,
 #ifdef CONFIG_NET_POLL_CONTROLLER
-//	.ndo_poll_controller	= keystone_ndo_poll_controller,
+	.ndo_poll_controller	= keystone_ndo_poll_controller,
 #endif
 };
 
@@ -479,7 +600,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	struct keystone_cpsw_priv	*priv;
 	int                             i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
-	char				hw_emac_addr[6];
+	u8				hw_emac_addr[6];
 #endif
 	struct cpdma_rx_cfg		c_rx_cfg;
 	struct cpdma_tx_cfg		c_tx_cfg;
@@ -508,40 +629,6 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	priv->dev  = &ndev->dev;
 	priv->rx_packet_max = max(rx_packet_max, 128);
 
-	cpmac_drv_start();
-	
-	rx_cfg->rx_base = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
-	rx_cfg->n_rx_chans = DEVICE_PA_CDMA_RX_NUM_CHANNELS;
-	rx_cfg->flow_base = DEVICE_PA_CDMA_RX_FLOW_CFG_BASE;
-	rx_cfg->nrx_flows = DEVICE_PA_CDMA_RX_NUM_FLOWS;
-	rx_cfg->qmnum_free_buf = 0;
-	rx_cfg->queue_free_buf = DEVICE_QM_LNK_BUF_Q;
-	rx_cfg->qmnum_rx = 0;
-	rx_cfg->queue_rx = DEVICE_QM_RCV_Q;
-	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
-
-	tx_cfg->gbl_ctl_base = DEVICE_PA_CDMA_GLOBAL_CFG_BASE;
-	tx_cfg->tx_base = DEVICE_PA_CDMA_TX_CHAN_CFG_BASE;
-	tx_cfg->n_tx_chans = DEVICE_PA_CDMA_TX_NUM_CHANNELS;
-
-	cpdma_rx_config(rx_cfg);
-	cpdma_tx_config(tx_cfg);
-
-
-	/* Streaming switch configuration */
-	__raw_writel(DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0,
-			DEVICE_PSTREAM_CFG_REG_ADDR);
-	
-	q_cfg->link_ram_base		= 0x2a800000;
-	q_cfg->link_ram_size		= 0x2000;
-	q_cfg->mem_region_base		= RAM_MSM_BASE + 0x100000; //  0x10860000;
-	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
-
-	hw_qm_setup(q_cfg);
-	
-	target_init_qs(ndev);
-
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
 	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
@@ -553,17 +640,73 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	}
 #endif
 
-//	if (is_valid_ether_addr(data->mac_addr))
+	if (is_valid_ether_addr(config.enetaddr))
 		memcpy(ndev->dev_addr, config.enetaddr, ETH_ALEN);
-//	else
-//		random_ether_addr(ndev->dev_addr);
+	else
+		random_ether_addr(ndev->dev_addr);
 
-	ndev->flags |= IFF_ALLMULTI;	
+#if 1
+	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
+	q_cfg->link_ram_base		= 0x00080000;
+	q_cfg->link_ram_size		= 0x3FFF;
+#else
+	/* Use MSM first megabyte memory for linking ram */
+	q_cfg->link_ram_base		= RAM_MSM_BASE;
+	q_cfg->link_ram_size		= 0x2000;
+#endif
 
+#if 1
+	/* Use MSM second megabyte memory for descriptors */
+	q_cfg->mem_region_base		= RAM_MSM_BASE + 0x100000;
+	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
+#else
+	/* Use L2 lower 256KB memory for descriptors */
+	q_cfg->mem_region_base		= RAM_SRAM_BASE;
+	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
+#endif
+
+	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
+
+	/* Initialize QM */
+	hw_qm_setup(q_cfg);
+
+	/* Configure Rx and Tx PKTDMA */
+	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
+	rx_cfg->n_rx_chans       = DEVICE_PA_CDMA_RX_NUM_CHANNELS;
+	rx_cfg->flow_base        = DEVICE_PA_CDMA_RX_FLOW_CFG_BASE;
+	rx_cfg->nrx_flows        = DEVICE_PA_CDMA_RX_NUM_FLOWS;
+	rx_cfg->qmnum_free_buf   = 0;
+	rx_cfg->queue_free_buf   = DEVICE_QM_RX_Q;
+	rx_cfg->qmnum_rx         = 0;
+	rx_cfg->queue_rx         = DEVICE_QM_ETH_RX_Q;
+	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
+
+	cpdma_rx_config(rx_cfg);
+
+	tx_cfg->gbl_ctl_base     = DEVICE_PA_CDMA_GLOBAL_CFG_BASE;
+	tx_cfg->tx_base          = DEVICE_PA_CDMA_TX_CHAN_CFG_BASE;
+	tx_cfg->n_tx_chans       = DEVICE_PA_CDMA_TX_NUM_CHANNELS;
+
+	cpdma_tx_config(tx_cfg);
+
+	/* Initialize PKTDMA queues */
+	cpdma_init_qs(ndev);
+
+	/* Configure the PA */
+	ret = keystone_pa_config(ndev->dev_addr);
+	if (ret != 0) {
+		printk("PA init failed \n");
+		return ret;
+	}
+
+	/* Streaming switch configuration */
+	streaming_switch_setup();
+	
+	/* Register the network device */
+	ndev->flags     |= IFF_ALLMULTI;	
 	ndev->netdev_ops = &keystone_netdev_ops;
-
-	/* register the network device */
 	SET_NETDEV_DEV(ndev, &pdev->dev);
+
 	ret = register_netdev(ndev);
 	if (ret) {
 		dev_err(priv->dev, "error registering net device\n");
@@ -619,7 +762,7 @@ static int __init pktdma_init(void)
 {
 	return platform_driver_register(&pktdma_driver);
 }
-late_initcall(pktdma_init);
+module_init(pktdma_init);
 
 static void __exit pktdma_exit(void)
 {
