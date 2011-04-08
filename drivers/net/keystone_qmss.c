@@ -42,8 +42,8 @@ u32 hw_qm_queue_count(u32 qnum)
 
 	rega = __raw_readl(DEVICE_QM_QUEUE_STATUS_BASE +
 			   QM_REG_QUEUE_REGA(qnum));
-	rega = BOOT_READ_BITFIELD (rega, QM_QA_ENTRY_COUNT_MSB,
-				   QM_QA_ENTRY_COUNT_LSB);
+	rega = READ_BITFIELD (rega, QM_QA_ENTRY_COUNT_MSB,
+			      QM_QA_ENTRY_COUNT_LSB);
 	
 	return (rega);
 }

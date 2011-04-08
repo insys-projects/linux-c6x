@@ -246,8 +246,8 @@ struct pktdma_rx_flow_cfg
 /* CPPI Tx DMA channel control register B definitions */
 #define CPDMA_REG_VAL_TCHAN_B_TX_FILT_EINFO	(1 << 30)
 #define CPDMA_REG_VAL_TCHAN_B_TX_FILT_PSWORDS	(1 << 29)
-#define CPDMA_REG_TCHAN_B_SET_DEFAULT_TDOWN_QMGR(x,v)  (x) = (BOOT_SET_BITFIELD((x), (v), 13, 12)
-#define CPDMA_REG_TCHAN_B_SET_DEFAULT_TDOWN_QNUM(x,v)  (x) = (BOOT_SET_BITFIELD((x), (v), 11,  0)
+#define CPDMA_REG_TCHAN_B_SET_DEFAULT_TDOWN_QMGR(x,v)  (x) = (SET_BITFIELD((x), (v), 13, 12)
+#define CPDMA_REG_TCHAN_B_SET_DEFAULT_TDOWN_QNUM(x,v)  (x) = (SET_BITFIELD((x), (v), 11,  0)
 
 /* CPPI Rx DMA channel control register A definitions */
 #define CPDMA_REG_VAL_RCHAN_A_RX_ENABLE		((u32)1 << 31)

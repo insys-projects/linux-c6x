@@ -121,7 +121,7 @@ struct qm_host_desc {
 	 */
 	u32	next_bdptr;
 	/* Completion tag, original buffer size */
-	u32	orig_buffer_len;
+	u32	orig_buff_len;
 	/* Original buffer pointer */
 	u32	orig_buff_ptr;
 	/* Optional EPIB word0 */
@@ -133,7 +133,9 @@ struct qm_host_desc {
 	/* Optional EPIB word3 */
 	u32	software_info2;
 	/* Optional protocol specific data */
-	u32	ps_data; 
+	u32	ps_data;
+	/* SW data */
+	u32     private;
 };
 
 #define DEVICE_QM
@@ -153,19 +155,19 @@ struct qm_host_desc {
 #define QM_DESC_PSINFO_IN_DESCR		0
 #define QM_DESC_DEFAULT_DESCINFO	(QM_DESC_TYPE_HOST << 30)    |  \
 					(QM_DESC_PSINFO_IN_DESCR << 22)
-#define QM_DESC_INFO_GET_PSINFO_LOC(x)	BOOT_READ_BITFIELD((x), 22, 22)
-#define QM_DESC_DESCINFO_SET_PKT_LEN(x,v)	(x) = BOOT_SET_BITFIELD((x), (v), 21, 0)
-#define QM_DESC_DESCINFO_GET_PKT_LEN(x)	BOOT_READ_BITFIELD((x), 21, 0)
+#define QM_DESC_INFO_GET_PSINFO_LOC(x)	READ_BITFIELD((x), 22, 22)
+#define QM_DESC_DESCINFO_SET_PKT_LEN(x,v)	(x) = SET_BITFIELD((x), (v), 21, 0)
+#define QM_DESC_DESCINFO_GET_PKT_LEN(x)	READ_BITFIELD((x), 21, 0)
 
 /* Packet Info */
 #define QM_DESC_PINFO_EPIB		1
 #define QM_DESC_PINFO_RETURN_OWN	1
 #define QM_DESC_DEFAULT_PINFO		(QM_DESC_PINFO_EPIB << 31) | \
 					(QM_DESC_PINFO_RETURN_OWN << 15)
-#define QM_PKT_INFO_GET_EPIB(x)		BOOT_READ_BITFIELD((x), 31, 31)
-#define QM_PKT_INFO_SET_PSINFO_SIZE(x,v)    (x) = BOOT_SET_BITFIELD((x), (v), 29, 24)
-#define QM_DESC_PINFO_SET_QM(x,v)	(x) = BOOT_SET_BITFIELD((x), (v), 13, 12)
-#define QM_DESC_PINFO_SET_QUEUE(x,v)    (x) = BOOT_SET_BITFIELD((x), (v), 11,  0)
+#define QM_PKT_INFO_GET_EPIB(x)		READ_BITFIELD((x), 31, 31)
+#define QM_PKT_INFO_SET_PSINFO_SIZE(x,v)    (x) = SET_BITFIELD((x), (v), 29, 24)
+#define QM_DESC_PINFO_SET_QM(x,v)	(x) = SET_BITFIELD((x), (v), 13, 12)
+#define QM_DESC_PINFO_SET_QUEUE(x,v)    (x) = SET_BITFIELD((x), (v), 11,  0)
 #define QM_REG_REVISION			0x00
 #define QM_REG_DIVERSION		0x08
 #define QM_REG_LINKRAM_BASE(x)		(0x0c + 8*(x))
@@ -188,7 +190,7 @@ struct qm_host_desc {
 #define QM_REG_QUEUE_REGD(x)		(0x0c + 16*(x))
 
 /* Description region setup */
-#define QM_REG_VAL_DESC_SETUP_SET_DESC_SIZE(x,v)  (x) = BOOT_SET_BITFIELD((x),((v) >> 4)-1, 28, 16)
+#define QM_REG_VAL_DESC_SETUP_SET_DESC_SIZE(x,v)  (x) = SET_BITFIELD((x),((v) >> 4)-1, 28, 16)
 
 /* Maximum linking RAM size mask */
 #define QM_REG_LINKRAM_SIZE_MAX_MASK	0x7ffff

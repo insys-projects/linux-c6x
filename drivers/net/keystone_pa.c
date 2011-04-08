@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -15,11 +16,14 @@
 #include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/io.h>
+#include <linux/slab.h>
 
 #include <mach/pa.h>
 #include <mach/netcp.h>
 #include <mach/keystone_qmss.h>
- 
+
+#define PA_CMD_SIZE 16
+
 static unsigned int pdsp_code[] =  {
 	0x2eff9196,
 	0x85002096,
@@ -111,27 +115,23 @@ int keystone_pa_enable(struct pa_config *cfg)
 	 * Mailbox 4 must be written last since this write triggers the
 	 * firmware to update the match information
 	 */
-	cfg->cmd_buf[0] = BOOT_READ_BITFIELD(cfg->mac0_ms, 31, 24);
-	cfg->cmd_buf[1] = BOOT_READ_BITFIELD(cfg->mac0_ms, 23, 16);
-	cfg->cmd_buf[2] = BOOT_READ_BITFIELD(cfg->mac0_ms, 15,  8);
-	cfg->cmd_buf[3] = BOOT_READ_BITFIELD(cfg->mac0_ms, 7, 0);
-	cfg->cmd_buf[4] = BOOT_READ_BITFIELD(cfg->mac0_ls, 31, 24);
-	cfg->cmd_buf[5] = BOOT_READ_BITFIELD(cfg->mac0_ls, 23, 16);
+	cfg->cmd_buf[0] = READ_BITFIELD(cfg->mac0_ms, 31, 24);
+	cfg->cmd_buf[1] = READ_BITFIELD(cfg->mac0_ms, 23, 16);
+	cfg->cmd_buf[2] = READ_BITFIELD(cfg->mac0_ms, 15,  8);
+	cfg->cmd_buf[3] = READ_BITFIELD(cfg->mac0_ms, 7, 0);
+	cfg->cmd_buf[4] = READ_BITFIELD(cfg->mac0_ls, 31, 24);
+	cfg->cmd_buf[5] = READ_BITFIELD(cfg->mac0_ls, 23, 16);
 	cfg->cmd_buf[6] = 0;
 	cfg->cmd_buf[7] = 0;
 
-	cfg->cmd_buf[8]  = BOOT_READ_BITFIELD(cfg->mac1_ms, 31, 24);
-	cfg->cmd_buf[9]  = BOOT_READ_BITFIELD(cfg->mac1_ms, 23, 16);
-	cfg->cmd_buf[10] = BOOT_READ_BITFIELD(cfg->mac1_ms, 15,  8);
-	cfg->cmd_buf[11] = BOOT_READ_BITFIELD(cfg->mac1_ms, 7, 0);
-	cfg->cmd_buf[12] = BOOT_READ_BITFIELD(cfg->mac1_ls, 31, 24);
-	cfg->cmd_buf[13] = BOOT_READ_BITFIELD(cfg->mac1_ls, 23, 16);
-	cfg->cmd_buf[14] = BOOT_READ_BITFIELD(cfg->rx_qnum, 15, 8);
-	cfg->cmd_buf[15] = BOOT_READ_BITFIELD(cfg->rx_qnum, 7, 0);
-
-	/* No coherency is assumed between PKTDMA and L2 cache */
-	L2_cache_block_writeback((u32) &cfg->cmd_buf[0],
-				 (u32) &cfg->cmd_buf[16]);
+	cfg->cmd_buf[8]  = READ_BITFIELD(cfg->mac1_ms, 31, 24);
+	cfg->cmd_buf[9]  = READ_BITFIELD(cfg->mac1_ms, 23, 16);
+	cfg->cmd_buf[10] = READ_BITFIELD(cfg->mac1_ms, 15,  8);
+	cfg->cmd_buf[11] = READ_BITFIELD(cfg->mac1_ms, 7, 0);
+	cfg->cmd_buf[12] = READ_BITFIELD(cfg->mac1_ls, 31, 24);
+	cfg->cmd_buf[13] = READ_BITFIELD(cfg->mac1_ls, 23, 16);
+	cfg->cmd_buf[14] = READ_BITFIELD(cfg->rx_qnum, 15, 8);
+	cfg->cmd_buf[15] = READ_BITFIELD(cfg->rx_qnum, 7, 0);
 
 	/*
 	 * Give some delay then verify that the
@@ -174,8 +174,8 @@ int keystone_pa_config(u8* mac_addr)
 	int                  ret = 0;
 
 	/*
-	 * Filter everything except the desired MAC address
-	 * and the broadcast MAC
+	 * Filter everything except the desired mac address
+	 * and the broadcast mac
 	 */
 	pa_cfg.mac0_ms = ((u32)mac_addr[0] << 24) |
 			 ((u32)mac_addr[1] << 16) |
@@ -193,28 +193,38 @@ int keystone_pa_config(u8* mac_addr)
 	 * Form the configuration command in a buffer
 	 * linked to a descriptor
 	 */
-	hd = hw_qm_queue_pop(DEVICE_QM_RX_Q);
+	hd = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
 
-	printk(KERN_CRIT "NetCP (%s): hd=0x%x, orig_buff_ptr=0x%x\n",
-	       __FUNCTION__, hd, hd->orig_buff_ptr);
-
-	pa_cfg.cmd_buf = (u8 *)hd->orig_buff_ptr;
+	pa_cfg.cmd_buf = (u8*) kzalloc(PA_CMD_SIZE, GFP_KERNEL);
+	if (pa_cfg.cmd_buf == NULL)
+		return -ENOMEM;
 
 	ret = keystone_pa_enable(&pa_cfg);
-	if (ret != 0)
+	if (ret != 0) {
+		kfree(pa_cfg.cmd_buf);
 		return ret;
+	}
+
+	/* No coherency is assumed between PKTDMA and GEM L1/L2 caches */
+	L2_cache_block_writeback((u32) pa_cfg.cmd_buf,
+				 (u32) pa_cfg.cmd_buf + PA_CMD_SIZE);
 
 	/* Send the command to the PA through the QM */
 	hd->software_info0 = PA_MAGIC_ID;
-	hd->buff_len       = 16;
-	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, 16);
+	hd->buff_len       = PA_CMD_SIZE;
+	hd->orig_buff_len  = PA_CMD_SIZE;
+	hd->orig_buff_ptr  = (u32) pa_cfg.cmd_buf;
+	hd->buff_ptr       = (u32) pa_cfg.cmd_buf;
+	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, PA_CMD_SIZE);
 
 	/* Set the return Queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_RX_Q);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_FREE_Q);
 
 	hw_qm_queue_push(hd, DEVICE_QM_PA_CFG_Q, QM_DESC_SIZE_BYTES);
 	
+	kfree(pa_cfg.cmd_buf);
+
 	return 0;
 }
 

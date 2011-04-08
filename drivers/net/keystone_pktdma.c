@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -34,13 +35,19 @@
 
 #include "keystone_pktdma.h"
 
-#define DPRINTK(fmt, args...)           printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
+#undef EMAC_DEBUG
+#ifdef EMAC_DEBUG
+#define DPRINTK(fmt, args...) printk(KERN_DEBUG "NETCP: [%s] " fmt, __FUNCTION__, ## args)
+#else
+#define DPRINTK(fmt, args...)
+#endif
 
+#define DEVICE_POLLING_PERIOD_MSEC      10
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
 
-#define KEYSTONE_CPSW_MIN_PACKET_SIZE	VLAN_ETH_ZLEN
+#define KEYSTONE_CPSW_MIN_PACKET_SIZE	ETH_ZLEN
 #define KEYSTONE_CPSW_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
 static int rx_packet_max = KEYSTONE_CPSW_MAX_PACKET_SIZE;
@@ -123,21 +130,17 @@ static void cpdma_init_qs(struct net_device *ndev)
 {
 	u32 i;
 	struct qm_host_desc *hd;
-	struct sk_buff   *skb;
+	struct sk_buff      *skb;
 
 	for (i = 0; i < DEVICE_NUM_RX_DESCS; i++) {
 		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
 		hd = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
-		hd->buff_len        = skb_tailroom(skb);
-		hd->orig_buffer_len = skb_tailroom(skb);
-		hd->buff_ptr        = (u32)skb->data;
-		hd->next_bdptr      = 0;
-		hd->orig_buff_ptr   = (u32)skb;
-#if 0
-		QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, skb_tailroom(skb));
-		DPRINTK("Filling Rx ring packets of len %d (skb=0x%x, hd=0x%x)\n",
-			skb_tailroom(skb), skb, hd);
-#endif
+		hd->buff_len       = skb_tailroom(skb);
+		hd->orig_buff_len  = skb_tailroom(skb);
+		hd->buff_ptr       = (u32)skb->data;
+		hd->next_bdptr     = 0;
+		hd->orig_buff_ptr  = (u32)skb->data;
+		hd->private        = (u32)skb;
 		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
 	}
 }
@@ -208,11 +211,11 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	 */
 	v = CPDMA_REG_VAL_MAKE_RX_FLOW_A(1,                     /* extended info passed */
                                          1,                     /* psinfo passed */
-                                         0,                     
+                                         0,
                                          CPDMA_DESC_TYPE_HOST,  /* Host type descriptor */
                                          0,                     /* PS located in descriptor */
                                          0,                     /* SOP offset */
-                                         cfg->qmnum_rx,            
+                                         cfg->qmnum_rx,
                                          cfg->queue_rx);        /* Rx packet destination queue */
 
 
@@ -351,23 +354,22 @@ static int cpmac_drv_start(void)
 
 	cfg.max_rx_len	= MAX_SIZE_STREAM_BUFFER;
 	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL;
-
-        mac_sl_reset(0);
-        mac_sl_config(0, &cfg);
-
-#if 0
+       
 	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
 		mac_sl_reset(i);
 		mac_sl_config(i, &cfg);
         }
-#endif
 
 	return 0;
 }
 
 static int cpmac_drv_stop(void)
 {
-	mac_sl_reset(0);
+	int i;
+
+	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)
+		mac_sl_reset(i);
+
 	return 0;
 }
  
@@ -388,29 +390,41 @@ static int pktdma_rx(struct net_device *ndev)
 	pkt_size = QM_DESC_DESCINFO_GET_PKT_LEN(hd->desc_info);
 
 	/* Get the incoming skbuff */
-	skb_rcv = (struct sk_buff *) hd->orig_buff_ptr;
+	skb_rcv = (struct sk_buff *) hd->private;
 
-	DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) packet_info = 0x%x\n",
+	DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) buffer = 0x%x\n",
 		pkt_size, skb_rcv, hd, hd->desc_info);
 
+	/* Prepare the received sk_buff */
+	skb_rcv->dev = ndev;
+	skb_put(skb_rcv, pkt_size);
+	skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
+
 	/* Cache sync here */
-	L2_cache_block_invalidate((u32) hd->buff_ptr,
-				  (u32) hd->buff_ptr + pkt_size);
+	L2_cache_block_invalidate((u32) hd->orig_buff_ptr,
+				  (u32) hd->orig_buff_ptr + pkt_size);
 			
 	/* Allocate a new skb */
 	skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
 	if (skb != NULL) {
 		/* Attach the new one */
-		hd->buff_len        = skb_tailroom(skb);
-		hd->orig_buffer_len = skb_tailroom(skb);
-		hd->buff_ptr        = (u32)skb->data;
-		hd->next_bdptr      = 0;
-		hd->orig_buff_ptr   = (u32)skb;
+		hd->buff_len      = skb_tailroom(skb);
+		hd->orig_buff_len = skb_tailroom(skb);
+		hd->buff_ptr      = (u32)skb->data;
+		hd->next_bdptr    = 0;
+		hd->orig_buff_ptr = (u32)skb->data;
+		hd->private       = (u32)skb;
 		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
 	}
 
         /* Give back old sk_buff */
 	netif_rx(skb_rcv);
+
+	ndev->last_rx = jiffies;
+
+	/* Fill statistic */
+	ndev->stats.rx_packets++;
+	ndev->stats.rx_bytes += pkt_size;
 
 	return pkt_size;
 }
@@ -425,18 +439,21 @@ static int pktdma_tx(struct net_device *ndev)
 	hd = hw_qm_queue_pop(DEVICE_QM_TX_Q);
 	if (hd != NULL) {
 		DPRINTK("Tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
-			hd->orig_buff_ptr, hd);
+			hd->private, hd);
 
-		if (hd->orig_buff_ptr)
+		if (hd->private)
 			/* Free the skbuff associated to this packet */
-			dev_kfree_skb_irq((struct sk_buff*) hd->orig_buff_ptr);
+			dev_kfree_skb_irq((struct sk_buff*) hd->private);
 
 		if (netif_running(ndev))
 			netif_wake_queue(ndev);
 
 		/* Send packet back to available free buffer queue */
 		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
+
+		return 1;
 	}
+	return 0;
 }
 
 /*
@@ -446,7 +463,10 @@ static irqreturn_t pktdma_rx_interrupt(int irq, void * netdev_id)
 {
 	struct net_device *ndev = (struct net_device *) netdev_id;
 
-	(void) pktdma_rx(ndev);
+	for (;;) {
+		if (pktdma_rx(ndev) == 0)
+			break;
+	}
 
 	return IRQ_HANDLED;
 }
@@ -455,7 +475,10 @@ static irqreturn_t pktdma_tx_interrupt(int irq, void * netdev_id)
 {
 	struct net_device         *ndev = (struct net_device *) netdev_id;
 
-	(void) pktdma_tx(ndev);
+	for (;;) {
+		if (pktdma_tx(ndev) == 0);
+		break;
+	}
 	
 	return IRQ_HANDLED;
 }
@@ -473,7 +496,8 @@ static void keystone_ndo_poll_controller(struct net_device *ndev)
 	// enable_netcp_irq();
 
 	/* Ugly hack */
-	mod_timer(&poll_timer, jiffies + msecs_to_jiffies(250));
+	mod_timer(&poll_timer,
+		  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
 }
 
 /*
@@ -483,12 +507,16 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 				   struct net_device *ndev)
 {
 	int                  ret;
+	unsigned             pkt_len = skb->len;
 	struct qm_host_desc *hd;
 
-	ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
-	if (unlikely(ret < 0)) {
-		printk("packet pad failed");
-		goto fail;
+	if (unlikely(pkt_len < KEYSTONE_CPSW_MIN_PACKET_SIZE)) {
+		ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
+		if (unlikely(ret < 0)) {
+			printk("packet pad failed");
+			goto fail;
+		}
+		pkt_len = KEYSTONE_CPSW_MIN_PACKET_SIZE;
 	}
 
 	hd  = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
@@ -501,13 +529,18 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	L2_cache_block_writeback((u32) skb->data,
 				 (u32) skb->data + skb->len);
 
-	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, skb->len);
+	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, pkt_len);
 	
-	hd->buff_len		= skb->len;
-	hd->orig_buffer_len	= skb->len;
+	hd->buff_len		= pkt_len;
+	hd->orig_buff_len	= skb->len;
 	hd->buff_ptr		= (u32)skb->data;
-	hd->orig_buff_ptr	= (u32)skb;
-    
+	hd->orig_buff_ptr	= (u32)skb->data;
+	hd->private             = (u32)skb;
+
+	ndev->stats.tx_packets++;
+	ndev->stats.tx_bytes += pkt_len;
+	ndev->trans_start     = jiffies;
+
 	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x)\n",
 		skb->len, skb, hd);
 
@@ -551,7 +584,8 @@ static int keystone_ndo_open(struct net_device *ndev)
 	init_timer(&poll_timer);
 	poll_timer.function = keystone_ndo_poll_controller;
 	poll_timer.data     = (unsigned long) ndev;
-	mod_timer(&poll_timer, jiffies + msecs_to_jiffies(250));
+	mod_timer(&poll_timer,
+		  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
 
 	return 0;
 }
@@ -645,26 +679,13 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	else
 		random_ether_addr(ndev->dev_addr);
 
-#if 1
 	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
 	q_cfg->link_ram_base		= 0x00080000;
 	q_cfg->link_ram_size		= 0x3FFF;
-#else
-	/* Use MSM first megabyte memory for linking ram */
-	q_cfg->link_ram_base		= RAM_MSM_BASE;
-	q_cfg->link_ram_size		= 0x2000;
-#endif
 
-#if 1
-	/* Use MSM second megabyte memory for descriptors */
-	q_cfg->mem_region_base		= RAM_MSM_BASE + 0x100000;
-	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-#else
 	/* Use L2 lower 256KB memory for descriptors */
 	q_cfg->mem_region_base		= RAM_SRAM_BASE;
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-#endif
-
 	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
 
 	/* Initialize QM */
@@ -701,8 +722,12 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 
 	/* Streaming switch configuration */
 	streaming_switch_setup();
+
+	/* Setup Ethernet driver function */
+	ether_setup(ndev);
 	
 	/* Register the network device */
+	ndev->dev_id     = 0;
 	ndev->flags     |= IFF_ALLMULTI;	
 	ndev->netdev_ops = &keystone_netdev_ops;
 	SET_NETDEV_DEV(ndev, &pdev->dev);

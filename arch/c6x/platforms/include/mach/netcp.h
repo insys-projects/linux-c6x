@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -15,11 +16,11 @@
 #ifndef __MACH_C6X_NETCP_H
 #define __MACH_C6X_NETCP_H
 
-#define BOOTBITMASK(x,y)	        (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
+#define BITMASK(x,y)	                (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
 					   - (u32)1 ))   <<  ((u32)y))
-#define BOOT_READ_BITFIELD(z,x,y)	(((u32)z) & BOOTBITMASK(x,y)) >> (y)
-#define BOOT_SET_BITFIELD(z,f,x,y)	(((u32)z) & ~BOOTBITMASK(x,y)) | \
-					((((u32)f) << (y)) & BOOTBITMASK(x,y))
+#define READ_BITFIELD(z,x,y)	        ((((u32)z) & BITMASK(x,y)) >> (y))
+#define SET_BITFIELD(z,f,x,y)	        ((((u32)z) & ~BITMASK(x,y)) |	\
+					 ((((u32)f) << (y)) & BITMASK(x,y)))
 
 /*
  * SGMII registers
