@@ -958,6 +958,12 @@ config TI_KEYSTONE_QM
 	help
 	  This driver supports TI's Keystone Queue Manager.
 
+config TI_KEYSTONE_CPSW
+	tristate "TI Keystone CPSW "
+	depends on TMS320C66X
+	help
+	  This driver supports TI's Keystone CPSW.
+
 config DM9000
 	tristate "DM9000 support"
 	depends on ARM || BLACKFIN || MIPS
