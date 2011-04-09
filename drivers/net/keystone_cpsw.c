@@ -25,35 +25,6 @@
 #define CPPI_PORT_NUM	0
 #define ETHERNET_MTU	1518
 
-unsigned int init_sgmii (unigned int macportnum)
-{  
-	struct sgmii_config_s sgmiic0, sgmiic1;
-
-	sgmiic0.master    = 1;
-	sgmiic0.loopback  = 0;
-	sgmiic0.autoneg   = 0;
-	sgmiic0.txconfig  = 0x000108a1;
-	sgmiic0.rxconfig  = 0x00700621;
-	sgmiic0.auxconfig = 0x00000041; /* PLL multiplier */
-
-	c66x_sgmii_config(0, &sgmiic0);
-
-	sgmiic1.master    = 1;
-	sgmiic1.loopback  = 0;
-	sgmiic1.autoneg   = 0;
-	sgmiic1.txconfig  = 0x000108a1;
-	sgmiic1.rxconfig  = 0x00700621;
-	sgmiic1.auxconfig = 0x00000041; /* PLL multiplier */
-
-	c66x_sgmii_config(1, &sgmiic1);
-
-	phy_init();
-
-	printk("SGMII init complete\n");
-
-	return 0;
-}
-
 void dump_ale_table(void)
 {
 	int i;
@@ -428,8 +399,6 @@ int cpsw_init (u8 macaddress[2][6])
 {
 	unsigned int	macportnum;
 	unsigned int	portnum;
- 
-	init_sgmii();
 	
 	/*
 	 * Initialize the Sliver submodules for the
