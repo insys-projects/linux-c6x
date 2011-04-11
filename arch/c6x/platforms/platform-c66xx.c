@@ -160,7 +160,9 @@ static void init_power(void)
 #ifdef CONFIG_TI_KEYSTONE_PKTDMA
 #include <mach/netcp.h>
 
-struct keystone_platform_data c6x_pktdma_data;
+struct keystone_platform_data c6x_pktdma_data = {
+	.irq            = 0, /* No interrupt support for the time being */
+};
 
 static struct platform_device pktdma_dev0 = {
         .name           = "keystone_pktdma",

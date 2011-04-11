@@ -35,13 +35,14 @@
 
 #include "keystone_pktdma.h"
 
-#undef EMAC_DEBUG
-#ifdef EMAC_DEBUG
+#undef NETCP_DEBUG
+#ifdef NETCP_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "NETCP: [%s] " fmt, __FUNCTION__, ## args)
 #else
 #define DPRINTK(fmt, args...)
 #endif
 
+#define DEVICE_NAPI_WEIGHT              16
 #define DEVICE_POLLING_PERIOD_MSEC      10
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
@@ -55,10 +56,6 @@ module_param(rx_packet_max, int, 0);
 MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
 
 static struct timer_list poll_timer;
-
-struct pktdma_private {
-	struct net_device *dev;
-};
 
 struct keystone_cpsw_priv {
 	spinlock_t			lock;
@@ -376,57 +373,63 @@ static int cpmac_drv_stop(void)
 /*
  * Pop an incoming packet
  */
-static int pktdma_rx(struct net_device *ndev)
+static int pktdma_rx(struct net_device *ndev,
+		     unsigned int *work_done,
+		     unsigned int work_to_do)
 {
-	int                  pkt_size;
-	struct qm_host_desc *hd;
+	int                  pkt_size = 0;
+	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
 
-	hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q);
-	if (hd == NULL)
-		return 0;
+	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL)) {
+		
+		if (unlikely(work_done && *work_done >= work_to_do))
+			return 0;
 
-	pkt_size = QM_DESC_DESCINFO_GET_PKT_LEN(hd->desc_info);
+		pkt_size = QM_DESC_DESCINFO_GET_PKT_LEN(hd->desc_info);
+		if (unlikely(pkt_size == 0))
+			return 0;
 
-	/* Get the incoming skbuff */
-	skb_rcv = (struct sk_buff *) hd->private;
+		/* Get the incoming skbuff */
+		skb_rcv = (struct sk_buff *) hd->private;
 
-	DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) buffer = 0x%x\n",
-		pkt_size, skb_rcv, hd, hd->desc_info);
+		DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) buffer = 0x%x\n",
+			pkt_size, skb_rcv, hd, hd->desc_info);
 
-	/* Prepare the received sk_buff */
-	skb_rcv->dev = ndev;
-	skb_put(skb_rcv, pkt_size);
-	skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
-
-	/* Cache sync here */
-	L2_cache_block_invalidate((u32) hd->orig_buff_ptr,
-				  (u32) hd->orig_buff_ptr + pkt_size);
+		/* Prepare the received sk_buff */
+		skb_rcv->dev = ndev;
+		skb_put(skb_rcv, pkt_size);
+		skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
+		
+		/* Cache sync here */
+		L2_cache_block_invalidate((u32) hd->orig_buff_ptr,
+					  (u32) hd->orig_buff_ptr + pkt_size);
 			
-	/* Allocate a new skb */
-	skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
-	if (skb != NULL) {
-		/* Attach the new one */
-		hd->buff_len      = skb_tailroom(skb);
-		hd->orig_buff_len = skb_tailroom(skb);
-		hd->buff_ptr      = (u32)skb->data;
-		hd->next_bdptr    = 0;
-		hd->orig_buff_ptr = (u32)skb->data;
-		hd->private       = (u32)skb;
-		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
+		/* Allocate a new skb */
+		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
+		if (skb != NULL) {
+			/* Attach the new one */
+			hd->buff_len      = skb_tailroom(skb);
+			hd->orig_buff_len = skb_tailroom(skb);
+			hd->buff_ptr      = (u32)skb->data;
+			hd->next_bdptr    = 0;
+			hd->orig_buff_ptr = (u32)skb->data;
+			hd->private       = (u32)skb;
+			hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
+		}
+		
+		/* Fill statistic */
+		ndev->last_rx = jiffies;
+		ndev->stats.rx_packets++;
+		ndev->stats.rx_bytes += pkt_size;
+		
+		/* Push to kernel received sk_buff */
+		netif_receive_skb(skb_rcv);
+		if (work_done)
+			(*work_done)++;
 	}
-
-        /* Give back old sk_buff */
-	netif_rx(skb_rcv);
-
-	ndev->last_rx = jiffies;
-
-	/* Fill statistic */
-	ndev->stats.rx_packets++;
-	ndev->stats.rx_bytes += pkt_size;
-
-	return pkt_size;
+	return 1;
 }
 
 /*
@@ -434,53 +437,65 @@ static int pktdma_rx(struct net_device *ndev)
  */
 static int pktdma_tx(struct net_device *ndev)
 {	
-	struct qm_host_desc *hd;
+	struct qm_host_desc *hd = NULL;
+	int tx_cleaned = 0;
 	
-	hd = hw_qm_queue_pop(DEVICE_QM_TX_Q);
-	if (hd != NULL) {
-		DPRINTK("Tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
+	while ((hd = hw_qm_queue_pop(DEVICE_QM_TX_Q)) && (hd != NULL)) {
+		
+		DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
 			hd->private, hd);
-
+		
 		if (hd->private)
 			/* Free the skbuff associated to this packet */
 			dev_kfree_skb_irq((struct sk_buff*) hd->private);
 
-		if (netif_running(ndev))
-			netif_wake_queue(ndev);
-
 		/* Send packet back to available free buffer queue */
 		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
 
-		return 1;
+		tx_cleaned = 1;
 	}
-	return 0;
+
+	if (unlikely(tx_cleaned && netif_queue_stopped(ndev)))
+		netif_wake_queue(ndev);
+		
+	return tx_cleaned;
 }
 
 /*
  * PKTDMA interrupt handling functions
  */
-static irqreturn_t pktdma_rx_interrupt(int irq, void * netdev_id)
+static irqreturn_t pktdma_interrupt(int irq, void * netdev_id)
 {
 	struct net_device *ndev = (struct net_device *) netdev_id;
+	struct keystone_cpsw_priv *p = netdev_priv(ndev);
 
-	for (;;) {
-		if (pktdma_rx(ndev) == 0)
-			break;
+	if (likely(napi_schedule_prep(&p->napi))) {
+		netcp_disable_irq(ndev);
+		__napi_schedule(&p->napi);
 	}
 
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t pktdma_tx_interrupt(int irq, void * netdev_id)
+/*
+ * NAPI poll
+ */
+static int pktdma_poll(struct napi_struct *napi, int budget)
 {
-	struct net_device         *ndev = (struct net_device *) netdev_id;
+	struct keystone_cpsw_priv *p = 
+		container_of(napi, struct keystone_cpsw_priv, napi);
+	unsigned int work_done = 0;
 
-	for (;;) {
-		if (pktdma_tx(ndev) == 0);
-		break;
+	pktdma_rx(p->ndev, &work_done, budget);
+	pktdma_tx(p->ndev);
+
+	/* If budget not fully consumed, exit the polling mode */
+	if (work_done < budget) {
+		napi_complete(napi);
+		netcp_enable_irq(p->ndev);
 	}
-	
-	return IRQ_HANDLED;
+
+	return work_done;
 }
 
 /*
@@ -488,12 +503,11 @@ static irqreturn_t pktdma_tx_interrupt(int irq, void * netdev_id)
  */
 static void keystone_ndo_poll_controller(struct net_device *ndev)
 {
-	// disable_netcp_irq()
+	netcp_disable_irq(ndev);
 
-	pktdma_rx_interrupt(0, ndev);
-	pktdma_tx_interrupt(0, ndev);
+	pktdma_interrupt(ndev->irq, ndev);
 
-	// enable_netcp_irq();
+	netcp_enable_irq(ndev);
 
 	/* Ugly hack */
 	mod_timer(&poll_timer,
@@ -573,10 +587,15 @@ static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
  */
 static int keystone_ndo_open(struct net_device *ndev)
 {
+	struct keystone_cpsw_priv *p = netdev_priv(ndev);
+	
 	/* Start CPMAC */
 	cpmac_drv_start();
 
-	netif_start_queue(ndev);
+	netif_wake_queue(ndev);
+	napi_enable(&p->napi);
+
+	netcp_enable_irq(ndev);
 
 	DPRINTK("starting to poll\n");
 
@@ -595,6 +614,11 @@ static int keystone_ndo_open(struct net_device *ndev)
  */
 static int keystone_ndo_stop(struct net_device *ndev)
 {
+	struct keystone_cpsw_priv *p = netdev_priv(ndev);
+
+	netcp_disable_irq(ndev);
+
+	napi_disable(&p->napi);
 	netif_stop_queue(ndev);
 	
 	cpmac_drv_stop();
@@ -725,10 +749,14 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);
+
+	/* NAPI register */
+	netif_napi_add(ndev, &priv->napi, pktdma_poll, DEVICE_NAPI_WEIGHT);
 	
 	/* Register the network device */
-	ndev->dev_id     = 0;
-	ndev->flags     |= IFF_ALLMULTI;	
+	ndev->irq     = data->irq;
+	ndev->dev_id  = 0;
+	ndev->flags  |= IFF_ALLMULTI;	
 	ndev->netdev_ops = &keystone_netdev_ops;
 	SET_NETDEV_DEV(ndev, &pdev->dev);
 

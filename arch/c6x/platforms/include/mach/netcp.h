@@ -15,6 +15,7 @@
 
 #ifndef __MACH_C6X_NETCP_H
 #define __MACH_C6X_NETCP_H
+#include <linux/netdevice.h>
 
 #define BITMASK(x,y)	                (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
 					   - (u32)1 ))   <<  ((u32)y))
@@ -82,7 +83,12 @@
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
 struct keystone_platform_data {
+	unsigned int irq;
 };
+
+/* Interrupt management */
+static inline void netcp_disable_irq(struct net_device *ndev) {}
+static inline void netcp_enable_irq(struct net_device *ndev) {}
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
 #define EMAC_ARCH_HAS_MAC_ADDR
