@@ -12,115 +12,111 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ASM_C6X_CPSW_H_
-#define __ASM_C6X_CPSW_H_
+#ifndef __ASM_C6X_KEYSTONE_CPSW_H_
+#define __ASM_C6X_KEYSTONE_CPSW_H_
 
 #define DEVICE_ETHERNET_SS_BASE		0x02090000
-#define DEVICE_CPSW_BASE		0x02090800
+#define KEYSTONE_CPSW_BASE		0x02090800
 
 struct port_info {
-    u32 p_max_blks;
-    u32 p_blk_cnt;
-    u32 p_port_vlan;
-    u32 p_tx_pri_map;
-    u32 sl_sa_lo;
-    u32 sl_sa_hi;
-    u32 p_ts_ctl;
-    u32 p_ts_seq_ltype;
-    u32 p_ts_vlan_ltype;
-    u8  rsvd2[12];
+	u32 p_max_blks;
+	u32 p_blk_cnt;
+	u32 p_port_vlan;
+	u32 p_tx_pri_map;
+	u32 sl_sa_lo;
+	u32 sl_sa_hi;
+	u32 p_ts_ctl;
+	u32 p_ts_seq_ltype;
+	u32 p_ts_vlan_ltype;
+	u8  rsvd2[12];
 };
 
 struct port_stats  {
-    u32 rxgoodframes;
-    u32 rxbroadcastframes;
-    u32 rxmulticastframes;
-    u32 rxpauseframes;
-    u32 rxcrcerrors;
-    u32 rxaligncodeerrors;
-    u32 rxoversizedframes;
-    u32 rxjabberframes;
-    u32 rxundersizedframes;
-    u32 rxfragments;
-    u8  rsvd0[8];
-    u32 rxoctets;
-    u32 txgoodframes;
-    u32 txbroadcastframes;
-    u32 txmulticastframes;
-    u32 txpauseframes;
-    u32 txdeferredframes;
-    u32 txcollisionframes;
-    u32 txsinglecollframes;
-    u32 txmultcollframes;
-    u32 txexcessivecollisions;
-    u32 txlatecollisions;
-    u32 txunderrun;
-    u32 txcarriersenseerrors;
-    u32 txoctets;
-    u32 octetframes64;
-    u32 octetframes65t127;
-    u32 octetframes128t255;
-    u32 octetframes256t511;
-    u32 octetframes512t1023;
-    u32 octetframes1024tup;
-    u32 netoctets;
-    u32 rxsofoverruns;
-    u32 rxmofoverruns;
-    u32 rxdmaoverruns;
-    u8  rsvd4[112];
+	u32 rxgoodframes;
+	u32 rxbroadcastframes;
+	u32 rxmulticastframes;
+	u32 rxpauseframes;
+	u32 rxcrcerrors;
+	u32 rxaligncodeerrors;
+	u32 rxoversizedframes;
+	u32 rxjabberframes;
+	u32 rxundersizedframes;
+	u32 rxfragments;
+	u8  rsvd0[8];
+	u32 rxoctets;
+	u32 txgoodframes;
+	u32 txbroadcastframes;
+	u32 txmulticastframes;
+	u32 txpauseframes;
+	u32 txdeferredframes;
+	u32 txcollisionframes;
+	u32 txsinglecollframes;
+	u32 txmultcollframes;
+	u32 txexcessivecollisions;
+	u32 txlatecollisions;
+	u32 txunderrun;
+	u32 txcarriersenseerrors;
+	u32 txoctets;
+	u32 octetframes64;
+	u32 octetframes65t127;
+	u32 octetframes128t255;
+	u32 octetframes256t511;
+	u32 octetframes512t1023;
+	u32 octetframes1024tup;
+	u32 netoctets;
+	u32 rxsofoverruns;
+	u32 rxmofoverruns;
+	u32 rxdmaoverruns;
+	u8  rsvd4[112];
 };
 
 struct cpsw_regs {
-    u32 idver;
-    u32 control;
-    u32 emcontrol;
-    u32 stat_port_en;
-    u32 ptype;
-    u8  rsvd0[8];
-    u32 gap_thresh_cpgmac_sl;
-    u32 tx_start_wds;
-    u32 flow_control;
-    u8  rsvd1[12];
-    u32 p0_cppi_src_id;
-    u32 p0_port_vlan;
-    u32 p0_rx_pri_map;
-    u32 p0_rx_maxlen;
-    u8  rsvd3[28];
-    struct port_info *p1;
-    struct port_info *p2;
-    u8  rsvd5[576];
-    struct port_stats *s1;
-    struct port_stats *s2;
-    u8  rsvd6[256];
-    u32 ale_id;
-    u8  rsvd7[4];
-    u32 ale_control;
-    u8  rsvd8[4];
-    u32 ale_prescale;
-    u8  rsvd9[4];
-    u32 ale_unknown_vlan;
-    u8  rsvd10[4];
-    u32 ale_table_control;
-    u8  rsvd11[16];
-    u32 ale_table_word2;
-    u32 ale_table_word1;
-    u32 ale_table_word0;
-    u32 ale_port_control[3];
-    u8  rsvd12[12];
-}
+	u32 idver;
+	u32 control;
+	u32 emcontrol;
+	u32 stat_port_en;
+	u32 ptype;
+	u8  rsvd0[8];
+	u32 gap_thresh_cpgmac_sl;
+	u32 tx_start_wds;
+	u32 flow_control;
+	u8  rsvd1[12];
+	u32 p0_cppi_src_id;
+	u32 p0_port_vlan;
+	u32 p0_rx_pri_map;
+	u32 p0_rx_maxlen;
+};
+
+struct ale_regs {
+	u32 ale_id;
+	u8  rsvd7[4];
+	u32 ale_control;
+	u8  rsvd8[4];
+	u32 ale_prescale;
+	u8  rsvd9[4];
+	u32 ale_unknown_vlan;
+	u8  rsvd10[4];
+	u32 ale_table_control;
+	u8  rsvd11[16];
+	u32 ale_table_word2;
+	u32 ale_table_word1;
+	u32 ale_table_word0;
+	u32 ale_port_control[3];
+	u8  rsvd12[12];
+};
 
 struct cpgmac_sl {
-    u32 idver;
-    u32 maccontrol;
-    u32 macstatus;
-    u32 soft_reset;
-    u32 rx_maxlen;
-    u8  rsvd0[4];
-    u32 rx_pause;
-    u32 tx_pause;
-    u32 emcontrol;
-    u32 pri_map;
-    u8  rsvd1[24];
+	u32 idver;
+	u32 maccontrol;
+	u32 macstatus;
+	u32 soft_reset;
+	u32 rx_maxlen;
+	u8  rsvd0[4];
+	u32 rx_pause;
+	u32 tx_pause;
+	u32 emcontrol;
+	u32 pri_map;
+	u8  rsvd1[24];
 };
 
 /* Enable full duplex mode */
@@ -173,6 +169,8 @@ struct cpgmac_sl {
 
 #define CPGMAC_SL_RX_MAXLEN_REG_RX_MAXLEN_MASK	(0x00003FFFu)
 
+#define CPSW_3GF_NUM_ALE_ENTRIES		1024
+
 #define CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_7_0_SHIFT	(0x00000008u)
 #define CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_15_8_SHIFT	(0x00000000u)
 #define CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_47_40_SHIFT	(0x00000000u)
@@ -213,11 +211,29 @@ struct cpgmac_sl {
 #define CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_MASK	(0x00003F00u)
 #define CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_SHIFT (0x00000008u)
 
-#define CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_MASK (0x003F0000u)
-#define CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_SHIFT (0x00000010u)
+#define CPSW_3GF_ALE_UNKNOWN_VLAN_REG_MCAST_FLOOD_MASK_MASK (0x003F0000u)
+#define CPSW_3GF_ALE_UNKNOWN_VLAN_REG_MCAST_FLOOD_MASK_SHIFT (0x00000010u)
 
 #define CPSW_3GF_ALE_UNKNOWN_VLAN_FORCE_UNTAGGED_EGRESS_MASK (0x3F000000u)
 #define CPSW_3GF_ALE_UNKNOWN_VLAN_FORCE_UNTAGGED_EGRESS_SHIFT (0x00000018u)
+
+#define CPSW_3GF_ALE_TABLE_CONTROL_ENTRY_POINTER_MASK	(0x000003FFu)
+#define CPSW_3GF_ALE_TABLE_CONTROL_ENTRY_POINTER_SHIFT	(0x00000000u)
+
+#define CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_MASK	(0x80000000u)
+#define CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_SHIFT	(0x0000001Fu)
+
+#define CPSW_3GF_ALE_TABLE_WORD1_ENTRY_TYPE_MASK	(0x30000000u)
+
+#define ALE_ENTRYTYPE_FREE		0
+#define ALE_ENTRYTYPE_ADDRESS		1
+#define ALE_ENTRYTYPE_VLAN		2
+#define ALE_ENTRYTYPE_VLANADDRESS	3
+
+#define ALE_UCASTTYPE_UCAST_NOAGE	0
+#define ALE_UCASTTYPE_UCAST_AGENOTOUCH	1
+#define ALE_UCASTTYPE_UCAST_OUI		2
+#define ALE_UCASTTYPE_UCAST_AGETOUCH	3
 
 #define cpsw_setbit_reg(reg, val) \
         *((volatile u32 *) (reg)) |= (u32) (val)
@@ -234,5 +250,5 @@ struct cpgmac_sl {
 #define cpsw_addr_reg(reg) \
         ((volatile u32 *) (reg))
 
-#endif /* __ASM_C6X_CPSW_H_ */
+#endif /* __ASM_C6X_KEYSTONE_CPSW_H_ */
 
