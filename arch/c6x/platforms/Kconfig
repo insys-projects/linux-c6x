@@ -61,6 +61,7 @@ config SOC_TMS320C6678
 	select TI_KEYSTONE_PA
 	select TI_KEYSTONE_QM
 	select TI_KEYSTONE_PKTDMA
+	select TI_KEYSTONE_CPSW
 
 comment "Board Selection"
 choice
