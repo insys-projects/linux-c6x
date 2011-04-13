@@ -19,189 +19,168 @@
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/sgmii.h>
-#include <asm/cpsw.h>
+
+#include "keystone_cpsw.h"
 
 #define CPPI_PORT_NUM	0
 #define ETHERNET_MTU	1518
 
-void dump_ale_table(void)
-{
-	int i;
-	CSL_CPSW_3GF_ALE_UNICASTADDR_ENTRY  ucastAddrCfg;
-	
-	for (i = 0; i < CSL_CPSW_3GF_NUMALE_ENTRIES; i++) {
-		if (CSL_CPSW_3GF_getALEEntryType(i) != ALE_ENTRYTYPE_FREE) {	/* Found a free entry */
-			CSL_CPSW_3GF_getAleUnicastAddrEntry (i, &ucastAddrCfg);
-			System_printf("Port = %d, ", ucastAddrCfg.portNumber);
-			System_printf("MAC address = %02x:%02x:%02x:%02x:%02x:%02x, ",
-				ucastAddrCfg.macAddress[0],
-				ucastAddrCfg.macAddress[1],
-				ucastAddrCfg.macAddress[2],
-				ucastAddrCfg.macAddress[3],
-				ucastAddrCfg.macAddress[4],
-				ucastAddrCfg.macAddress[5]);
-			System_printf("unicast_type = %d, ", ucastAddrCfg.ucastType);
-			System_printf("block = %d, ", ucastAddrCfg.blockEnable);
-			System_printf("secure = %d\n", ucastAddrCfg.secureEnable);
-		}
-	}
-}
-
 static int find_ale_next_free_entry(void)
 {
-	unsigned int i;
+	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
+					0x600);
+	unsigned int tmp, i;
 
 	/* 
 	 * Search the ALE table for the next available free ALE entry
 	 * Break if we find a free entry
 	 */
-	for (i = 0; i < CSL_CPSW_3GF_NUMALE_ENTRIES; i++)
-		if (CSL_CPSW_3GF_getALEEntryType (i) == ALE_ENTRYTYPE_FREE)
-			break;                    
+	for (i = 0; i < CPSW_3GF_NUM_ALE_ENTRIES; i++) {
+		tmp = __raw_readl(&ale->ale_table_control);
+		tmp &= ~(CPSW_3GF_ALE_TABLE_CONTROL_ENTRY_POINTER_MASK |
+			CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_MASK);
+		tmp |= (0 << CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_SHIFT);
+		tmp |= i;
+		__raw_writel(tmp, &ale->ale_table_control);
+
+		/* Read Table Word 1 to check entry type */
+		tmp = __raw_readl(&ale->ale_table_word1);
+		tmp &= CPSW_3GF_ALE_TABLE_WORD1_ENTRY_TYPE_MASK;
+		tmp >>= 28;
+		
+		if (tmp == ALE_ENTRYTYPE_FREE)
+			break;
+	}
 
 	/* No free ALE entry found. return error. */
-	if (i == CSL_CPSW_3GF_NUMALE_ENTRIES)
-        return -1;
+	if (i == CPSW_3GF_NUM_ALE_ENTRIES)
+		return -1;
 
-	/* Found a free ALE entry at index "i". */
+	/* Found a free ALE entry at index "i" */
 	return i;
 }
 
-/** ============================================================================
- *   @n@b Add_Unicast_ALE_Entry
- *
- *   @b Description
- *   @n This API adds a unicast ALE entry to the switch ALE table
- *
- *   @param[in]  
- *   @n portNum         Switch port number.
- 
- *   @param[in]  
- *   @n macAddress      MAC address to configure on the switch.
+/* 
+ * This API adds a unicast ALE entry to the switch ALE table
  * 
- *   @param[in]  
- *   @n blocked         Flag to indicate packet matching this entry must be
+ * por_tnum		Switch port number.
+ *
+ * mac_address		MAC address to configure on the switch.
+ * 
+ * blocked		Flag to indicate packet matching this entry must be
  *                      blocked/dropped
- *
- *   @param[in]  
- *   @n secure          Flag to indicate if the packet with matching source 
- *                      address should be dropped if the received port is 
+ *                      
+ * secure		Flag to indicate if the packet with matching source
+ *                      address should be dropped if the received port is
  *                      not same as table entry.
- *
- *   @return
- *   @n None
- * =============================================================================
  */
-int add_unicast_ale_entry (unsigned int portnum, 
-    UInt8       macAddress[6], 
-    UInt32      blocked,
-    UInt32      secure
-)
+int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
+				u32 blocked, u32 secure)
 {
-    Int32       aleTblIndex;
-    CSL_CPSW_3GF_ALE_UNICASTADDR_ENTRY  ucastAddrCfg;
+	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
+					0x600);
+	unsigned int tmp;
+	int ale_tbl_index;
 
-    // YS: No update ALE address supported yet. Only permanent addresses
+	// TODO: No update ALE address supported yet. Only permanent addresses
 
-    /* Program the ALE with the MAC address.
-     *
-     * The ALE entries determine the switch port to which any
-     * matching received packet must be forwarded to.
-     */
-    if ((aleTblIndex = Find_ALE_NextFreeEntry ()) < 0)
-    {
-        /* ALE Table full */            
-        return -1;
-    }
-    else
-    {
-        /* Found a free ALE entry to program our MAC address */            
-        memcpy (ucastAddrCfg.macAddress, macAddress, 6);    // Set the MAC address
-        ucastAddrCfg.ucastType      =      ALE_UCASTTYPE_UCAST_NOAGE;   // Add a permanent unicast address entryALE_UCASTTYPE_UCAST_NOAGE.
-        ucastAddrCfg.secureEnable   =      secure;   
-        ucastAddrCfg.blockEnable    =      blocked;   
-        ucastAddrCfg.portNumber     =      portNum;   // Add the ALE entry for this port
+	/* Program the ALE with the MAC address.
+	 *
+	 * The ALE entries determine the switch port to which any
+	 * matching received packet must be forwarded to.
+	 */
+	if ((ale_tbl_index = find_ale_next_free_entry()) < 0)           
+		return -1;
+	else {
+		/* Found a free ALE entry to program our MAC address */
+		tmp = (mac_address[5] |  mac_address[4] << 8 |
+			mac_address[3] << 16 |	 mac_address[2] << 24);
+		__raw_writel(tmp, &ale->ale_table_word0);
 
-        /* Setup the ALE entry for this port's MAC address */
-        CSL_CPSW_3GF_setAleUnicastAddrEntry (aleTblIndex, &ucastAddrCfg);            
-    }
+		tmp = (mac_address[1] |  mac_address[0] << 8);
+		tmp |=  ((ALE_UCASTTYPE_UCAST_NOAGE << 30) |
+			(1 << 28));
+		__raw_writel(tmp, &ale->ale_table_word1);
 
-    /* Done with adding unicast entry address */
-    return 0;
+		tmp = ((secure << 0) | (blocked << 1) | (port_num << 2));
+		__raw_writel(tmp, &ale->ale_table_word2);
+
+		tmp = __raw_readl(&ale->ale_table_control);
+		tmp &= ~(CPSW_3GF_ALE_TABLE_CONTROL_ENTRY_POINTER_MASK |
+			CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_MASK);
+		tmp |= (1 << CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_SHIFT);
+		tmp |= ale_tbl_index;
+		__raw_writel(tmp, &ale->ale_table_control);
+	}
+
+	/* Done with adding unicast entry address */
+	return 0;
 }
 
-/** ============================================================================
- *   @n@b Add_Multicast_ALE_Entry
- *
- *   @b Description
- *   @n This API adds a multicast ALE entry to the switch ALE table
- *
- *   @param[in]  
- *   @n portMask        MAC ports that the packets destined to matching 
+/*
+ * This API adds a multicast ALE entry to the switch ALE table
+ *  
+ * port_mask		MAC ports that the packets destined to matching 
  *                      multicast address must be forwarded to.
- 
- *   @param[in]  
- *   @n macAddress      Multicast address.
- * 
- *   @param[in]  
- *   @n super           Flag to indicate if this is a supervisory packet
  *
- *   @param[in]  
- *   @n fwdState        The state in which matching multicast packets will be
+ * mac_address		Multicast address.
+ *   
+ * super		Flag to indicate if this is a supervisory packet
+ *
+ * fwd_state		The state in which matching multicast packets will be
  *                      forwarded.
- *
- *   @return
- *   @n None
- * =============================================================================
  */
-Int32 Add_Multicast_ALE_Entry 
-(
-    UInt32      portMask, 
-    UInt8       macAddress[6], 
-    UInt32      super,
-    UInt32      fwdState
-)
+int add_multicast_ale_entry(u32 port_mask, u8 mac_address[6],
+				u32 super, u32 fwd_state)
 {
-    Int32       aleTblIndex;
-    CSL_CPSW_3GF_ALE_MCASTADDR_ENTRY  mcastAddrCfg;
+	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
+					0x600);
+	unsigned int tmp;
+	int ale_tbl_index;
 
-    //  No update ALE address supported yet. Only permanent addresses
 
-    /* Program the ALE with the MAC address.
-     *
-     * The ALE entries determine the switch port to which any
-     * matching received packet must be forwarded to.
-     */
-    if ((aleTblIndex = Find_ALE_NextFreeEntry ()) < 0)
-    {
-        /* ALE Table full */            
-        return -1;
-    }
-    else
-    {
-        /* Found a free ALE entry to program our MAC address */            
-        memcpy (mcastAddrCfg.macAddress, macAddress, 6);    // Set the MAC address
-        mcastAddrCfg.mcastFwdState  =   fwdState;   
-        mcastAddrCfg.superEnable    =   super;   
-        mcastAddrCfg.portMask       =   portMask;   
+	//TODO:  No update ALE address supported yet. Only permanent addresses
 
-        /* Setup the ALE entry for this port's MAC address */
-        CSL_CPSW_3GF_setAleMcastAddrEntry (aleTblIndex, &mcastAddrCfg);            
-    }
+	/* Program the ALE with the MAC address.
+	 *
+	 * The ALE entries determine the switch port to which any
+	 * matching received packet must be forwarded to.
+	 */
+	if ((ale_tbl_index = find_ale_next_free_entry()) < 0)           
+		return -1;
+	else {
+		/* Found a free ALE entry to program our MAC address */
+		tmp =  (mac_address[5] |  mac_address[4] << 8 |
+			mac_address[3] << 16 |	 mac_address[2] << 24);
+		__raw_writel(tmp, &ale->ale_table_word0);
 
-    /* Done with adding the multicast entry address */
-    return 0;
+		tmp = (mac_address[1] |  mac_address[0] << 8);
+		tmp |=  ((fwd_state << 30) | (1 << 28));
+		__raw_writel(tmp, &ale->ale_table_word1);
+
+		tmp = ((super << 1) | (port_mask << 2));
+		__raw_writel(tmp, &ale->ale_table_word2);
+	
+		tmp = __raw_readl(&ale->ale_table_control);
+		tmp &= ~(CPSW_3GF_ALE_TABLE_CONTROL_ENTRY_POINTER_MASK |
+			CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_MASK);
+		tmp |= (1 << CPSW_3GF_ALE_TABLE_CONTROL_WRITE_RDZ_SHIFT);
+		tmp |= ale_tbl_index;
+		__raw_writel(tmp, &ale->ale_table_control);
+	}
+
+	/* Done with adding the multicast entry address */
+	return 0;
 }
 
 unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu)
 {
 
-	struct cpgmac_sl *mac_sl = (struct cpgmac_sl *)(DEVICE_ETHERNET_SS_BASE
-					+ 0x900 + 0x100 *macportnum);
-	struct cpsw_regs *cpsw = (struct cpsw_regs *)(DEVICE_ETHERNET_SS_BASE
-					+ 0x800);
-
+	struct cpgmac_sl *mac_sl = (struct cpgmac_sl *)(KEYSTONE_CPSW_BASE +
+					0x100 + 0x40 * macportnum);
+	struct port_info *p_info = (struct port_info *)(KEYSTONE_CPSW_BASE +
+					0x60 + 0x30 * macportnum);
+	
 	unsigned int tmp;
 
 	/*
@@ -209,7 +188,7 @@ unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu
 	 * Poll till the reset has occurred
 	 */
 	__raw_writel(0x00000001, &mac_sl->soft_reset);
-	while(__raw_readl(&mac_sl->soft_reset);           
+	while(__raw_readl(&mac_sl->soft_reset));           
 
 	/*
 	 * Setup the MAC Control Register for this port:
@@ -222,10 +201,10 @@ unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu
 	 * (5) Don't enable any control/error/short frames
 	 */
 	tmp = __raw_readl(&mac_sl->maccontrol);
-	tmp |= CPGMAC_SL_MACCONTROL_FULLDUPLEX_EN |
+	tmp |= (CPGMAC_SL_MACCONTROL_FULLDUPLEX_EN |
 		CPGMAC_SL_MACCONTROL_GMII_EN |
 		CPGMAC_SL_MACCONTROL_GIG_EN |
-		CPGMAC_SL_MACCONTROL_GIG_FORCE_EN |
+		CPGMAC_SL_MACCONTROL_GIG_FORCE_EN);	
 	__raw_writel(tmp, &mac_sl->maccontrol);
 		
 	/* Enable Short Frames */
@@ -233,35 +212,22 @@ unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu
 	tmp |= CPGMAC_SL_MACCONTROL_RX_CSF_EN;
 	__raw_writel(tmp, &mac_sl->maccontrol);
 
-	/* Configure the MAC address for this port */
-	if (!macportnum)
-		__raw_writel((mac_address[0] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_7_0_SHIFT) |
-				(mac_address[1] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_15_8_SHIFT),
-				cpsw->p1->sl_sa_lo);
-		__raw_writel((mac_address[2] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_23_16_SHIFT) |
-				(mac_address[3] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_31_24_SHIFT) |
-				(mac_address[4] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_39_32_SHIFT) |
-				(mac_address[5] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_47_40_SHIFT),
-				cpsw->p1->sl_sa_hi);
-	else
-		__raw_writel((mac_address[0] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_7_0_SHIFT) |
-				(mac_address[1] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_15_8_SHIFT),
-				cpsw->p2->sl_sa_lo);
-		__raw_writel((mac_address[2] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_23_16_SHIFT) |
-				(mac_address[3] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_31_24_SHIFT) |
-				(mac_address[4] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_39_32_SHIFT) |
-				(mac_address[5] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_47_40_SHIFT),
-				cpsw->p2->sl_sa_hi);
-		
+	/* Configure the MAC address for appropriate port */
+	__raw_writel(((mac_address[0] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_7_0_SHIFT) |
+			(mac_address[1] << CPSW_3GF_SL_SA_LO_REG_MACSRCADDR_15_8_SHIFT)),
+			&p_info->sl_sa_lo);
+	__raw_writel(((mac_address[2] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_23_16_SHIFT) |
+			(mac_address[3] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_31_24_SHIFT) |
+			(mac_address[4] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_39_32_SHIFT) |
+			(mac_address[5] << CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_47_40_SHIFT)),
+			&p_info->sl_sa_hi);
+ 	
 	/*
-	 * Configure VLAN ID/CFI/Priority
+	 * Configure VLAN ID/CFI/Priority for appropriate port
 	 * For now, we are not using VLANs so just configure them
 	 * to all zeros
 	 */
-	if (!macportnum)
-		__raw_writel(0, cpsw->p1->p_port_vlan);
-	else
-		__raw_writel(0, cpsw->p2->p_port_vlan);
+	__raw_writel(0, &p_info->p_port_vlan);
 
 	/* 
 	 * Configure the Receive Maximum length on this port,
@@ -283,14 +249,14 @@ unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu
 void init_mdio (unsigned int macportnum)
 {
 	/* PHYs already enabled. Do nothing. Return success. */
-	return 0;
 }
 
 void init_switch(unsigned int mtu)
 {
 
-	struct cpsw_regs *cpsw = (struct cpsw_regs *)(DEVICE_ETHERNET_SS_BASE
-					+ 0x800);
+	struct cpsw_regs *cpsw = (struct cpsw_regs *)(KEYSTONE_CPSW_BASE);
+	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
+					0x600);
 	unsigned int tmp;
 
 	/*
@@ -332,39 +298,38 @@ void init_switch(unsigned int mtu)
 	 *          properties for the switch, i.e., which 
 	 *	    ports to send the packets to.
 	 */
-	tmp = __raw_readl(&cpsw->ale_control);
+	tmp = __raw_readl(&ale->ale_control);
 	tmp |= CPSW_3GF_ALE_CONTROL_REG_ENABLE_ALE |
 		CPSW_3GF_ALE_CONTROL_REG_CLEAR_TABLE;
 	tmp &= ~(CPSW_3GF_ALE_CONTROL_REG_ALE_VLAN_AWARE |
 		CPSW_3GF_ALE_CONTROL_REG_RATE_LIMIT_TX);
-	__raw_writel(tmp, &cpsw->ale_control);
+	__raw_writel(tmp, &ale->ale_control);
 
 	
-	__raw_writel(125000000u/1000u, &cpsw->ale_prescale);
+	__raw_writel(125000000u/1000u, &ale->ale_prescale);
 
-	tmp = __raw_readl(&cpsw->ale_unknown_vlan);
+	tmp = __raw_readl(&ale->ale_unknown_vlan);
 	tmp &= ~(CPSW_3GF_ALE_UNKNOWN_VLAN_MEMBER_LIST_MASK |
 		CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_MASK |
-		CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_MASK |
+		CPSW_3GF_ALE_UNKNOWN_VLAN_REG_MCAST_FLOOD_MASK_MASK |
 		CPSW_3GF_ALE_UNKNOWN_VLAN_FORCE_UNTAGGED_EGRESS_MASK);
 	tmp |= (7 << CPSW_3GF_ALE_UNKNOWN_VLAN_MEMBER_LIST_SHIFT) |
 		(3 << CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_SHIFT) |
-		(3 << CPSW_3GF_ALE_UNKNOWN_VLAN_MCAST_FLOOD_MASK_SHIFT) |
+		(3 << CPSW_3GF_ALE_UNKNOWN_VLAN_REG_MCAST_FLOOD_MASK_SHIFT) |
 		(7 << CPSW_3GF_ALE_UNKNOWN_VLAN_FORCE_UNTAGGED_EGRESS_SHIFT); 
-	__raw_writel(tmp, &cpsw->ale_unknown_vlan);
+	__raw_writel(tmp, &ale->ale_unknown_vlan);
 
 	/* Done with switch configuration */
-	return 0;
 }
 
 void setup_ale_portconfig (unsigned int portnum)
 {
-	struct cpsw_regs *cpsw = (struct cpsw_regs *)(DEVICE_ETHERNET_SS_BASE
-					+ 0x800);
+	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
+					0x600);
 	unsigned int tmp;
 
 	/* Configure the address in "Learning"/"Forward" state */
-	tmp = __raw_readl(&cpsw->ale_port_control[portnum]);
+	tmp = __raw_readl(&ale->ale_port_control[portnum]);
 	tmp |= (CPSW_3GF_ALE_PORTSTATE_FORWARD & 
 		CPSW_3GF_ALE_PORT_CONTROL_REG_PORT_STATE_MASK);
 	tmp &= ~(CPSW_3GF_ALE_PORT_CONTROL_REG_DROP_UNTAGGED |
@@ -380,7 +345,7 @@ void setup_ale_portconfig (unsigned int portnum)
 	 * disabled on the GMAC ports, i.e.,Ports 1 and 2.
 	 * Learning should be enabled only on Port 0, i.e., CPPI Port
 	 */
-	if (portNum != CPPI_PORT_NUM)
+	if (portnum != CPPI_PORT_NUM)
 		tmp |= CPSW_3GF_ALE_PORT_CONTROL_REG_NO_LEARN;
 	else
 		tmp &= ~CPSW_3GF_ALE_PORT_CONTROL_REG_NO_LEARN;
@@ -390,16 +355,15 @@ void setup_ale_portconfig (unsigned int portnum)
 	tmp |= (0 << CPSW_3GF_ALE_PORT_CONTROL_REG_MCAST_LIMIT_SHIFT) |
 		(0 << CPSW_3GF_ALE_PORT_CONTROL_REG_BCAST_LIMIT_SHIFT);
 
-	__raw_writel(tmp, &cpsw->ale_port_control[portnum]);
+	__raw_writel(tmp, &ale->ale_port_control[portnum]);
 
-	return 0;
 }
 
 int cpsw_init (u8 macaddress[2][6])
 {
 	unsigned int	macportnum;
 	unsigned int	portnum;
-	
+
 	/*
 	 * Initialize the Sliver submodules for the
 	 * two corresponding MAC ports.
@@ -427,9 +391,7 @@ int cpsw_init (u8 macaddress[2][6])
 	add_unicast_ale_entry (0, macaddress[0], 0, 1);
 	add_unicast_ale_entry (0, macaddress[1], 1, 1);
 
-    return 0;
+	return 0;
 }
-
-arch_initcall(cpsw_init);
 
 

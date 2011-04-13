@@ -45,6 +45,15 @@
 #define DPRINTK(fmt, args...)
 #endif
 
+#define KEYSTONE_CPSW_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		| \
+			 NETIF_MSG_DRV		| NETIF_MSG_LINK	| \
+			 NETIF_MSG_IFUP		| NETIF_MSG_INTR	| \
+			 NETIF_MSG_PROBE	| NETIF_MSG_TIMER	| \
+			 NETIF_MSG_IFDOWN	| NETIF_MSG_RX_ERR	| \
+			 NETIF_MSG_TX_ERR	| NETIF_MSG_TX_DONE	| \
+			 NETIF_MSG_PKTDATA	| NETIF_MSG_TX_QUEUED	| \
+			 NETIF_MSG_RX_STATUS)
+
 #define DEVICE_NAPI_WEIGHT              16
 #define DEVICE_POLLING_PERIOD_MSEC      10
 #define DEVICE_NUM_RX_DESCS	        64
@@ -58,6 +67,10 @@
 static int rx_packet_max = KEYSTONE_CPSW_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
 MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
+
+static int debug_level;
+module_param(debug_level, int, 0);
+MODULE_PARM_DESC(debug_level, "keystone cpsw debug level (NETIF_MSG bits)");
 
 static struct timer_list poll_timer;
 
@@ -742,6 +755,32 @@ static void keystone_ndo_tx_timeout(struct net_device *ndev)
 	netif_wake_queue(ndev);
 }
 
+static void keystone_cpsw_get_drvinfo(struct net_device *ndev,
+			     struct ethtool_drvinfo *info)
+{
+	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
+	strcpy(info->driver, "TI KEYSTONE CPSW Driver");
+	strcpy(info->version, "v1.0");
+}
+
+static u32 keystone_cpsw_get_msglevel(struct net_device *ndev)
+{
+	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
+	return priv->msg_enable;
+}
+
+static void keystone_cpsw_set_msglevel(struct net_device *ndev, u32 value)
+{
+	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
+	priv->msg_enable = value;
+}
+
+static const struct ethtool_ops keystone_cpsw_ethtool_ops = {
+	.get_drvinfo	= keystone_cpsw_get_drvinfo,
+	.get_msglevel	= keystone_cpsw_get_msglevel,
+	.set_msglevel	= keystone_cpsw_set_msglevel
+};
+
 static const struct net_device_ops keystone_netdev_ops = {
 	.ndo_open		= keystone_ndo_open,
 	.ndo_stop		= keystone_ndo_stop,
@@ -789,6 +828,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	priv->pdev = pdev;
 	priv->ndev = ndev;
 	priv->dev  = &ndev->dev;
+	priv->msg_enable = netif_msg_init(debug_level, KEYSTONE_CPSW_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
 	spin_lock_init(&priv->lock);
 
@@ -886,6 +926,8 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	ndev->dev_id  = 0;
 	ndev->flags  |= IFF_ALLMULTI;	
 	ndev->netdev_ops = &keystone_netdev_ops;
+
+	SET_ETHTOOL_OPS(ndev, &keystone_cpsw_ethtool_ops);
 	SET_NETDEV_DEV(ndev, &pdev->dev);
 
 	ret = register_netdev(ndev);
