@@ -26,12 +26,15 @@
 #include <linux/netdevice.h>
 #include <linux/phy.h>
 #include <linux/timer.h>
+#include <linux/interrupt.h>
+
+#include <asm/system.h>
+#include <asm/irq.h>
 
 #include <mach/pa.h>
 #include <mach/netcp.h>
 #include <mach/keystone_qmss.h>
-
-#include <asm/system.h>
+#include <mach/keystone_qmss_firmware.h>
 
 #include "keystone_pktdma.h"
 
@@ -47,6 +50,7 @@
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
+#define DEVICE_QM_ACC_RAM_OFFSET        (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
 #define KEYSTONE_CPSW_MIN_PACKET_SIZE	ETH_ZLEN
 #define KEYSTONE_CPSW_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
@@ -72,11 +76,11 @@ struct keystone_cpsw_priv {
 	struct clk			*clk;
 };
 
-/* The linking RAM */
-u8 qm_linkram_buf[DEVICE_NUM_DESCS * 2 * (sizeof(u32) / sizeof(u8))];
-
-/* The CPPI RAM */
-u8 qm_cppi_buf[QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS];
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+/* The QM accumulator RAM */
+static u32 *acc_list_addr;
+#endif
+static u32 netcp_irq_enabled = 0;
 
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
 
@@ -121,6 +125,20 @@ static int __init get_mac_addr_from_cmdline(char *str)
 __setup("emac_addr=", get_mac_addr_from_cmdline);
 
 /*
+ * Cleanup queues used by the PKTDMA
+ */
+static void cpdma_cleanup_qs(struct net_device *ndev)
+{
+	struct qm_host_desc *hd = NULL;
+
+	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL))
+		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
+
+	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)) && (hd != NULL))
+		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
+}
+
+/*
  * Initialize queues used by the PKTDMA
  */
 static void cpdma_init_qs(struct net_device *ndev)
@@ -138,7 +156,7 @@ static void cpdma_init_qs(struct net_device *ndev)
 		hd->next_bdptr     = 0;
 		hd->orig_buff_ptr  = (u32)skb->data;
 		hd->private        = (u32)skb;
-		hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
 	}
 }
 
@@ -197,9 +215,43 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	u32 v;
 	u32 i;
 	int ret = 0;
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	struct qm_acc_cmd_config acc_cmd_cfg;
+	int                      num_acc_entries = (DEVICE_RX_INT_THRESHOLD + 1) * 2;
+#endif
 
 	if (cpdma_rx_disable(cfg) != 0)
-		ret = -1;
+		return -1;
+	
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	/*
+	 * Set the accumulator list memory in L2 memory after descriptors to avoid
+	 * cache synchronization
+	 */
+	acc_list_addr = (u32 *) (RAM_SRAM_BASE + DEVICE_QM_ACC_RAM_OFFSET);
+	memset((void *) acc_list_addr, 0, num_acc_entries << 2);
+
+	/*
+	 * Setup accumulator configuration for receive 
+	 */
+	acc_cmd_cfg.channel          = DEVICE_QM_ETH_ACC_CHANNEL;
+	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
+	acc_cmd_cfg.queue_mask       = 0;  /* none */
+	acc_cmd_cfg.list_addr        = (u32) acc_list_addr;
+	acc_cmd_cfg.queue_index      = cfg->queue_rx;
+	acc_cmd_cfg.max_entries      = DEVICE_RX_INT_THRESHOLD + 1;
+	acc_cmd_cfg.timer_count      = 40;
+	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
+	acc_cmd_cfg.list_entry_size  = 0;  /* C,D registers */
+	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
+	
+	ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
+
+	if (ret != 0) {
+		printk("NetCP accumulator config failed (%d)\n", ret);
+		return ret;
+	}
+#endif
 
 	/*
 	 * Configure the flow
@@ -301,7 +353,7 @@ int mac_sl_reset(u16 port)
 	u32 i, v;
 
 	/* Set the soft reset bit */
-	__raw_writel(CPGMAC_REG_RESET_VAL_RESET, 
+	__raw_writel(CPGMAC_REG_RESET_VAL_RESET,
 		     DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
 
 	/* Wait for the bit to clear */
@@ -369,7 +421,50 @@ static int cpmac_drv_stop(void)
 
 	return 0;
 }
- 
+
+/*
+ * Interrupt management 
+ * 
+ * Because NetCP interrupts do not exactly match the behavior of a standard NIC
+ * and cannot be easily enable/disable, we use a software switch instead.
+ *
+ * Real interrupt re-enabling for NAPI is done within netcp_irq_ack().
+ */
+static inline void netcp_irq_disable(struct net_device *ndev)
+{
+	netcp_irq_enabled = 0;
+}
+
+static inline void netcp_irq_enable(struct net_device *ndev)
+{
+	netcp_irq_enabled = 1;
+}
+
+static inline void netcp_irq_ack(struct net_device *ndev)
+{
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	if (netcp_irq_enabled) {
+		__raw_writel(1, QM_REG_INTD_COUNT_IRQ(DEVICE_QM_ETH_ACC_CHANNEL));
+		__raw_writel(QM_REG_INTD_EOI_HIGH_PRIO_INDEX + DEVICE_QM_ETH_ACC_CHANNEL,
+			     DEVICE_QM_INTD_BASE + QM_REG_INTD_EOI);
+	}
+#endif
+}
+
+/*
+ * PKTDMA interrupt handling functions
+ */
+static irqreturn_t pktdma_interrupt(int irq, void *netdev_id)
+{
+	struct net_device         *ndev = (struct net_device *) netdev_id;
+	struct keystone_cpsw_priv *p    = netdev_priv(ndev);
+
+	if (likely(napi_schedule_prep(&p->napi))) {
+		__napi_schedule(&p->napi);
+	}
+	return IRQ_HANDLED;
+}
+
 /*
  * Pop an incoming packet
  */
@@ -381,9 +476,28 @@ static int pktdma_rx(struct net_device *ndev,
 	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	static u32          *acc_list = 0;
+	u32                 *acc_list_p;
 
-	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL)) {
-		
+	/* Accumulator ping pong buffer management */
+	if (acc_list == acc_list_addr)
+		acc_list = acc_list_addr + (DEVICE_RX_INT_THRESHOLD + 1);
+	else
+		acc_list = acc_list_addr;
+
+	acc_list_p = acc_list;
+
+/* With interrupt support: get the descriptors from the accumulator list */
+#define	PKTDMA_RX_LOOP_ITERATOR() ((struct qm_host_desc *) *acc_list_p++)
+#else
+/* Without interrupt support: get the descriptors directly from the queue */
+#define PKTDMA_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
+#endif
+
+	/* Main loop */
+	while ((hd = PKTDMA_RX_LOOP_ITERATOR()) && (hd != NULL)) {
+
 		if (unlikely(work_done && *work_done >= work_to_do))
 			return 0;
 
@@ -416,7 +530,7 @@ static int pktdma_rx(struct net_device *ndev,
 			hd->next_bdptr    = 0;
 			hd->orig_buff_ptr = (u32)skb->data;
 			hd->private       = (u32)skb;
-			hw_qm_queue_push(hd, DEVICE_QM_RX_Q, QM_DESC_SIZE_BYTES);
+			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
 		}
 		
 		/* Fill statistic */
@@ -440,7 +554,7 @@ static int pktdma_tx(struct net_device *ndev)
 	struct qm_host_desc *hd = NULL;
 	int tx_cleaned = 0;
 	
-	while ((hd = hw_qm_queue_pop(DEVICE_QM_TX_Q)) && (hd != NULL)) {
+	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)) && (hd != NULL)) {
 		
 		DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
 			hd->private, hd);
@@ -462,22 +576,6 @@ static int pktdma_tx(struct net_device *ndev)
 }
 
 /*
- * PKTDMA interrupt handling functions
- */
-static irqreturn_t pktdma_interrupt(int irq, void * netdev_id)
-{
-	struct net_device *ndev = (struct net_device *) netdev_id;
-	struct keystone_cpsw_priv *p = netdev_priv(ndev);
-
-	if (likely(napi_schedule_prep(&p->napi))) {
-		netcp_disable_irq(ndev);
-		__napi_schedule(&p->napi);
-	}
-
-	return IRQ_HANDLED;
-}
-
-/*
  * NAPI poll
  */
 static int pktdma_poll(struct napi_struct *napi, int budget)
@@ -487,12 +585,17 @@ static int pktdma_poll(struct napi_struct *napi, int budget)
 	unsigned int work_done = 0;
 
 	pktdma_rx(p->ndev, &work_done, budget);
+
+	/*
+	 * The release of transmitted buffer is done under receive, not the best 
+	 * way for doing this...
+	 */
 	pktdma_tx(p->ndev);
 
 	/* If budget not fully consumed, exit the polling mode */
 	if (work_done < budget) {
 		napi_complete(napi);
-		netcp_enable_irq(p->ndev);
+		netcp_irq_ack(p->ndev);
 	}
 
 	return work_done;
@@ -503,15 +606,14 @@ static int pktdma_poll(struct napi_struct *napi, int budget)
  */
 static void keystone_ndo_poll_controller(struct net_device *ndev)
 {
-	netcp_disable_irq(ndev);
-
+	netcp_irq_disable(ndev);
 	pktdma_interrupt(ndev->irq, ndev);
+	netcp_irq_enable(ndev);
 
-	netcp_enable_irq(ndev);
-
-	/* Ugly hack */
-	mod_timer(&poll_timer,
-		  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
+	if (ndev->irq == -1) {
+		mod_timer(&poll_timer,
+			  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
+	}
 }
 
 /*
@@ -560,7 +662,7 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 
 	/* Return the descriptor back to the transmit queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_TX_Q);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_TX_CP_Q);
 	
 	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
 
@@ -593,18 +695,20 @@ static int keystone_ndo_open(struct net_device *ndev)
 	cpmac_drv_start();
 
 	netif_wake_queue(ndev);
+
 	napi_enable(&p->napi);
 
-	netcp_enable_irq(ndev);
+	DPRINTK("starting interface\n");
 
-	DPRINTK("starting to poll\n");
-
-	/* Ugly hack: use timeout to poll */
-	init_timer(&poll_timer);
-	poll_timer.function = keystone_ndo_poll_controller;
-	poll_timer.data     = (unsigned long) ndev;
-	mod_timer(&poll_timer,
-		  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
+	if (ndev->irq == -1) {
+		/* Use timeout to poll */
+		init_timer(&poll_timer);
+		poll_timer.function = keystone_ndo_poll_controller;
+		poll_timer.data     = (unsigned long) ndev;
+		mod_timer(&poll_timer,
+			  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
+	} else
+		netcp_irq_enable(ndev);
 
 	return 0;
 }
@@ -616,7 +720,7 @@ static int keystone_ndo_stop(struct net_device *ndev)
 {
 	struct keystone_cpsw_priv *p = netdev_priv(ndev);
 
-	netcp_disable_irq(ndev);
+	netcp_irq_disable(ndev);
 
 	napi_disable(&p->napi);
 	netif_stop_queue(ndev);
@@ -686,6 +790,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	priv->ndev = ndev;
 	priv->dev  = &ndev->dev;
 	priv->rx_packet_max = max(rx_packet_max, 128);
+	spin_lock_init(&priv->lock);
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
@@ -712,6 +817,16 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
 	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
 
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	/* load QM PDSP firmwares for accumulators */
+	q_cfg->pdsp_firmware[0].id       = 0;
+	q_cfg->pdsp_firmware[0].firmware = &acc48_le;
+	q_cfg->pdsp_firmware[0].size     = sizeof(acc48_le);
+#else
+	q_cfg->pdsp_firmware[0].firmware = NULL;
+#endif
+	q_cfg->pdsp_firmware[1].firmware = NULL;
+
 	/* Initialize QM */
 	hw_qm_setup(q_cfg);
 
@@ -721,7 +836,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	rx_cfg->flow_base        = DEVICE_PA_CDMA_RX_FLOW_CFG_BASE;
 	rx_cfg->nrx_flows        = DEVICE_PA_CDMA_RX_NUM_FLOWS;
 	rx_cfg->qmnum_free_buf   = 0;
-	rx_cfg->queue_free_buf   = DEVICE_QM_RX_Q;
+	rx_cfg->queue_free_buf   = DEVICE_QM_ETH_RX_FREE_Q;
 	rx_cfg->qmnum_rx         = 0;
 	rx_cfg->queue_rx         = DEVICE_QM_ETH_RX_Q;
 	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
@@ -735,6 +850,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	cpdma_tx_config(tx_cfg);
 
 	/* Initialize PKTDMA queues */
+	cpdma_cleanup_qs(ndev);
 	cpdma_init_qs(ndev);
 
 	/* Configure the PA */
@@ -752,9 +868,21 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 
 	/* NAPI register */
 	netif_napi_add(ndev, &priv->napi, pktdma_poll, DEVICE_NAPI_WEIGHT);
-	
+
+#ifdef EMAC_ARCH_HAS_INTERRUPT
+	/* Register interrupt */
+	ret = request_irq(data->irq, pktdma_interrupt, 0, ndev->name, ndev);
+	if (ret == 0)
+		ndev->irq = data->irq;
+	else {
+		dev_err(priv->dev, "irq mode failed (%d), use polling\n", ret);
+		ndev->irq = -1;
+	}
+#else
+	ndev->irq = -1;
+#endif
+
 	/* Register the network device */
-	ndev->irq     = data->irq;
 	ndev->dev_id  = 0;
 	ndev->flags  |= IFF_ALLMULTI;	
 	ndev->netdev_ops = &keystone_netdev_ops;

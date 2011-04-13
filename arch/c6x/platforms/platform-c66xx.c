@@ -159,9 +159,11 @@ static void init_power(void)
 
 #ifdef CONFIG_TI_KEYSTONE_PKTDMA
 #include <mach/netcp.h>
+#include <mach/keystone_qmss.h>
 
 struct keystone_platform_data c6x_pktdma_data = {
-	.irq            = 0, /* No interrupt support for the time being */
+	.irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_CHANNEL,
+
 };
 
 static struct platform_device pktdma_dev0 = {

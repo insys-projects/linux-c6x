@@ -79,6 +79,8 @@
 
 #define DEVICE_RX_CDMA_TIMEOUT_COUNT		1000
 
+#define DEVICE_RX_INT_THRESHOLD                 3
+
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
@@ -86,11 +88,8 @@ struct keystone_platform_data {
 	unsigned int irq;
 };
 
-/* Interrupt management */
-static inline void netcp_disable_irq(struct net_device *ndev) {}
-static inline void netcp_enable_irq(struct net_device *ndev) {}
-
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define EMAC_ARCH_HAS_INTERRUPT
 #define EMAC_ARCH_HAS_MAC_ADDR
 #define EFUSE_REG_MAC_ADDR	                0x2620110
 #define emac_arch_get_mac_addr	emac_arch_get_mac_addr_from_efuse
