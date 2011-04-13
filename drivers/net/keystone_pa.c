@@ -193,7 +193,7 @@ int keystone_pa_config(u8* mac_addr)
 	 * Form the configuration command in a buffer
 	 * linked to a descriptor
 	 */
-	hd = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
+	hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
 	if (hd == NULL)
 		return -ENOMEM;
 
@@ -217,11 +217,12 @@ int keystone_pa_config(u8* mac_addr)
 	hd->orig_buff_len  = PA_CMD_SIZE;
 	hd->orig_buff_ptr  = (u32) pa_cfg.cmd_buf;
 	hd->buff_ptr       = (u32) pa_cfg.cmd_buf;
+	hd->private        = 0;
 	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, PA_CMD_SIZE);
 
 	/* Set the return Queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_FREE_Q);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_FREE_Q);
 
 	hw_qm_queue_push(hd, DEVICE_QM_PA_CFG_Q, QM_DESC_SIZE_BYTES);
 	

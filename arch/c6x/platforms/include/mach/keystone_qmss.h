@@ -306,13 +306,11 @@ struct qm_host_desc {
 #define QM_STARV_QUEUE                  736
 
 #define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
-#define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
 /* Ethernet (NetCP) queues */
+#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
 #define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		(QM_HIGH_PRIO_QUEUE + (DEVICE_QM_ETH_ACC_CHANNEL << 5) + 0)
-                                        /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_CP_Q         	(QM_HIGH_PRIO_QUEUE + (DEVICE_QM_ETH_ACC_CHANNEL << 5) + 1)
-                                        /* Ethernet Tx completion queue */
+#define DEVICE_QM_ETH_RX_Q		(QM_HIGH_PRIO_QUEUE + \
+					 (DEVICE_QM_ETH_ACC_CHANNEL << 5)) /* Ethernet Rx queue (filled by PA) */
 #define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
 
 /* Prototypes */

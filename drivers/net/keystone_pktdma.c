@@ -145,10 +145,7 @@ static void cpdma_cleanup_qs(struct net_device *ndev)
 	struct qm_host_desc *hd = NULL;
 
 	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL))
-		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
-
-	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)) && (hd != NULL))
-		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, QM_DESC_SIZE_BYTES);
 }
 
 /*
@@ -162,7 +159,7 @@ static void cpdma_init_qs(struct net_device *ndev)
 
 	for (i = 0; i < DEVICE_NUM_RX_DESCS; i++) {
 		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
-		hd = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
+		hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
 		hd->buff_len       = skb_tailroom(skb);
 		hd->orig_buff_len  = skb_tailroom(skb);
 		hd->buff_ptr       = (u32)skb->data;
@@ -560,35 +557,6 @@ static int pktdma_rx(struct net_device *ndev,
 }
 
 /*
- * Release a transmitted packet
- */
-static int pktdma_tx(struct net_device *ndev)
-{	
-	struct qm_host_desc *hd = NULL;
-	int tx_cleaned = 0;
-	
-	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)) && (hd != NULL)) {
-		
-		DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
-			hd->private, hd);
-		
-		if (hd->private)
-			/* Free the skbuff associated to this packet */
-			dev_kfree_skb_irq((struct sk_buff*) hd->private);
-
-		/* Send packet back to available free buffer queue */
-		hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, QM_DESC_SIZE_BYTES);
-
-		tx_cleaned = 1;
-	}
-
-	if (unlikely(tx_cleaned && netif_queue_stopped(ndev)))
-		netif_wake_queue(ndev);
-		
-	return tx_cleaned;
-}
-
-/*
  * NAPI poll
  */
 static int pktdma_poll(struct napi_struct *napi, int budget)
@@ -598,12 +566,6 @@ static int pktdma_poll(struct napi_struct *napi, int budget)
 	unsigned int work_done = 0;
 
 	pktdma_rx(p->ndev, &work_done, budget);
-
-	/*
-	 * The release of transmitted buffer is done under receive, not the best 
-	 * way for doing this...
-	 */
-	pktdma_tx(p->ndev);
 
 	/* If budget not fully consumed, exit the polling mode */
 	if (work_done < budget) {
@@ -648,10 +610,26 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 		pkt_len = KEYSTONE_CPSW_MIN_PACKET_SIZE;
 	}
 
-	hd  = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
+	hd  = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
 	if (hd == NULL) {
 		DPRINTK("no packet retrieved\n");
-		return -1;
+		goto fail;
+	}
+
+	/* 
+	 * Check if the packet has been used before, if so we need
+	 * to release the attached sk_buff
+	 */
+	if (hd->private) {
+		DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
+			hd->private, hd);
+		
+		/* Free the skbuff associated to this packet */
+		dev_kfree_skb_irq((struct sk_buff*) hd->private);
+
+		/* If queue has been stopped previously */
+		if (netif_queue_stopped(ndev))
+			netif_wake_queue(ndev);
 	}
 
 	/* No coherency is assumed between PKTDMA and L2 cache */
@@ -673,9 +651,9 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x)\n",
 		skb->len, skb, hd);
 
-	/* Return the descriptor back to the transmit queue */
+	/* Return the descriptor back to the free queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_TX_CP_Q);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_FREE_Q);
 	
 	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
 
@@ -758,7 +736,6 @@ static void keystone_ndo_tx_timeout(struct net_device *ndev)
 static void keystone_cpsw_get_drvinfo(struct net_device *ndev,
 			     struct ethtool_drvinfo *info)
 {
-	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
 	strcpy(info->driver, "TI KEYSTONE CPSW Driver");
 	strcpy(info->version, "v1.0");
 }
@@ -855,7 +832,8 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	/* Use L2 lower 256KB memory for descriptors */
 	q_cfg->mem_region_base		= RAM_SRAM_BASE;
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-	q_cfg->dest_q			= DEVICE_QM_FREE_Q;
+	q_cfg->dest_q			= DEVICE_QM_ETH_FREE_Q;
+	memset((void *) q_cfg->mem_region_base, 0, DEVICE_QM_ACC_RAM_OFFSET);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* load QM PDSP firmwares for accumulators */
