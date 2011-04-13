@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -43,6 +44,7 @@
 #define QMSS_VUSR_QUEUE_BASE			864
 #define QMSS_MAX_VUSR_QUEUE			32
 #define QMSS_MAX_GENERAL_PURPOSE_QUEUE      	7296
+#define QMSS_MAX_PDSP                           2
 
 enum qmss_queuetype
 {
@@ -86,13 +88,64 @@ enum qmss_queuetype
 /* The driver supports only a single descriptor size */
 #define QM_DESC_SIZE_BYTES	64
 
+#define QM_ACC_CMD_ENABLE       0x81
+#define QM_ACC_CMD_DISABLE      0x80
+
+/* Accumulator command interface structure */
+struct qm_acc_cmd_config {
+	/* Accumulator channel affected (0-47) */
+	u8                 channel;
+	/* Accumulator channel command (enable or disable) */
+	u8                 command;
+	/*
+	 * This field specifies which queues are to be included in the queue group.
+	 * Bit 0 corresponds to the base queue index, and bit 31 corresponds to the base
+	 * queue index plus 31. For any bit set in this mask, the corresponding queue index
+	 * is included in the monitoring function.
+	 */
+	u32                queue_mask;
+	/* Physical pointer to list ping/pong buffer. NULL when channel disabled */
+	u32                list_addr;
+	/* Queue Manager and Queue Number index to monitor. This serves as a base queue index when the
+	 * channel in multi-queue mode, and must be a multiple of 32 when multi-queue mode is enabled. */
+	u16                queue_index;
+	/* Max entries per list buffer page */
+	u16                max_entries;
+	/* Number of 25us timer ticks to delay interrupt */
+	u16                timer_count;
+	/* Interrupt pacing mode: specifies when the interrupt should be trigerred */
+	u8                 pacing_mode;
+	/* List entry size: specifies the size of each data entry */
+	u8                 list_entry_size;
+	/* List count mode: the number of entries in the list */
+        u8                 list_count_mode;
+	/* Queue mode: monitor single or multiple queues */
+	u8                 multi_queue_mode;
+};
+
+/* QM PDSP firmware download information structure */
+struct pdsp_config {
+	/* ID of the PDSP to download this firmware to */
+	u32                id;
+	/*
+	 * Pointer to the firmware image, If the firmware pointer is NULL, do not
+	 * download the firmware.
+	 */ 
+	void              *firmware;
+	/* Size of firmware in bytes */
+	u32                size;
+};
+
 /* QM setup configuration */
 struct qm_config  {
-	u32 link_ram_base;
-	u32 link_ram_size;
-	u32 mem_region_base;
-	u32 mem_regnum_descriptors;
-	u32 dest_q;       /* Where the initialized descriptors are placed */
+	u32                link_ram_base;
+	u32                link_ram_size;
+	u32                mem_region_base;
+	u32                mem_regnum_descriptors;
+	/* Where the initialized descriptors are placed */
+	u32                dest_q;
+	/* PDSP firmware to load */
+	struct pdsp_config pdsp_firmware[QMSS_MAX_PDSP];
 };
 
 struct qm_host_desc {
@@ -139,11 +192,29 @@ struct qm_host_desc {
 };
 
 #define DEVICE_QM
-#define DEVICE_QM_MANAGER_BASE		0x02a68000
-#define DEVICE_QM_DESC_SETUP_BASE	0x02a6a000
+#define DEVICE_QM_QUEUE_STATUS_BASE	0x02a00000
 #define DEVICE_QM_MANAGER_QUEUES_BASE	0x02a20000
 #define DEVICE_QM_MANAGER_Q_PROXY_BASE	0x02a40000
-#define DEVICE_QM_QUEUE_STATUS_BASE	0x02a00000
+#define DEVICE_QM_PDSP1_IRAM_BASE       0x02a60000
+#define DEVICE_QM_PDSP2_IRAM_BASE       0x02a61000
+#define DEVICE_QM_MANAGER_BASE		0x02a68000
+#define DEVICE_QM_DESC_SETUP_BASE	0x02a6a000
+#define DEVICE_QM_PDSP1_CTRL_BASE       0x02a6e000
+#define DEVICE_QM_PDSP2_CTRL_BASE       0x02a6f000
+#define DEVICE_QM_INTD_BASE             0x02aa0000
+#define DEVICE_QM_PDSP1_CMD_BASE        0x02ab8000
+#define DEVICE_QM_PDSP2_CMD_BASE        0x02abc000
+
+#define DEVICE_QM_PDSP_CTRL_BASE(x)     (DEVICE_QM_PDSP1_CTRL_BASE \
+					 + ((DEVICE_QM_PDSP2_CTRL_BASE - DEVICE_QM_PDSP1_CTRL_BASE) \
+					    * (x)))
+#define DEVICE_QM_PDSP_CMD_BASE(x)      (DEVICE_QM_PDSP1_CMD_BASE \
+					 + ((DEVICE_QM_PDSP2_CMD_BASE - DEVICE_QM_PDSP1_CMD_BASE) \
+					    * (x)))
+#define DEVICE_QM_PDSP_IRAM_BASE(x)     (DEVICE_QM_PDSP1_IRAM_BASE \
+					 + ((DEVICE_QM_PDSP2_IRAM_BASE - DEVICE_QM_PDSP1_IRAM_BASE) \
+					    * (x)))
+
 #define DEVICE_QM_NUM_LINKRAMS		2
 #define DEVICE_QM_NUM_MEMREGIONS	20
 
@@ -195,11 +266,53 @@ struct qm_host_desc {
 /* Maximum linking RAM size mask */
 #define QM_REG_LINKRAM_SIZE_MAX_MASK	0x7ffff
 
+/* QM PDSP control registers */
+#define QM_REG_PDSP_CONTROL_REG         0x00
+#define QM_REG_PDSP_STATUS_REG          0x04
+#define QM_REG_PDSP_WAKEUP_ENABLE_REG   0x08
+#define QM_REG_PDSP_CYCLE_COUNT_REG     0x0c
+#define QM_REG_PDSP_STALL_COUNT_REG     0x10
+
+#define QM_REG_VAL_PDSP_CTL_DISABLE     0x0000
+#define QM_REG_VAL_PDSP_CTL_ENABLE(pc)  (((pc) << 16) | 0x3)
+#define QM_REG_VAL_PDSP_CTL_STATE       0x8000
+
+/* The QM INTD registers */
+#define QM_REG_INTD_EOI		        0x010
+#define QM_REG_INTD_STATUS0	        0x200
+#define QM_REG_INTD_STATUS1	        0x204
+#define QM_REG_INTD_STATUS4	        0x210
+#define QM_REG_INTD_CLEAR0	        0x280
+#define QM_REG_INTD_CLEAR1	        0x284
+#define QM_REG_INTD_CLEAR4	        0x290
+#define QM_REG_INTD_COUNT               0x300
+
+#define QM_REG_INTD_COUNT_IRQ(i)        (DEVICE_QM_INTD_BASE + QM_REG_INTD_COUNT + (i << 2))
+
+#define QM_REG_INTD_EOI_STARV_INDEX     0
+#define QM_REG_INTD_EOI_HIGH_PRIO_INDEX 2
+#define QM_REG_INTD_EOI_LOW_PRIO_INDEX  34
+
+/* 
+ * Accumulator interrupt definitions
+ */
+#define DEVICE_QM_ETH_ACC_CHANNEL       0 /* Ethernet accumulator channel base number */
+
+/*
+ * Queue definitions
+ */
+#define QM_LOW_PRIO_QUEUE               0
+#define QM_HIGH_PRIO_QUEUE              704
+#define QM_STARV_QUEUE                  736
+
 #define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
 #define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
-#define DEVICE_QM_RX_Q		        911 /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		912 /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_TX_Q	         	913 /* Ethernet Tx completion queue */
+/* Ethernet (NetCP) queues */
+#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_Q		(QM_HIGH_PRIO_QUEUE + (DEVICE_QM_ETH_ACC_CHANNEL << 5) + 0)
+                                        /* Ethernet Rx queue (filled by PA) */
+#define DEVICE_QM_ETH_TX_CP_Q         	(QM_HIGH_PRIO_QUEUE + (DEVICE_QM_ETH_ACC_CHANNEL << 5) + 1)
+                                        /* Ethernet Tx completion queue */
 #define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
 
 /* Prototypes */
@@ -209,6 +322,8 @@ int                  hw_qm_setup(struct qm_config *cfg);
 u32                  hw_qm_queue_count(u32 qnum);
 void                 hw_qm_teardown(void);
 int                  hw_qm_init_threshold(u32 qnum);
+int                  hw_qm_download_firmware(u32 pdsp_id, void *image, u32 size);
+u32                  hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg);
 
 /* Helper functions */
 static inline int address_is_local(u32 addr)
@@ -235,5 +350,6 @@ static inline u32 device_local_addr_to_global(u32 addr)
 	
 	return addr;
 }
+
 #endif /* __MACH_C6X_KEYSTONE_QMSS_H */
 
