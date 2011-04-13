@@ -194,8 +194,10 @@ int keystone_pa_config(u8* mac_addr)
 	 * linked to a descriptor
 	 */
 	hd = hw_qm_queue_pop(DEVICE_QM_FREE_Q);
+	if (hd == NULL)
+		return -ENOMEM;
 
-	pa_cfg.cmd_buf = (u8*) kzalloc(PA_CMD_SIZE, GFP_KERNEL);
+	pa_cfg.cmd_buf = (u8*) kzalloc(max(PA_CMD_SIZE, L2_CACHE_BYTES), GFP_KERNEL);
 	if (pa_cfg.cmd_buf == NULL)
 		return -ENOMEM;
 
