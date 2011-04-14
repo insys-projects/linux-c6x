@@ -332,7 +332,7 @@ static struct davinci_spi_platform_data evm_spi0_pdata = {
 	.poll_mode	= 0, /* 0 -> interrupt mode, 1-> polling mode */
 	.c2tdelay	= 0,
 	.t2cdelay	= 0,
-	.use_dma        = 0, /* do not use EDMA */
+	.use_dma        = 1, /* use EDMA */
 };
 
 static struct platform_device evm_spi0_device = {
