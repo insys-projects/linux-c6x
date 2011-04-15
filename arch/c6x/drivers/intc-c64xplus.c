@@ -59,7 +59,7 @@ extern int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 			 void (*handler)(unsigned int irq, struct irq_desc *desc),
 			 struct irqaction             *combiner_actions);
 #else /* NR_SOC_COMBINERS > 0 */
-#define irq_soc_mapped(i) (i)
+#define irq_soc_mapped_irq(i) (i)
 #endif /* NR_SOC_COMBINERS > 0 */
 
 /* lock protecting irq mappings */
