@@ -35,8 +35,11 @@ static int sgmii_init(void)
 	sgmiic0.autoneg   = 0;
 	sgmiic0.txconfig  = 0x000108a1;
 	sgmiic0.rxconfig  = 0x00700621;
+#ifdef CONFIG_ARCH_BOARD_EVM6670
+	sgmiic0.auxconfig = 0x00000051; /* PLL multiplier */
+#else
 	sgmiic0.auxconfig = 0x00000041; /* PLL multiplier */
-
+#endif
 	c66x_sgmii_config(0, &sgmiic0);
 
 	sgmiic1.master    = 1;
@@ -44,8 +47,12 @@ static int sgmii_init(void)
 	sgmiic1.autoneg   = 0;
 	sgmiic1.txconfig  = 0x000108a1;
 	sgmiic1.rxconfig  = 0x00700621;
+#ifdef CONFIG_ARCH_BOARD_EVM6670
+	sgmiic0.auxconfig = 0x00000051; /* PLL multiplier */
+#else
 	sgmiic1.auxconfig = 0x00000041; /* PLL multiplier */
-
+#endif
+	
 	c66x_sgmii_config(1, &sgmiic1);
 
 	printk("SGMII init complete\n");
