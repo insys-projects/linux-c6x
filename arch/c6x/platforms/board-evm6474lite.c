@@ -316,11 +316,6 @@ static void __init board_setup_edma(void)
 #define board_setup_edma()
 #endif /* CONFIG_EDMA3 */
 
-static struct clk watchdog_clk = {
-	.name = "watchdog",
-	.parent = &pll1_sysclk10,
-};
-
 SOC_CLK_DEF(61440000); /* clkin is a 61.4MHz clock */
 
 static struct clk_lookup evm_clks[] = {
