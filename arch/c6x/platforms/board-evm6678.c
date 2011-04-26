@@ -287,14 +287,8 @@ arch_initcall(evm_init_edma);
 
 static struct mtd_partition evm6678_nand_parts[] = {
 	{
-		.name		= "bootloader",
-		.offset		= 0,
-		.size		= 0x00200000,
-		.mask_flags	= MTD_WRITEABLE,
-	},
-	{
 		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
+		.offset		= 0,
 		.size		= 0x01000000,
 		.mask_flags	= 0,
 	},
