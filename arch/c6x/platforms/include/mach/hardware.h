@@ -165,10 +165,28 @@
 #define PSC_BASE                     0x02350000
 #define PSC_PTCMD                    0x02350120
 #define PSC_PTSTAT                   0x02350128
-#define PSC_PDCTL0                   0x02ac0300
-#define PSC_MDSTAT0                  0x02ac0800
-#define PSC_MDCTL0                   0x02ac0a00
-#endif  /* CONFIG_SOC_TMS329C6670 */
+#define PSC_PDCTL0                   0x02350300
+#define PSC_MDSTAT0                  0x02350800
+#define PSC_MDCTL0                   0x02350a00
+
+#ifdef CONFIG_SOC_TMS320C6678
+#define PSC_EMIF25_SPI               3  /* EMIF16 and SPI */
+#endif /* CONFIG_SOC_TMS320C6678 */
+#define PSC_DEBUGSS_TRC              5  /* Debug trace */
+#define PSC_TETB_TRC                 6
+#define PSC_PA                       7  /* PA */
+#define PSC_CPGMAC                   8  /* SGMII */
+#define PSC_SA                       9  /* SA */
+#define PSC_PCIE                     10 /* PCIe */
+#define PSC_SRIO                     11 /* sRIO */
+#define PSC_HYPERLINK                12 /* HyperLink */
+#define PSC_MSMCSRAM                 14 /* MSMC RAM */
+
+#define PSC_SYNCRESET                0x1000
+#define PSC_DISABLE                  0x0000
+#define PSC_ENABLE                   0x0003
+#endif /* CONFIG_SOC_TMS329C6670 || CONFIG_SOC_TMS320C6678 */
+
 /*
  * TCI648x megamodules misc registers & constants
  */

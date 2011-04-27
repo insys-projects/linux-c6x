@@ -153,8 +153,95 @@ static void init_pll(void)
 	dscr_set_reg(DSCR_KICK1, 0);
 }
 
+static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
+{
+	volatile unsigned int *mdctl;
+	volatile unsigned int *mdstat;
+	volatile unsigned int *pdctl;
+	int timeout;
+
+	/* Only core 0 can set PSC */
+	if (get_coreid() == 0) {
+		mdctl  = (volatile unsigned int *) (PSC_MDCTL0 + (id << 2));
+		mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
+		pdctl  = (volatile unsigned int *) (PSC_PDCTL0 + (pd << 2));
+		
+		if (state == PSC_SYNCRESET)
+			return 0; /* not yet supported */
+
+		/* If state is already set, do nothing */
+		if ((*mdstat & 0x1f) == state)
+			return 1;
+
+		/* Wait transition and check if we got timeout error while waiting */
+		timeout = 0;
+		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
+			udelay(1);
+			if (timeout++ > 150) {
+				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
+				return -1;
+			}
+		}
+
+		/* Set power domain control */
+		*pdctl = (*pdctl) | 0x00000001;
+            
+		/* Set MDCTL NEXT to new state */
+		*mdctl = ((*mdctl) & ~(0x1f)) | state;
+			
+		/* Start power transition by setting PTCMD GO to 1 */
+		*(volatile unsigned int *) (PSC_PTCMD) =
+			*(volatile unsigned int *) (PSC_PTCMD) | (0x1 << pd);
+
+		/* Wait for PTSTAT GOSTAT to clear */
+		timeout = 0;
+		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
+			udelay(1);
+			if (timeout++ > 150) {
+				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
+				return -1;
+			}
+		}
+
+		/* Verify that state changed */
+		udelay(1);
+		if((*mdstat & 0x1f ) != state) {
+			printk(KERN_DEBUG "PSC: pd %d, id %d state did not change (%d != %d)\n",
+			       pd, id, state, *mdstat);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Enable needed SoC devices
+ */
 static void init_power(void)
 {
+#if defined(CONFIG_SOC_TMS320C6678) && (defined(CONFIG_SPI) || defined(CONFIG_MTD))
+	/* EMIF16 and SPI (C6678 only) */
+	set_psc_state(0, PSC_EMIF25_SPI, PSC_ENABLE);
+#endif
+#ifdef CONFIG_TI_KEYSTONE_PKTDMA
+	/* NetCP, PA and SA */
+        set_psc_state(2, PSC_PA,     PSC_ENABLE);
+        set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
+/*      set_psc_state(2, PSC_SA,     PSC_ENABLE); */
+#endif
+#ifdef CONFIG_PCI
+	/* PCIe */
+        set_psc_state(3, PSC_PCIE, PSC_ENABLE);
+#endif
+#ifdef CONFIG_RAPIDIO_TCI648X
+	/* sRIO */
+        set_psc_state(4, PSC_SRIO, PSC_ENABLE);
+#endif
+#if 0
+	/* HyperLink and MSMC RAM */
+        set_psc_state(5, PSC_HYPERLINK, PSC_ENABLE);
+        set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
+#endif
 }
 
 #ifdef CONFIG_TI_KEYSTONE_PKTDMA
@@ -163,7 +250,6 @@ static void init_power(void)
 
 struct keystone_platform_data c6x_pktdma_data = {
 	.irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_CHANNEL,
-
 };
 
 static struct platform_device pktdma_dev0 = {
@@ -174,12 +260,12 @@ static struct platform_device pktdma_dev0 = {
 	},
 };
 
-static void setup_pa(void)
+static int __init setup_pa(void)
 {
-        platform_device_register(&pktdma_dev0);
+        return platform_device_register(&pktdma_dev0);
 }
-#else
-static void setup_pa(void) { }
+
+core_initcall(setup_pa);
 #endif
 
 void c6x_soc_setup_arch(void)
@@ -196,12 +282,9 @@ void c6x_soc_setup_arch(void)
 	request_resource(&iomem_resource, &c6x_soc_res);
 }
 
-
 static int __init platform_arch_init(void)
 {
 	int status = 0;
-
-	setup_pa();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
