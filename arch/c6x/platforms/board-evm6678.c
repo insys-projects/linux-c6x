@@ -307,7 +307,7 @@ static struct davinci_nand_pdata evmc6678_nand_data = {
 	.nr_parts		= ARRAY_SIZE(evm6678_nand_parts),
 	.ecc_mode		= NAND_ECC_HW,
 	.ecc_bits               = 4,
-	.options	        = NAND_USE_FLASH_BBT,
+	.options	        = 0,
 };
 
 static struct resource evmc6678_nand_resources[] = {
