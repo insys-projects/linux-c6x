@@ -253,6 +253,7 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	acc_cmd_cfg.timer_count      = 40;
 	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
 	acc_cmd_cfg.list_entry_size  = 0;  /* C,D registers */
+	acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
 	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
 	
 	ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
