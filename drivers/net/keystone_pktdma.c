@@ -825,6 +825,9 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	else
 		random_ether_addr(ndev->dev_addr);
 
+	/* Disable PA PDSP */
+	keystone_pa_disable();
+
 	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
 	q_cfg->link_ram_base		= 0x00080000;
 	q_cfg->link_ram_size		= 0x3FFF;
@@ -874,7 +877,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	/* Configure the PA */
 	ret = keystone_pa_config(ndev->dev_addr);
 	if (ret != 0) {
-		printk("PA init failed \n");
+		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;
 	}
 

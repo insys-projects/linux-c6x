@@ -134,8 +134,10 @@ int keystone_pa_config(u8* mac_addr)
 	 * linked to a descriptor
 	 */
 	hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
-	if (hd == NULL)
+	if (hd == NULL) {
+		printk(KERN_DEBUG "PA: no more free desc hd = 0x%x\n", hd);
 		return -ENOMEM;
+	}
 
 	pa_cfg.cmd_buf = (u8*) kzalloc(max(PA_CMD_SIZE, L2_CACHE_BYTES), GFP_KERNEL);
 	if (pa_cfg.cmd_buf == NULL)
@@ -143,6 +145,7 @@ int keystone_pa_config(u8* mac_addr)
 
 	ret = keystone_pa_enable(&pa_cfg);
 	if (ret != 0) {
+		printk(KERN_DEBUG "PA: enabling failed ret = %d\n", ret);
 		kfree(pa_cfg.cmd_buf);
 		return ret;
 	}

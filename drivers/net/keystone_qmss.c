@@ -178,6 +178,11 @@ int hw_qm_setup (struct qm_config *cfg)
 	    
 	struct qm_host_desc *hd;
 
+	/* Reset the QM PDSP */
+	for (i = 0; i < QMSS_MAX_PDSP; i++)
+		__raw_writel(QM_REG_VAL_PDSP_CTL_DISABLE,
+			     DEVICE_QM_PDSP_CTRL_BASE(cfg->pdsp_firmware[i].id));
+
 	/* Verify that alignment requirements */
 	if ((cfg->link_ram_base & (QM_LINKRAM_ALIGN - 1)) != 0)
 		return QM_INVALID_LINKRAM_ALIGNMENT;
