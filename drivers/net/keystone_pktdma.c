@@ -56,6 +56,8 @@
 
 #define DEVICE_NAPI_WEIGHT              16
 #define DEVICE_POLLING_PERIOD_MSEC      10
+#define DEVICE_REFILL_PERIOD_MSEC       10   /* timeout to arm refill timer */
+#define DEVICE_TX_LOOP_FREE_QUEUE       500 /* number of loop to spin on free queue */
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
@@ -73,6 +75,7 @@ module_param(debug_level, int, 0);
 MODULE_PARM_DESC(debug_level, "keystone cpsw debug level (NETIF_MSG bits)");
 
 static struct timer_list poll_timer;
+static struct timer_list refill_timer;
 
 struct keystone_cpsw_priv {
 	spinlock_t			lock;
@@ -252,14 +255,15 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	acc_cmd_cfg.max_entries      = DEVICE_RX_INT_THRESHOLD + 1;
 	acc_cmd_cfg.timer_count      = 40;
 	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
-	acc_cmd_cfg.list_entry_size  = 0;  /* C,D registers */
+	acc_cmd_cfg.list_entry_size  = 0;  /* D registers */
 	acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
 	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
 	
 	ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
 
 	if (ret != 0) {
-		printk("NetCP accumulator config failed (%d)\n", ret);
+		printk(KERN_ERR "%s: NetCP accumulator config failed (%d)\n",
+		       __FUNCTION__, ret);
 		return ret;
 	}
 #endif
@@ -477,6 +481,26 @@ static irqreturn_t pktdma_interrupt(int irq, void *netdev_id)
 }
 
 /*
+ * Wait the refill of free queue when getting out of free desc for a not short period
+ */
+static void pktdma_refill_timer(unsigned long dummy)
+{
+	struct net_device *ndev = (struct net_device *) dummy;
+
+	/* Check if the free queue is no more empty in case of tx queue stopped */
+	if (unlikely(netif_queue_stopped(ndev)
+		     && hw_qm_queue_count(DEVICE_QM_ETH_FREE_Q))) {
+		
+		ndev->trans_start = jiffies;
+		netif_wake_queue(ndev);
+	} else {
+		/* Re-arm timer until free desc */
+		mod_timer(&refill_timer,
+			  jiffies + msecs_to_jiffies(DEVICE_REFILL_PERIOD_MSEC));
+	}
+}
+
+/*
  * Pop an incoming packet
  */
 static int pktdma_rx(struct net_device *ndev,
@@ -601,20 +625,40 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	int                  ret;
 	unsigned             pkt_len = skb->len;
 	struct qm_host_desc *hd;
+	int                  loop = 0;
 
 	if (unlikely(pkt_len < KEYSTONE_CPSW_MIN_PACKET_SIZE)) {
 		ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
 		if (unlikely(ret < 0)) {
-			printk("packet pad failed");
-			goto fail;
+			printk(KERN_WARNING "%s: packet padding failed", ndev->name);
+			netif_stop_queue(ndev);
+			return NETDEV_TX_BUSY;
 		}
 		pkt_len = KEYSTONE_CPSW_MIN_PACKET_SIZE;
 	}
 
-	hd  = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
+	/* Spin a little bit if free queue is empty until we get free desc */
+	while(((hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q)) == NULL)
+	      && (++loop < DEVICE_TX_LOOP_FREE_QUEUE));
+
+	/* 
+	 * If even while spinning we does not have new free desc, let's stop the 
+         * tx queue and wait for a more long time using a timer timeout.
+	 */
 	if (hd == NULL) {
-		DPRINTK("no packet retrieved\n");
-		goto fail;
+	       	DPRINTK("no free descriptor retrieved, loop = %d\n", loop);
+
+		ndev->stats.tx_dropped++;
+		ndev->trans_start = jiffies;
+
+		/* Stop the queue */
+		netif_stop_queue(ndev);
+
+		/* Arm the refill timer */
+		mod_timer(&refill_timer,
+			  jiffies + msecs_to_jiffies(DEVICE_REFILL_PERIOD_MSEC));
+
+		return NETDEV_TX_BUSY;
 	}
 
 	/* 
@@ -659,9 +703,6 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
 
 	return NETDEV_TX_OK;
-fail:
-	netif_stop_queue(ndev);
-	return NETDEV_TX_BUSY;
 }
 
 /*
@@ -723,15 +764,15 @@ static int keystone_ndo_stop(struct net_device *ndev)
 }
 
 /*
- * Called by the kernel to send a packet out into the void
- * of the net.
+ * Transmit timeout: if tx queue is stopped since a long time
  */
 static void keystone_ndo_tx_timeout(struct net_device *ndev)
 {
 	printk(KERN_WARNING "%s: transmit timed out\n", ndev->name);
 	ndev->stats.tx_errors++;
 	ndev->trans_start = jiffies;
-	netif_wake_queue(ndev);
+	if (netif_queue_stopped(ndev))
+		netif_wake_queue(ndev);
 }
 
 static void keystone_cpsw_get_drvinfo(struct net_device *ndev,
@@ -808,7 +849,6 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	priv->dev  = &ndev->dev;
 	priv->msg_enable = netif_msg_init(debug_level, KEYSTONE_CPSW_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
-	spin_lock_init(&priv->lock);
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
@@ -903,6 +943,11 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 #else
 	ndev->irq = -1;
 #endif
+
+	/* Refill timer */
+	init_timer(&refill_timer);
+	refill_timer.function = pktdma_refill_timer;
+	refill_timer.data     = (unsigned long) ndev;
 
 	/* Register the network device */
 	ndev->dev_id  = 0;
