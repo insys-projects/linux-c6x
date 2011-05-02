@@ -413,7 +413,9 @@ static int cpmac_drv_start(void)
 	int i;
 
 	cfg.max_rx_len	= MAX_SIZE_STREAM_BUFFER;
-	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL;
+	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL |
+				GMACSL_ENABLE_FULL_DUPLEX | 
+				GMACSL_ENABLE_GIG_MODE;
        
 	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
 		mac_sl_reset(i);
