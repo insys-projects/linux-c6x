@@ -309,14 +309,8 @@ core_initcall(board_setup_i2c);
 #include <linux/mtd/nand-gpio-c6x.h>
 static struct mtd_partition evm_nand_parts[] = {
 	{
-		.name		= "bootloader",
-		.offset		= 0,
-		.size		= 0x00200000,
-		.mask_flags	= MTD_WRITEABLE,
-	},
-	{
 		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
+		.offset		= 0,
 		.size		= 0x01000000,
 		.mask_flags	= 0,
 	},
