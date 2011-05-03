@@ -26,6 +26,19 @@
 #include <mach/pa.h>
 #include <mach/keystone_qmss.h>
 
+#define KICK0		(BOOTCFG_BASE + 0x0038)
+#define KICK1		(BOOTCFG_BASE + 0x003C)
+#define KICK0_UNLOCK	(0x83E70B13)
+#define KICK1_UNLOCK	(0x95A4F1E0)
+#define KICK_LOCK	0
+
+#define BOOTCFG_BASE		0x02620000
+#define SGMII_SERDES_CFGPLL	(BOOTCFG_BASE + 0x340)
+#define SGMII_SERDES_CFGRX0	(BOOTCFG_BASE + 0x344)
+#define SGMII_SERDES_CFGTX0	(BOOTCFG_BASE + 0x348)
+#define SGMII_SERDES_CFGRX1	(BOOTCFG_BASE + 0x34C)
+#define SGMII_SERDES_CFGTX1	(BOOTCFG_BASE + 0x350)
+
 static int sgmii_init(void)
 {
 	struct sgmii_config_s sgmiic0, sgmiic1;
@@ -87,7 +100,28 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 }
 
 int evm_pa_ss_init(void)
-{
+{	
+	/* SERDES init */
+
+	__raw_writel(KICK0_UNLOCK, KICK0);
+	__raw_writel(KICK1_UNLOCK, KICK1);
+	
+	__raw_writel(0x00000041, SGMII_SERDES_CFGPLL);
+
+	_c6x_delay(2000);
+
+	__raw_writel(0x00700621, SGMII_SERDES_CFGRX0);
+	__raw_writel(0x00700621, SGMII_SERDES_CFGRX1);
+
+	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX0);
+	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX1);
+
+	_c6x_delay(2000);
+
+	__raw_writel(KICK_LOCK, KICK0);
+	__raw_writel(KICK_LOCK, KICK1);
+
+	
 	/* Configure the SGMII */
 	sgmii_init();
 
