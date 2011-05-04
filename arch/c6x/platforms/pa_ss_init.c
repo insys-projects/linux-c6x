@@ -44,8 +44,12 @@ static int serdes_init(void)
 {
 	__raw_writel(KICK0_UNLOCK, KICK0);
 	__raw_writel(KICK1_UNLOCK, KICK1);
-	
+
+#ifdef CONFIG_ARCH_BOARD_EVM6670
+	__raw_writel(0x00000051, SGMII_SERDES_CFGPLL);
+#else
 	__raw_writel(0x00000041, SGMII_SERDES_CFGPLL);
+#endif
 
 	_c6x_delay(2000);
 
