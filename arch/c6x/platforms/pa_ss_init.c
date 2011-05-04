@@ -39,6 +39,30 @@
 #define SGMII_SERDES_CFGRX1	(BOOTCFG_BASE + 0x34C)
 #define SGMII_SERDES_CFGTX1	(BOOTCFG_BASE + 0x350)
 
+
+static int serdes_init(void)
+{
+	__raw_writel(KICK0_UNLOCK, KICK0);
+	__raw_writel(KICK1_UNLOCK, KICK1);
+	
+	__raw_writel(0x00000041, SGMII_SERDES_CFGPLL);
+
+	_c6x_delay(2000);
+
+	__raw_writel(0x00700621, SGMII_SERDES_CFGRX0);
+	__raw_writel(0x00700621, SGMII_SERDES_CFGRX1);
+
+	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX0);
+	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX1);
+
+	_c6x_delay(2000);
+
+	__raw_writel(KICK_LOCK, KICK0);
+	__raw_writel(KICK_LOCK, KICK1);
+
+	return 0;
+}	
+
 static int sgmii_init(void)
 {
 	struct sgmii_config_s sgmiic0, sgmiic1;
@@ -102,25 +126,7 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 int evm_pa_ss_init(void)
 {	
 	/* SERDES init */
-
-	__raw_writel(KICK0_UNLOCK, KICK0);
-	__raw_writel(KICK1_UNLOCK, KICK1);
-	
-	__raw_writel(0x00000041, SGMII_SERDES_CFGPLL);
-
-	_c6x_delay(2000);
-
-	__raw_writel(0x00700621, SGMII_SERDES_CFGRX0);
-	__raw_writel(0x00700621, SGMII_SERDES_CFGRX1);
-
-	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX0);
-	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX1);
-
-	_c6x_delay(2000);
-
-	__raw_writel(KICK_LOCK, KICK0);
-	__raw_writel(KICK_LOCK, KICK1);
-
+	serdes_init();
 	
 	/* Configure the SGMII */
 	sgmii_init();
