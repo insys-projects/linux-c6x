@@ -106,7 +106,12 @@
 #define IMCR_L2PDSTAT1    0x0184c064
 
 /* 
+ * MAR register bits
+ */
+#define IMCR_MAR_PC       (1 << 0)
+#define IMCR_MAR_PFX      (1 << 3)
+
+/* 
  * Physical memory granularity for MAR registers 
  */
 #define IMCR_MAR_SIZE     0x01000000
-

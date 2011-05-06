@@ -286,6 +286,18 @@ static inline void L1D_cache_global_writeback_invalidate(void)
                               IMCR_L1DWBAR, IMCR_L1DWWC)
 #endif
 
+/*
+ * XMC Prefetch buffer management
+ */ 
+#ifdef ARCH_HAS_XMC_PREFETCHW
+static inline void xmc_prefetch_buffer_invalidate(void)
+{
+	*((volatile unsigned int *) (XMC_XPFCMD)) |= 1;
+}
+#else
+static inline void xmc_prefetch_buffer_invalidate(void) {}
+#endif
+
 #ifdef CONFIG_TMS320C6X_CACHES_ON
 /*
  * L2 caches management
@@ -311,6 +323,8 @@ static inline void L2_cache_global_writeback_invalidate(void)
 {
 	*((volatile unsigned int *) (IMCR_L2WBINV)) = 1;
 	while (*((volatile unsigned int *) (IMCR_L2WBINV)));
+
+	xmc_prefetch_buffer_invalidate();
 }
 
 /*
@@ -328,7 +342,8 @@ static inline void L2_cache_global_writeback(void)
 #define L2_cache_block_invalidate(start, end)              \
         cache_block_operation((unsigned int *) (start),    \
                               (unsigned int *) (end),      \
-                              IMCR_L2IBAR, IMCR_L2IWC)
+                              IMCR_L2IBAR, IMCR_L2IWC);	   \
+	xmc_prefetch_buffer_invalidate()
 
 #define L2_cache_block_writeback(start, end)               \
         cache_block_operation((unsigned int *) (start),    \
@@ -338,15 +353,18 @@ static inline void L2_cache_global_writeback(void)
 #define L2_cache_block_writeback_invalidate(start, end)    \
         cache_block_operation((unsigned int *) (start),    \
                               (unsigned int *) (end),      \
-                              IMCR_L2WIBAR, IMCR_L2WIWC)
+                              IMCR_L2WIBAR, IMCR_L2WIWC);  \
+	xmc_prefetch_buffer_invalidate()
 
 #define L2_cache_block_invalidate_nowait(start, end)              \
         cache_block_operation_nowait((unsigned int *) (start),    \
 				     (unsigned int *) (end),      \
-				     IMCR_L2IBAR, IMCR_L2IWC)
+				     IMCR_L2IBAR, IMCR_L2IWC);	  \
+	xmc_prefetch_buffer_invalidate()
 
 #define L2_cache_block_invalidate_wait()              \
-        cache_block_operation_wait(IMCR_L2IWC)
+        cache_block_operation_wait(IMCR_L2IWC);	      \
+	xmc_prefetch_buffer_invalidate()
 
 #define L2_cache_block_writeback_nowait(start, end)               \
         cache_block_operation_nowait((unsigned int *) (start),    \
@@ -359,10 +377,12 @@ static inline void L2_cache_global_writeback(void)
 #define L2_cache_block_writeback_invalidate_nowait(start, end)    \
         cache_block_operation_nowait((unsigned int *) (start),    \
 				     (unsigned int *) (end),      \
-				     IMCR_L2WIBAR, IMCR_L2WIWC)
+				     IMCR_L2WIBAR, IMCR_L2WIWC);  \
+	xmc_prefetch_buffer_invalidate()
 
 #define L2_cache_block_writeback_invalidate_wait()    \
-        cache_block_operation_wait(IMCR_L2WIWC)
+        cache_block_operation_wait(IMCR_L2WIWC);      \
+	xmc_prefetch_buffer_invalidate()
 
 /*
  * Cacheability controls
@@ -374,8 +394,12 @@ static inline void enable_caching(unsigned int *start,	unsigned int *end)
 	unsigned int *mar_e = (unsigned int *) IMCR_MAR_BASE\
 		+ ((unsigned int) end >> 24);
 	
-	for (;mar <= mar_e; mar++)
-		*mar |= 1;
+	for (;mar <= mar_e; mar++) {
+		*mar |= IMCR_MAR_PC;
+#ifdef ARCH_HAS_XMC_PREFETCHW
+		*mar |= IMCR_MAR_PFX;
+#endif
+	}
 }
 
 static inline void disable_caching(unsigned int *start, unsigned int *end)
@@ -385,8 +409,12 @@ static inline void disable_caching(unsigned int *start, unsigned int *end)
 	unsigned int *mar_e = (unsigned int *) IMCR_MAR_BASE\
 		+ ((unsigned int) end >> 24);
 	
-	for (;mar <= mar_e; mar++)
-		*mar &= ~1;
+	for (;mar <= mar_e; mar++) {
+		*mar &= ~IMCR_MAR_PC;
+#ifdef ARCH_HAS_XMC_PREFETCHW
+		*mar &= ~IMCR_MAR_PFX;
+#endif
+	}
 }
 
 #else /* CONFIG_TMS320C6X_CACHES_ON */

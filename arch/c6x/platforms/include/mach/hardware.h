@@ -239,4 +239,24 @@
 #define UART_BASE_ADDR               0x02540000
 #endif
 
+/*
+ * KeyStone XMC Controller
+ */
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define XMC_BASE                     0x08000000
+#define XMC_MPAX_BASE                0x08000000
+#define XMC_XMPFAR                   0x08000200
+#define XMC_XMPFSR                   0x08000204
+#define XMC_XMPFCR                   0x08000208
+#define XMC_MDMAARBX                 0x08000280
+#define XMC_XPFCMD                   0x08000300
+#define XMC_XPFACS                   0x08000304
+#define XMC_XPFAC0                   0x08000310
+#define XMC_XPFADDR0                 0x08000400
+
+/* Use prefetch buffers */
+#define ARCH_HAS_XMC_PREFETCHW       
+
+#endif /* (CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678) */
+
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */
