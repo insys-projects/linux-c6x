@@ -293,25 +293,16 @@ struct qm_host_desc {
 #define QM_REG_INTD_EOI_HIGH_PRIO_INDEX 2
 #define QM_REG_INTD_EOI_LOW_PRIO_INDEX  34
 
-/* 
- * Accumulator interrupt definitions
- */
-#define DEVICE_QM_ETH_ACC_CHANNEL       0 /* Ethernet accumulator channel base number */
-
-/*
- * Queue definitions
- */
+/* Queue definitions */
 #define QM_LOW_PRIO_QUEUE               0
 #define QM_HIGH_PRIO_QUEUE              704
 #define QM_STARV_QUEUE                  736
 
-#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
-/* Ethernet (NetCP) queues */
-#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
-#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		(QM_HIGH_PRIO_QUEUE + \
-					 (DEVICE_QM_ETH_ACC_CHANNEL << 5)) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
+/* Return queue for a given accumulation channel  */
+#define QM_HIGH_PRIO_CHAN_MAP(c)        (QM_HIGH_PRIO_QUEUE + (c))
+
+/* Return the channel for a given channel idx on the current core */
+#define QM_HIGH_PRIO_IDX_MAP(i)         (((i) * CORE_NUM) + get_coreid())
 
 /* Prototypes */
 struct qm_host_desc *hw_qm_queue_pop(u32 qnum);

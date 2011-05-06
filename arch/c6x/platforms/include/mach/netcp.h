@@ -80,18 +80,38 @@
 #define DEVICE_RX_CDMA_TIMEOUT_COUNT		1000
 
 #define DEVICE_RX_INT_THRESHOLD                 3
+#define DEVICE_TX_INT_THRESHOLD                 3
 
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
-struct keystone_platform_data {
-	unsigned int irq;
+struct netcp_platform_data {
+	unsigned int rx_irq;
+	unsigned int tx_irq;
 };
+
+/* Accumulator channel definition */
+#define DEVICE_QM_ETH_ACC_RX_IDX        0   /* Rx Ethernet accumulator channel index */
+#define DEVICE_QM_ETH_ACC_TX_IDX        1   /* Tx Ethernet accumulator channel index */
+
+/* Accumulator channels */
+#define DEVICE_QM_ETH_ACC_RX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX)
+#define DEVICE_QM_ETH_ACC_TX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX)
+
+/* Queue definitions */
+#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
+
+/* Ethernet (NetCP) queues */
+#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
+#define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL)  /* Ethernet Tx completion queue (filled by PA) */
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
 #define EMAC_ARCH_HAS_INTERRUPT
 #define EMAC_ARCH_HAS_MAC_ADDR
-#define EFUSE_REG_MAC_ADDR	                0x2620110
+#define EFUSE_REG_MAC_ADDR	        0x2620110
 #define emac_arch_get_mac_addr	emac_arch_get_mac_addr_from_efuse
 
 /* Read the e-fuse value as 32 bit values to be endian independent */

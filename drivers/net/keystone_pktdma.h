@@ -317,6 +317,7 @@ struct cpdma_tx_cfg {
 	u32 gbl_ctl_base;	/* Base address of global control registers */
 	u32 tx_base;		/* Base address of the tx registers */
 	u32 n_tx_chans;		/* The number of tx channels */
+	u32 queue_tx;		/* Default Tx queue for Tx completion packets */
 };
 
 /* Prototypes */

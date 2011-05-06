@@ -248,24 +248,25 @@ static void init_power(void)
 #include <mach/netcp.h>
 #include <mach/keystone_qmss.h>
 
-struct keystone_platform_data c6x_pktdma_data = {
-	.irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_CHANNEL,
+struct netcp_platform_data netcp_data = {
+	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
+	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,
 };
 
-static struct platform_device pktdma_dev0 = {
-        .name           = "keystone_pktdma",
+static struct platform_device netcp_dev0 = {
+	.name           = "keystone_pktdma",
         .id             = 0,
 	.dev = {
-		.platform_data = &c6x_pktdma_data,
+		.platform_data = &netcp_data,
 	},
 };
 
-static int __init setup_pa(void)
+static int __init setup_netcp(void)
 {
-        return platform_device_register(&pktdma_dev0);
+        return platform_device_register(&netcp_dev0);
 }
 
-core_initcall(setup_pa);
+core_initcall(setup_netcp);
 #endif
 
 void c6x_soc_setup_arch(void)
