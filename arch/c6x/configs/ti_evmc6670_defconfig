@@ -171,7 +171,7 @@ CONFIG_CMDLINE="console=cio rw"
 # CONFIG_RAM_ATTACHED_ROMFS is not set
 # CONFIG_TI_C6X_COMPILER is not set
 # CONFIG_CPU_BIG_ENDIAN is not set
-CONFIG_FORCE_MAX_ZONEORDER=13
+CONFIG_FORCE_MAX_ZONEORDER=16
 
 #
 # Processor type and features

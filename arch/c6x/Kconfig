@@ -105,7 +105,8 @@ config CPU_BIG_ENDIAN
 	  of your chipset/board/processor.
 
 config FORCE_MAX_ZONEORDER
-	int
+	int 
+	default "16" if TMS320C66X
 	default "13"
 
 menu "Processor type and features"
