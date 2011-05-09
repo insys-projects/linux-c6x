@@ -14,11 +14,7 @@
 /* 
  * Board memory
  */
-#ifdef CONFIG_C66X_USE_MSM
-#define BOARD_RAM_SIZE	0x00200000
-#else
 #define BOARD_RAM_SIZE	0x20000000
-#endif
 
 /* 
  * PLL settings

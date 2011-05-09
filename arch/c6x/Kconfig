@@ -140,10 +140,6 @@ config INTC_C64XPLUS
 config CP_INTC
 	bool "Communication Port Interrupt Controller"
 	depends on TMS320C66X
-
-config C66X_USE_MSM
-	bool "Use internal memory"
-	depends on TMS320C66X
 	
 config GPIO_C6X
 	bool

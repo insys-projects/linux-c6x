@@ -56,11 +56,7 @@
 #define RAM_SRAM_SIZE     0x00100000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
-#ifdef CONFIG_C66X_USE_MSM
-#define RAM_MEMORY_START  RAM_MSM_BASE
-#else
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-#endif
 #elif defined(CONFIG_SOC_TMS320C6678)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
