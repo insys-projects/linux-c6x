@@ -42,6 +42,7 @@
 #include <asm/machdep.h>
 #include <asm/io.h>
 #include <asm/cache.h>
+#include <asm/xmc.h>
 #include <asm/pm.h>
 #include <asm/hardware.h>
 
@@ -253,6 +254,30 @@ static void cache_set(unsigned int start, unsigned int end)
 	 * DMA coherent memory region will be set as non-cacheable later.
 	 */
 	enable_caching((unsigned int *) start, (unsigned int *) (end - 1));
+
+#ifdef ARCH_HAS_MSM
+	/*
+	 * If the device has KeyStone MSM, set it cacheable/prefetchable for L1
+	 */
+	enable_caching((unsigned int *) RAM_MSM_BASE,
+		       (unsigned int *) (RAM_MSM_BASE + IMCR_MAR_SIZE - 1));
+
+#ifdef ARCH_HAS_XMC_MPAX
+	/*
+	 * Map MSM in a non cacheable/prefetchable region
+	 */
+	xmc_map_region(3,
+		       RAM_MSM_CO_BASE,
+		       RAM_MSM_BASE,
+		       XMC_SEG_SIZE_2MB,
+		       XMC_PERM_SX | XMC_PERM_SW | XMC_PERM_SR |
+		       XMC_PERM_UX | XMC_PERM_UW | XMC_PERM_UR);
+	
+	disable_caching((unsigned int *) RAM_MSM_CO_BASE,
+			(unsigned int *) (RAM_MSM_CO_BASE + IMCR_MAR_SIZE - 1));
+
+#endif /* ARCH_HAS_XMC_MPAX */
+#endif /* ARCH_HAS_MSM */
 }
 
 /*

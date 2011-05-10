@@ -1,10 +1,11 @@
 /*
- *  linux/arch/c6x/mach-evm6486/include/mach/hardware.h
+ *  linux/arch/c6x/platforms/include/mach/hardware.h
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
  *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -56,6 +57,8 @@
 #define RAM_SRAM_SIZE     0x00100000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
+#define RAM_MSM_SIZE      0x00200000
+#define RAM_MSM_CO_BASE   0x2c000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
 #elif defined(CONFIG_SOC_TMS320C6678)
 #define RAM_SRAM          0x00800000
@@ -68,6 +71,8 @@
 #define RAM_EMIFA_CE5     0x7c000000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
+#define RAM_MSM_SIZE      0x00200000
+#define RAM_MSM_CO_BASE   0x2c000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
 #else
 #error "No SoC memory address space defines"
@@ -235,24 +240,13 @@
 #define UART_BASE_ADDR               0x02540000
 #endif
 
-/*
- * KeyStone XMC Controller
- */
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
-#define XMC_BASE                     0x08000000
-#define XMC_MPAX_BASE                0x08000000
-#define XMC_XMPFAR                   0x08000200
-#define XMC_XMPFSR                   0x08000204
-#define XMC_XMPFCR                   0x08000208
-#define XMC_MDMAARBX                 0x08000280
-#define XMC_XPFCMD                   0x08000300
-#define XMC_XPFACS                   0x08000304
-#define XMC_XPFAC0                   0x08000310
-#define XMC_XPFADDR0                 0x08000400
-
-/* Use prefetch buffers */
-#define ARCH_HAS_XMC_PREFETCHW       
-
+/*
+ * KeyStone specific features
+ */
+#define ARCH_HAS_XMC_PREFETCHW       /* Use prefetch buffers */
+#define ARCH_HAS_XMC_MPAX            /* Use XMC address extension  */
+#define ARCH_HAS_MSM                 /* Architecture has MSM */
 #endif /* (CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678) */
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */
