@@ -219,6 +219,12 @@ struct qm_host_desc {
 #define DEVICE_QM_NUM_MEMREGIONS	20
 
 /*
+ * Memory location where QM descriptors and accumulator lists reside
+ */
+#define DEVICE_QM_DESC_RAM_BASE_PHYS    RAM_MSM_BASE     /* Physical addr as viewed by PDSP */
+#define DEVICE_QM_DESC_RAM_BASE         RAM_MSM_CO_BASE  /* Virtual addr as viewed by cores (must be coherent)*/
+
+/*
  * Descriptor Info: Descriptor type is host
  * with any protocol specific info in the descriptor
  */
@@ -338,6 +344,16 @@ static inline u32 device_local_addr_to_global(u32 addr)
 		addr = (1 << 28) | (get_coreid() << 24) | addr;
 	
 	return addr;
+}
+
+static inline u32 qm_desc_ptov(u32 p) {
+	return (p == 0) ?
+		0 : p + (DEVICE_QM_DESC_RAM_BASE - DEVICE_QM_DESC_RAM_BASE_PHYS);
+}
+
+static inline u32 qm_desc_vtop(u32 v) {
+	return (v == 0) ?
+		0 : v - (DEVICE_QM_DESC_RAM_BASE - DEVICE_QM_DESC_RAM_BASE_PHYS);
 }
 
 #endif /* __MACH_C6X_KEYSTONE_QMSS_H */

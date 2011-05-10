@@ -32,15 +32,13 @@ static DEFINE_MUTEX(qmss_mutex);
 
 struct qm_host_desc *hw_qm_queue_pop(u32 qnum)
 {
-	struct qm_host_desc *hd;
 	u32 uhd;
 
 	/* Strip the descriptor size info */
 	uhd = __raw_readl(DEVICE_QM_MANAGER_QUEUES_BASE + QM_REG_QUEUE_REGD(qnum));
 	uhd = uhd & ~0xf;
-	hd  = (struct qm_host_desc *)uhd;
 
-	return hd;
+	return (struct qm_host_desc *) qm_desc_ptov(uhd);
 }
 
 u32 hw_qm_queue_count(u32 qnum)
@@ -67,8 +65,8 @@ void hw_qm_queue_push (struct qm_host_desc *hd, u32 qnum, u32 desc_size)
 {
 	u32 regd;
 
-	regd = ((u32) hd | ((desc_size >> 4) - 1));
-
+	regd = (qm_desc_vtop((u32) hd)) | ((desc_size >> 4) - 1);
+	
 	/* Push the descriptor onto the queue */
 	__raw_writel(regd, (DEVICE_QM_MANAGER_QUEUES_BASE +
 			    QM_REG_QUEUE_REGD(qnum)));
@@ -241,7 +239,7 @@ int hw_qm_setup (struct qm_config *cfg)
 	     i < cfg->mem_regnum_descriptors;
 	     i++, v += QM_DESC_SIZE_BYTES) {
 		
-		hd = (struct qm_host_desc *)v;
+		hd = (struct qm_host_desc *) qm_desc_ptov(v);
 		memset (hd, 0, sizeof(struct qm_host_desc));
 		
 		hd->desc_info = QM_DESC_DEFAULT_DESCINFO;

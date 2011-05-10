@@ -95,6 +95,8 @@ struct keystone_cpsw_priv {
 /* The QM accumulator RAM */
 static u32 *acc_list_addr_rx;
 static u32 *acc_list_addr_tx;
+static u32 *acc_list_phys_addr_rx;
+static u32 *acc_list_phys_addr_tx;
 #endif
 static u32 netcp_irq_enabled = 0;
 
@@ -237,11 +239,11 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 		return -1;
 	
 #ifdef EMAC_ARCH_HAS_INTERRUPT
-	/*
-	 * Set the accumulator list memory in L2 memory after descriptors to avoid
-	 * cache synchronization
-	 */
-	acc_list_addr_rx = (u32 *) (RAM_SRAM_BASE + DEVICE_QM_ACC_RAM_OFFSET);
+	/* Set the accumulator list memory in the descriptor memory */
+	acc_list_addr_rx      = (u32 *) (DEVICE_QM_DESC_RAM_BASE
+					 + DEVICE_QM_ACC_RAM_OFFSET);
+	acc_list_phys_addr_rx = (u32 *) (DEVICE_QM_DESC_RAM_BASE_PHYS
+					 + DEVICE_QM_ACC_RAM_OFFSET);
 	memset((void *) acc_list_addr_rx, 0, num_acc_entries << 2);
 
 	/*
@@ -250,7 +252,7 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	acc_cmd_cfg.channel          = DEVICE_QM_ETH_ACC_RX_CHANNEL;
 	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
 	acc_cmd_cfg.queue_mask       = 0;  /* none */
-	acc_cmd_cfg.list_addr        = (u32) acc_list_addr_rx;
+	acc_cmd_cfg.list_addr        = (u32) acc_list_phys_addr_rx;
 	acc_cmd_cfg.queue_index      = cfg->queue_rx;
 	acc_cmd_cfg.max_entries      = DEVICE_RX_INT_THRESHOLD + 1;
 	acc_cmd_cfg.timer_count      = 40;
@@ -329,11 +331,10 @@ int cpdma_tx_config(struct cpdma_tx_cfg *cfg)
 	int                      num_acc_entries = (DEVICE_TX_INT_THRESHOLD + 1) * 2;
 	int                      ret;
 
-	/*
-	 * Set the accumulator list memory in L2 memory after descriptors to avoid
-	 * cache synchronization
-	 */
-	acc_list_addr_tx = acc_list_addr_rx + ((DEVICE_RX_INT_THRESHOLD + 1) * 2);
+	/* Set the accumulator list memory in the descriptor memory */
+	acc_list_addr_tx      = acc_list_addr_rx + ((DEVICE_RX_INT_THRESHOLD + 1) * 2);
+	acc_list_phys_addr_tx = acc_list_phys_addr_rx + ((DEVICE_RX_INT_THRESHOLD + 1) * 2);
+
 	memset((void *) acc_list_addr_tx , 0, num_acc_entries << 2);
 
 	/*
@@ -342,7 +343,7 @@ int cpdma_tx_config(struct cpdma_tx_cfg *cfg)
 	acc_cmd_cfg.channel          = DEVICE_QM_ETH_ACC_TX_CHANNEL;
 	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
 	acc_cmd_cfg.queue_mask       = 0;  /* none */
-	acc_cmd_cfg.list_addr        = (u32) acc_list_addr_tx;
+	acc_cmd_cfg.list_addr        = (u32) acc_list_phys_addr_tx;
 	acc_cmd_cfg.queue_index      = cfg->queue_tx;
 	acc_cmd_cfg.max_entries      = DEVICE_TX_INT_THRESHOLD + 1;
 	acc_cmd_cfg.timer_count      = 40;
@@ -544,7 +545,7 @@ static int pktdma_tx(struct net_device *ndev)
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	PKTDMA_TX_LOOP_ITERATOR() ((struct qm_host_desc *) *acc_list_p++)
+#define	PKTDMA_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
 #define PKTDMA_TX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)
@@ -608,7 +609,7 @@ static int pktdma_rx(struct net_device *ndev,
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	PKTDMA_RX_LOOP_ITERATOR() ((struct qm_host_desc *) *acc_list_p++)
+#define	PKTDMA_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
 #define PKTDMA_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
@@ -777,9 +778,9 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	
 	hd->buff_len		= pkt_len;
 	hd->orig_buff_len	= pkt_len;
-	hd->buff_ptr		= (u32)skb->data;
-	hd->orig_buff_ptr	= (u32)skb->data;
-	hd->private             = (u32)skb;
+	hd->buff_ptr		= (u32) skb->data;
+	hd->orig_buff_ptr	= (u32) skb->data;
+	hd->private             = (u32) skb;
 
 	ndev->stats.tx_packets++;
 	ndev->stats.tx_bytes += pkt_len;
@@ -966,11 +967,12 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	q_cfg->link_ram_base		= 0x00080000;
 	q_cfg->link_ram_size		= 0x3FFF;
 
-	/* Use L2 lower 256KB memory for descriptors */
-	q_cfg->mem_region_base		= RAM_SRAM_BASE;
+	/* Use device defined memory for descriptors */
+	q_cfg->mem_region_base		= DEVICE_QM_DESC_RAM_BASE_PHYS;
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
 	q_cfg->dest_q			= DEVICE_QM_ETH_FREE_Q;
-	memset((void *) q_cfg->mem_region_base, 0, DEVICE_QM_ACC_RAM_OFFSET);
+
+	memset((void *) DEVICE_QM_DESC_RAM_BASE, 0, DEVICE_QM_ACC_RAM_OFFSET);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* load QM PDSP firmwares for accumulators */
