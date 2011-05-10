@@ -86,6 +86,12 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #define __rint()                 asm(" RINT")
 #endif
 
+#ifdef __TMS320C66X__
+#define mfence()                 asm(" MFENCE")
+#else
+#define mfence()
+#endif
+
 #define global_sti()             CSR |= 1
 #define global_cli()             CSR &= -2
 
@@ -168,6 +174,13 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #ifdef __TMS320C6XPLUS__
 #define __dint()                 asm volatile (" DINT\n")
 #define __rint()                 asm volatile (" RINT\n")
+#endif
+
+#ifdef __TMS320C66X__
+/* MFENCE C66x opcode */
+#define mfence()                 asm volatile (" .word 0x10008000\n")
+#else
+#define mfence()
 #endif
 
 #define global_sti()             or_creg(CSR, 1)
