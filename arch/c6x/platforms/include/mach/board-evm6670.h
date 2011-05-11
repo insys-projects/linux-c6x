@@ -28,7 +28,7 @@
 /* 
  * I2C bus specs 
  */
-#define ARCH_I2C_FREQ   400   /* KHz  */
+#define ARCH_I2C_FREQ   100   /* KHz  */
 #define ARCH_I2C_DELAY    0   /* usec */
 
 /*

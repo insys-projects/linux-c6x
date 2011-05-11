@@ -282,7 +282,7 @@ arch_initcall(evm_init_edma);
 #ifdef CONFIG_EEPROM_AT24
 static struct at24_platform_data at24_eeprom_data = {
 	.byte_len	= 1024 * 1024 / 8,
-	.page_size	= 256,
+	.page_size	= 128,
 	.flags		= AT24_FLAG_ADDR16,
 };
 #endif
