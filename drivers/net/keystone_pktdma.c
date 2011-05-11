@@ -164,14 +164,20 @@ static void cpdma_init_qs(struct net_device *ndev)
 
 	for (i = 0; i < DEVICE_NUM_RX_DESCS; i++) {
 		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
+
 		hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
+
 		hd->buff_len       = skb_tailroom(skb);
 		hd->orig_buff_len  = skb_tailroom(skb);
 		hd->buff_ptr       = (u32)skb->data;
 		hd->next_bdptr     = 0;
 		hd->orig_buff_ptr  = (u32)skb->data;
 		hd->private        = (u32)skb;
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
+
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);		
+
+		L2_cache_block_writeback_invalidate((u32) skb->data,
+						    (u32) skb->data + KEYSTONE_CPSW_MAX_PACKET_SIZE);
 	}
 }
 
@@ -638,10 +644,6 @@ static int pktdma_rx(struct net_device *ndev,
 		skb_put(skb_rcv, pkt_size);
 		skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
 		
-		/* Cache sync here */
-		L2_cache_block_invalidate((u32) hd->orig_buff_ptr,
-					  (u32) hd->orig_buff_ptr + pkt_size);
-			
 		/* Allocate a new skb */
 		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
 		if (skb != NULL) {
@@ -653,6 +655,9 @@ static int pktdma_rx(struct net_device *ndev,
 			hd->orig_buff_ptr = (u32)skb->data;
 			hd->private       = (u32)skb;
 			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
+
+			L2_cache_block_writeback_invalidate((u32) skb->data,
+							    (u32) skb->data + KEYSTONE_CPSW_MAX_PACKET_SIZE);
 		}
 		
 		/* Fill statistic */
@@ -772,7 +777,6 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-	/* No coherency is assumed between PKTDMA and L2 cache */
 	L2_cache_block_writeback((u32) skb->data,
 				 (u32) skb->data + pkt_len);
 
