@@ -21,15 +21,7 @@
 /*
  * L2 used as cache
  */
-#if defined(CONFIG_TMS320C66X) && defined(CONFIG_TI_KEYSTONE_QM)
-#if defined(CONFIG_SOC_TMS320C6670) 
-#define L2MODE_SIZE       L2MODE_512K_CACHE /* Reserve 512KB for QM region  */
-#elif defined(CONFIG_SOC_TMS320C6678)
-#define L2MODE_SIZE       L2MODE_256K_CACHE /* Reserve 256KB for QM region */
-#endif
-#else
 #define L2MODE_SIZE       L2MODE_MAX_CACHE  /* Use all possible L2 as cache */
-#endif
 
 /*
  * Internal Memory Control Registers for caches
