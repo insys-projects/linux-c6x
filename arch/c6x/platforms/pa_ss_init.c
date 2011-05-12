@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -21,48 +22,36 @@
 #include <asm/io.h>
 #include <asm/gmdio.h>
 #include <asm/sgmii.h>
+#include <asm/dscr.h>
 
 #include <mach/netcp.h>
 #include <mach/pa.h>
 #include <mach/keystone_qmss.h>
 
-#define KICK0		(BOOTCFG_BASE + 0x0038)
-#define KICK1		(BOOTCFG_BASE + 0x003C)
-#define KICK0_UNLOCK	(0x83E70B13)
-#define KICK1_UNLOCK	(0x95A4F1E0)
-#define KICK_LOCK	0
-
-#define BOOTCFG_BASE		0x02620000
-#define SGMII_SERDES_CFGPLL	(BOOTCFG_BASE + 0x340)
-#define SGMII_SERDES_CFGRX0	(BOOTCFG_BASE + 0x344)
-#define SGMII_SERDES_CFGTX0	(BOOTCFG_BASE + 0x348)
-#define SGMII_SERDES_CFGRX1	(BOOTCFG_BASE + 0x34C)
-#define SGMII_SERDES_CFGTX1	(BOOTCFG_BASE + 0x350)
-
-
 static int serdes_init(void)
 {
-	__raw_writel(KICK0_UNLOCK, KICK0);
-	__raw_writel(KICK1_UNLOCK, KICK1);
-
+	/* Unlock DSCR boot config */
+	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+	
 #ifdef CONFIG_ARCH_BOARD_EVM6670
-	__raw_writel(0x00000051, SGMII_SERDES_CFGPLL);
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGPLL, 0x00000051);
 #else
-	__raw_writel(0x00000041, SGMII_SERDES_CFGPLL);
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGPLL, 0x00000041);
 #endif
+	_c6x_delay(2000);
+
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGRX0, 0x00700621);
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGRX1, 0x00700621);
+
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGTX0, 0x000108A1);
+	dscr_set_reg(DSCR_SGMII_SERDES_CFGTX1, 0x000108A1);
 
 	_c6x_delay(2000);
 
-	__raw_writel(0x00700621, SGMII_SERDES_CFGRX0);
-	__raw_writel(0x00700621, SGMII_SERDES_CFGRX1);
-
-	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX0);
-	__raw_writel(0x000108A1, SGMII_SERDES_CFGTX1);
-
-	_c6x_delay(2000);
-
-	__raw_writel(KICK_LOCK, KICK0);
-	__raw_writel(KICK_LOCK, KICK1);
+	/* Lock DSCR */
+	dscr_set_reg(DSCR_KICK0, 0);
+	dscr_set_reg(DSCR_KICK1, 0);
 
 	return 0;
 }	
@@ -81,7 +70,7 @@ static int sgmii_init(void)
 #else
 	sgmiic0.auxconfig = 0x00000041; /* PLL multiplier */
 #endif
-	c66x_sgmii_config(0, &sgmiic0);
+	sgmii_config(0, &sgmiic0);
 
 	sgmiic1.master    = 1;
 	sgmiic1.loopback  = 0;
@@ -93,8 +82,7 @@ static int sgmii_init(void)
 #else
 	sgmiic1.auxconfig = 0x00000041; /* PLL multiplier */
 #endif
-	
-	c66x_sgmii_config(1, &sgmiic1);
+	sgmii_config(1, &sgmiic1);
 
 	printk("SGMII init complete\n");
 
@@ -129,6 +117,10 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 
 int evm_pa_ss_init(void)
 {	
+	/* Reset SGMII */
+	sgmii_reset(0);
+	sgmii_reset(1);
+
 	/* SERDES init */
 	serdes_init();
 	

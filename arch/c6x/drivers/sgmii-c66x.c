@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -23,7 +24,18 @@
 
 #include <mach/netcp.h>
 
-int c66x_sgmii_config(int port, struct sgmii_config_s *config)
+extern int sgmii_reset(int port)
+{
+	sgmii_set_reg(SGMII_CTL_REG(port), 0);
+
+	/* Soft reset */
+	sgmii_setbit_reg(SGMII_SRESET_REG(port), 0x1); 
+	while(sgmii_get_reg(SGMII_SRESET_REG(port)) != 0x0);
+
+	return 0;
+}
+
+int sgmii_config(int port, struct sgmii_config_s *config)
 {
 	unsigned int i, status;
 

@@ -121,6 +121,7 @@ config TMS320C64XPLUS
 config TMS320C66X
 	bool "TMS320C66X"
 	select SERIAL_CORE
+	select SGMII_C66X
 
 config CIO_CONSOLE
        bool "CIO Console"
@@ -151,16 +152,10 @@ config USE_RT_TIMER
 	bool "Compensate for lost ticks"
 	default n
 
-config SGMII
-	bool "Ethernet SGMII support"
-	default n
-
-config SGMII_C66X
-	bool "Ethernet SGMII support for C66x"
-	depends on TMS320C66X
-
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
+	depends on !TMS320C66X
+	select SGMII
 	default n
 
 config TMS320C64X_GEMAC_0
@@ -171,6 +166,16 @@ config TMS320C64X_GEMAC_0
 config TMS320C64X_GEMAC_1
 	bool "Second Ethernet interface"
 	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
+	default n
+
+config SGMII
+	bool "Ethernet SGMII support for C64x"
+	depends on TMS320C64X_GEMAC
+	default n
+
+config SGMII_C66X
+	bool "Ethernet SGMII support for C66x"
+	depends on TMS320C66X
 	default n
 
 config EDMA3
