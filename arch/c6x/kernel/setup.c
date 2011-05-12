@@ -269,7 +269,7 @@ static void cache_set(unsigned int start, unsigned int end)
 	xmc_map_region(3,
 		       RAM_MSM_CO_BASE,
 		       RAM_MSM_BASE,
-		       XMC_SEG_SIZE_2MB,
+		       XMC_SEG_SIZE_4MB,
 		       XMC_PERM_SX | XMC_PERM_SW | XMC_PERM_SR |
 		       XMC_PERM_UX | XMC_PERM_UW | XMC_PERM_UR);
 	

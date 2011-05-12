@@ -71,7 +71,7 @@
 #define RAM_EMIFA_CE5     0x7c000000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
-#define RAM_MSM_SIZE      0x00200000
+#define RAM_MSM_SIZE      0x00400000
 #define RAM_MSM_CO_BASE   0x2c000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
 #else
