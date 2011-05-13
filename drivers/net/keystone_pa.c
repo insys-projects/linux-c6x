@@ -24,70 +24,57 @@
 
 #define PA_CMD_SIZE 16
 
-int keystone_pa_enable(struct pa_config *cfg)
+int keystone_pa_reset(void)
 {
 	u32 i;
-	u32 v;
-	int done = 0;
 
-	/* Disable all PDSPs */
-	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++)
-		__raw_writel(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
+	/* Reset and disable all PDSPs */
+	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++) {
+		__raw_writel(PA_REG_VAL_PDSP_CTL_RESET_PDSP,
 			     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(i)));
-	
-	/* Clear the mailbox registers for PDSP 0 */
-	for (i = 0; i < PA_NUM_MAILBOX_SLOTS; i++)
-		__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(0, i)));
 
-	/* Give a few cycles for the disable */
-	udelay(1000);
-
-	/* Download the firmware */
-	memcpy((unsigned int *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(0)),
-	       pdsp_code, sizeof(pdsp_code));
-
-	/* Reset the PC and enable PDSP0 */
-	__raw_writel(PA_REG_VAL_PDSP_CTL_ENABLE_PDSP(0),
-		     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(0)));
-	
-	/* 
-	 * Copy the two destination mac addresses to the mail box slots.
-	 * Mailbox 4 must be written last since this write triggers the
-	 * firmware to update the match information
-	 */
-	cfg->cmd_buf[0] = READ_BITFIELD(cfg->mac0_ms, 31, 24);
-	cfg->cmd_buf[1] = READ_BITFIELD(cfg->mac0_ms, 23, 16);
-	cfg->cmd_buf[2] = READ_BITFIELD(cfg->mac0_ms, 15,  8);
-	cfg->cmd_buf[3] = READ_BITFIELD(cfg->mac0_ms, 7, 0);
-	cfg->cmd_buf[4] = READ_BITFIELD(cfg->mac0_ls, 31, 24);
-	cfg->cmd_buf[5] = READ_BITFIELD(cfg->mac0_ls, 23, 16);
-	cfg->cmd_buf[6] = 0;
-	cfg->cmd_buf[7] = 0;
-
-	cfg->cmd_buf[8]  = READ_BITFIELD(cfg->mac1_ms, 31, 24);
-	cfg->cmd_buf[9]  = READ_BITFIELD(cfg->mac1_ms, 23, 16);
-	cfg->cmd_buf[10] = READ_BITFIELD(cfg->mac1_ms, 15,  8);
-	cfg->cmd_buf[11] = READ_BITFIELD(cfg->mac1_ms, 7, 0);
-	cfg->cmd_buf[12] = READ_BITFIELD(cfg->mac1_ls, 31, 24);
-	cfg->cmd_buf[13] = READ_BITFIELD(cfg->mac1_ls, 23, 16);
-	cfg->cmd_buf[14] = READ_BITFIELD(cfg->rx_qnum, 15, 8);
-	cfg->cmd_buf[15] = READ_BITFIELD(cfg->rx_qnum, 7, 0);
-
-	/*
-	 * Give some delay then verify that the
-	 * mailboxes have been cleared
-	 */
-	for (i = 0, done = 0;
-	     ((i < DEVICE_PA_RUN_CHECK_COUNT) && (done == 0)); i++)  {
-		udelay(1000);
-		v = __raw_readl(DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(0, 3));
-		if (v == 0)
-			done = 1;
+		while((__raw_readl(DEVICE_PA_BASE + PA_REG_PDSP_CTL(i))
+		       & PA_REG_VAL_PDSP_CTL_STATE));
 	}
-	
-	if (done == 0)
-		return -1;
-	
+
+	/* Reset packet Id */
+	__raw_writel(1, DEVICE_PA_BASE + PA_REG_PKTID_SOFT_RESET);
+
+	/* Reset LUT2 */
+	__raw_writel(1, DEVICE_PA_BASE + PA_REG_LUT2_SOFT_RESET);
+
+	/* Reset statistic */
+	__raw_writel(1, DEVICE_PA_BASE + PA_REG_STATS_SOFT_RESET);
+
+	/* Reset timers */
+	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++) {
+		__raw_writel(0, (DEVICE_PA_BASE + PA_REG_TIMER_CTL(i)));
+	}
+
+	return 0;
+}
+
+int keystone_pa_enable(int pdsp)
+{
+	u32 i;
+	int v;
+
+	/* Check the PDSP state */
+	v = __raw_readl(DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp));
+	if (v & PA_REG_VAL_PDSP_CTL_STATE) {
+		/* Already enabled */
+		return 1;
+	}
+
+	/* Clear the mailboxes */
+	for (i = 0; i < PA_NUM_MAILBOX_SLOTS; i++) {
+		__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(pdsp, i)));
+	}
+
+	/* Enable PDSP */
+	__raw_writel(PA_REG_VAL_PDSP_CTL_ENABLE_PDSP(0),
+		     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp)));
+
 	return 0;
 }
     
@@ -135,22 +122,54 @@ int keystone_pa_config(u8* mac_addr)
 	 */
 	hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
 	if (hd == NULL) {
-		printk(KERN_DEBUG "PA: no more free desc hd = 0x%x\n", hd);
+		printk(KERN_DEBUG "PA: no more free desc hd = 0x%x\n", (u32) hd);
 		return -ENOMEM;
+	}
+
+	/* Reset all PDSP */
+	ret = keystone_pa_reset();
+	if (ret != 0) {
+		printk(KERN_DEBUG "PA: reset failed ret = %d\n", ret);
+		return ret;
+	}
+
+	/* Download the firmware in PDSP0 */
+	memcpy((unsigned int *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(0)),
+	       pdsp_code, sizeof(pdsp_code));
+	
+	/* Enable PDSP0 */
+	ret = keystone_pa_enable(0);
+	if (ret != 0) {
+		printk(KERN_DEBUG "PA: enabling failed ret = %d\n", ret);
+		return ret;
 	}
 
 	pa_cfg.cmd_buf = (u8*) kzalloc(max(PA_CMD_SIZE, L2_CACHE_BYTES), GFP_KERNEL);
 	if (pa_cfg.cmd_buf == NULL)
 		return -ENOMEM;
 
-	ret = keystone_pa_enable(&pa_cfg);
-	if (ret != 0) {
-		printk(KERN_DEBUG "PA: enabling failed ret = %d\n", ret);
-		kfree(pa_cfg.cmd_buf);
-		return ret;
-	}
+	/* 
+	 * Give the two destination mac addresses to the firmware 
+	 * to update the match information
+	 */
+	pa_cfg.cmd_buf[0] = READ_BITFIELD(pa_cfg.mac0_ms, 31, 24);
+	pa_cfg.cmd_buf[1] = READ_BITFIELD(pa_cfg.mac0_ms, 23, 16);
+	pa_cfg.cmd_buf[2] = READ_BITFIELD(pa_cfg.mac0_ms, 15,  8);
+	pa_cfg.cmd_buf[3] = READ_BITFIELD(pa_cfg.mac0_ms, 7, 0);
+	pa_cfg.cmd_buf[4] = READ_BITFIELD(pa_cfg.mac0_ls, 31, 24);
+	pa_cfg.cmd_buf[5] = READ_BITFIELD(pa_cfg.mac0_ls, 23, 16);
+	pa_cfg.cmd_buf[6] = 0;
+	pa_cfg.cmd_buf[7] = 0;
 
-	/* No coherency is assumed between PKTDMA and GEM L1/L2 caches */
+	pa_cfg.cmd_buf[8]  = READ_BITFIELD(pa_cfg.mac1_ms, 31, 24);
+	pa_cfg.cmd_buf[9]  = READ_BITFIELD(pa_cfg.mac1_ms, 23, 16);
+	pa_cfg.cmd_buf[10] = READ_BITFIELD(pa_cfg.mac1_ms, 15,  8);
+	pa_cfg.cmd_buf[11] = READ_BITFIELD(pa_cfg.mac1_ms, 7, 0);
+	pa_cfg.cmd_buf[12] = READ_BITFIELD(pa_cfg.mac1_ls, 31, 24);
+	pa_cfg.cmd_buf[13] = READ_BITFIELD(pa_cfg.mac1_ls, 23, 16);
+	pa_cfg.cmd_buf[14] = READ_BITFIELD(pa_cfg.rx_qnum, 15, 8);
+	pa_cfg.cmd_buf[15] = READ_BITFIELD(pa_cfg.rx_qnum, 7, 0);
+
 	L2_cache_block_writeback((u32) pa_cfg.cmd_buf,
 				 (u32) pa_cfg.cmd_buf + PA_CMD_SIZE);
 
@@ -168,9 +187,9 @@ int keystone_pa_config(u8* mac_addr)
 	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_FREE_Q);
 
 	hw_qm_queue_push(hd, DEVICE_QM_PA_CFG_Q, QM_DESC_SIZE_BYTES);
-	
-	kfree(pa_cfg.cmd_buf);
 
+	kfree(pa_cfg.cmd_buf);
+		
 	return 0;
 }
 

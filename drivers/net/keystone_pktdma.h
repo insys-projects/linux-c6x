@@ -384,6 +384,7 @@ struct mac_sliver {
 int mac_sl_reset(u16 port);
 int mac_sl_config(u16 port, struct mac_sliver *cfg);
 
-int keystone_pa_enable(struct pa_config *cfg);
+int keystone_pa_enable(int pdsp);
 int keystone_pa_disable(void);
+int keystone_pa_reset(void);
 int keystone_pa_config(u8 *mac_addr);
