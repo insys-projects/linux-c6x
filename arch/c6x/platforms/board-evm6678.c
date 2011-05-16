@@ -491,7 +491,7 @@ static struct spi_board_info evm_spi_info[] __initconst = {
 		.max_speed_hz	= 25000000,
 		.bus_num	= 0,
 		.chip_select	= 0,
-		.mode		= SPI_MODE_1,
+		.mode		= SPI_MODE_0,
 		.bits_per_word  = 8,
 	},
 	{
