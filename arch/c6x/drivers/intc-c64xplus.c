@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -40,6 +41,8 @@ static uint8_t irq_to_prio[NR_IRQS];
 
 /* The 16 SoC GPIOs can span more than one megamodule */
 #define NR_GPIO_CHIPS 2
+
+static unsigned __gpio_irq_list[] = MACH_GPIO_IRQ_LIST_DEF();
 
 struct c6x_irq_chip {
 	struct irq_chip	chip;
@@ -438,13 +441,14 @@ void __init init_intc_c64xplus(void)
 	 */
 	last_chip = NULL;
 	idx = 0;
-	for (i = IRQ_GPIO_START; i <= IRQ_GPIO15; i++) {
-		chip = (struct c6x_irq_chip *)irq_to_desc(i)->chip;
+	for (i = 0; i < ARRAY_SIZE(__gpio_irq_list); i++) {
+		unsigned irq = __gpio_irq_list[i];
+		chip = (struct c6x_irq_chip *)irq_to_desc(irq)->chip;
 		if (chip != last_chip) {
 			last_chip = chip;
 			gpio_chips[idx++] = *chip;
 		}
-		irq_to_desc(i)->chip = (struct irq_chip *)&gpio_chips[idx - 1];
+		irq_to_desc(irq)->chip = (struct irq_chip *)&gpio_chips[idx - 1];
 	}
 
 	/* map megamodule combined IRQs to low-priority core IRQs */

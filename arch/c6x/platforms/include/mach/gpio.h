@@ -18,11 +18,18 @@
 
 #include <linux/io.h>
 
-#ifdef CONFIG_TMS320C66X
-#define SOC_GPIO_BASE 0x02320000
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
+#include <mach/gpio-c645x.h>
+#elif defined(CONFIG_SOC_TMS320C6472)
+#include <mach/gpio-c6472.h>
+#elif defined(CONFIG_SOC_TMS320C6474)
+#include <mach/gpio-c6474.h>
+#elif defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#include <mach/gpio-c667x.h>
 #else
-#define SOC_GPIO_BASE 0x02B00000
+#error "No machine GPIO definitions"
 #endif
+
 #define NR_SOC_GPIO   16
 
 /*
