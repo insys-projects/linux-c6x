@@ -175,6 +175,7 @@
 #define DSCR_KICK0                   0x02620038
 #define DSCR_KICK1                   0x0262003c
 #define DSCR_BOOTADDR                0x02620040
+#define DSCR_BOOTCOMPLETE            0x0262013C
 #define DSCR_DEVCFG                  0x0262014c
 #define DSCR_MACID                   0x02620110
 #define DSCR_TINPSEL                 0x02620300
@@ -197,6 +198,8 @@
 
 #define DSCR_B_DEVSTAT_LENDIAN       BIT(0)
 #define DSCR_B_DEVSTAT_PCIESSEN      BIT(16)
+
+#define DSP_BOOT_ADDR(x)             (DSCR_BOOTADDR + (x * 4))
 
 /* Using SGMII */
 #define DEVSTAT_MACSEL_OFFSET        0

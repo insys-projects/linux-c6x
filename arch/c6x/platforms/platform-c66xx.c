@@ -148,9 +148,7 @@ static void init_pll(void)
 	pll1_set_reg(SECCTL, 0x10000 | ((PLL_OUTDIV - 1) << 19)); 
 	pll1_setbit_reg(PLLCTL, PLLCTL_PLLEN);
 
-	/* Lock DSCR */
-	dscr_set_reg(DSCR_KICK0, 0);
-	dscr_set_reg(DSCR_KICK1, 0);
+	/* Do not lock DSCR for multicore issue reason */
 }
 
 static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
