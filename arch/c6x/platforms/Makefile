@@ -12,6 +12,7 @@ obj-$(CONFIG_TMS320C66X)     += platform-c66xx.o
 # SoC objects
 obj-$(CONFIG_SOC_TMS320C6472)	+= mcore.o
 obj-$(CONFIG_SOC_TMS320C6474)	+= mcore.o cic.o
+obj-$(CONFIG_SOC_TMS320C6678)	+= mcore.o
 
 # Board objects
 obj-$(CONFIG_ARCH_BOARD_DSK6455)    += board-dsk6455.o

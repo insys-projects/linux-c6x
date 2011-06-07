@@ -36,13 +36,44 @@ struct ram_private_data {
 
 extern unsigned int memory_end;
 
+
+#ifdef CONFIG_SOC_TMS320C6678
+static inline void kick_lock(void)
+{
+	volatile u32 *reg0 = (volatile u32 *)KICK0;
+	volatile u32 *reg1 = (volatile u32 *)KICK1;
+	/* data sheet says any other value will lock it */
+	*reg0 = ~KICK0_UNLOCK_CODE;
+	*reg1 = ~KICK1_UNLOCK_CODE;
+
+        printk("kick_lock, kick0 val 0x%x, kick1 val 0x%x\n", *reg0, *reg1);
+}
+
+static inline void kick_unlock(void)
+{
+	volatile u32 *reg0 = (volatile u32 *)KICK0;
+	volatile u32 *reg1 = (volatile u32 *)KICK1;
+	
+	*reg0 = KICK0_UNLOCK_CODE;
+	*reg1 = KICK1_UNLOCK_CODE;
+        printk("kick_unlock, kick0 val 0x%x, kick1 val 0x%x\n", *reg0, *reg1);
+}
+
+#endif
 static ssize_t control_proc_write(struct file* file,
 				  const char*  buf,
 				  size_t       size,
 				  loff_t*      ppos)
 {
 	char cmd, num;
+	char bootaddr_str[32];
 	unsigned int psc_mdctl = 0;
+	unsigned long boot_addr, addr_size, pd;
+        volatile unsigned int *reg;
+
+
+	printk("control_proc_write, size=%d\n", size);
+        
 
 #ifdef CONFIG_SOC_TMS320C6474
 	psc_mdctl = PSC_MDCTL3;
@@ -50,7 +81,11 @@ static ssize_t control_proc_write(struct file* file,
 #ifdef CONFIG_SOC_TMS320C6472
 	psc_mdctl = PSC_MDCTL0;
 #endif
+#ifdef CONFIG_SOC_TMS320C6678
+	psc_mdctl = PSC_CORE0_TIMER0_BASE;
+#endif
 
+	printk("psc_mdctl = 0x%x\n", psc_mdctl);
 	if ((!size) || (!psc_mdctl))
 		return 0;
 
@@ -64,6 +99,32 @@ static ssize_t control_proc_write(struct file* file,
 		/* First boot for the Faraday case */
 		assert_event(INTC_B_EVTPULSE4);
 #endif
+#ifdef CONFIG_SOC_TMS320C6678
+        	if (size < 4)
+		      return -EFAULT;
+
+		printk("buf = %s, size = %d:%d\n", buf, size, sizeof (bootaddr_str));
+
+		memset(bootaddr_str, 0, sizeof (bootaddr_str)); 
+        	addr_size = size-3;
+
+        	if (copy_from_user(bootaddr_str, (buf + 3), addr_size))    
+			return -EFAULT;
+
+		printk("addr_size = %ld\n", addr_size);
+		printk("bootaddr_str = %s\n", bootaddr_str);
+		boot_addr = simple_strtoul(bootaddr_str, (char **)(bootaddr_str+addr_size-1), 16);
+		if (boot_addr <= 0) {
+			printk("Error converting string to integer\n");
+			return -EFAULT;
+		} else {
+	       		printk("boot_addr = 0x%lx\n", boot_addr);
+		}
+
+		/* boot address should be 1KB aligned */
+		if (boot_addr & 0x3ff)
+			return -EFAULT;
+#endif
 		if ((num == 0) || (num == 10)) {
 			/* Boot all cores */
 			int i;
@@ -71,11 +132,16 @@ static ssize_t control_proc_write(struct file* file,
 				if (i != get_coreid()) {
 					printk(KERN_INFO "MCORE: booting core %d\n", i);
 					*((volatile u32 *) (psc_mdctl) + i) |= 0x100;
-				}
+			}
 #ifdef CONFIG_SOC_TMS320C6472
 			/* set BOOT_COMPLETE_STAT */
 			*((volatile u32 *) 0x2ab0004 ) = 0x3f;
 #endif
+#ifdef CONFIG_SOC_TMS320C6678
+			/* set BOOT_COMPLETE_STAT */
+			*((volatile u32 *) 0x262013C) = 0x3f;
+#endif
+			
 		} else {
 			/* Boot a specific core */
 			int core_num;
@@ -83,11 +149,37 @@ static ssize_t control_proc_write(struct file* file,
 			if ((core_num >= 0) && 
 			    (core_num < CORE_NUM) && 
 			    (core_num != get_coreid())) {
-				printk(KERN_INFO "MCORE: booting core %d\n", core_num);
-				*((volatile u32 *) (psc_mdctl) + core_num) |= 0x100;
+
 #ifdef CONFIG_SOC_TMS320C6472
+				*((volatile u32 *) (psc_mdctl) + core_num) |= 0x100;
 				/* set BOOT_COMPLETE_STAT */
 				*((volatile u32 *) 0x2ab0004 ) |= (1 << core_num);
+#endif
+#ifdef CONFIG_SOC_TMS320C6678
+				kick_unlock();
+			        reg = (volatile u32 *)DSP_BOOT_ADDR(core_num);	
+				*reg = boot_addr;
+
+				printk(KERN_INFO "MCORE: booting core %d, boot_addr %p, val read 0x%x\n", core_num, reg, *reg);
+				/* set BOOT_COMPLETE_STAT */
+				*((volatile u32 *) BOOTCOMPLETE) = (1 << core_num);
+
+				/* Take the core out of reset */
+				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
+				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
+				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;
+				printk("reg = %p, val = %x\n", reg, *reg );
+
+				/* Enable power domain module */
+				pd = GET_PD(core_num);		
+				reg = (unsigned int*)PSC_PTCMD;
+				*reg = (1 << pd);
+
+				/* Poll for transition done */
+				reg = (unsigned int*)PSC_PTSTAT;
+				while ((*reg & (1 << pd)));
+				kick_lock();
+
 #endif
 			}
 
@@ -111,7 +203,31 @@ static ssize_t control_proc_write(struct file* file,
 			    (core_num < CORE_NUM) && 
 			    (core_num != get_coreid())) {
 				printk(KERN_INFO "MCORE: reseting core %d\n", core_num);
+#ifdef CONFIG_SOC_TMS320C6472
 				*((volatile u32 *) (psc_mdctl) + core_num) &= ~0x100;
+#endif
+#ifdef CONFIG_SOC_TMS320C6678
+				kick_unlock();
+
+				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
+				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
+				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;
+
+				/* Place the core in reset */
+				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
+				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
+				*reg = (*reg & ~ MDCTL_LRSTZ_MASK);
+
+				/* Enable power domain module */
+				pd = GET_PD(core_num);		
+				reg = (unsigned int*)PSC_PTCMD;
+				*reg = (1 << pd);
+
+				/* Poll for transition done */
+				reg = (unsigned int*)PSC_PTSTAT;
+				while ((*reg & (1 << pd)));
+				kick_lock();
+#endif
 			}
 		}
 		break;
@@ -324,6 +440,7 @@ static int mcore_init(void)
 			if (ram_proc_create(core, "ddr", &ram_proc_fops, data))
 				return -EBUSY;
 		}
+#ifdef CONFIG_SOC_TMS320C6678 | 
 	}
 
 	/* Initialize mmap() properties */

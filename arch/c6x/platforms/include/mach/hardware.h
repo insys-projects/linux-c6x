@@ -172,6 +172,30 @@
 
 #ifdef CONFIG_SOC_TMS320C6678
 #define PSC_EMIF25_SPI               3  /* EMIF16 and SPI */
+#define PSC_CORE0_TIMER0_BASE        (PSC_MDCTL0 + (15 * 4)) /* Base of Core and Timer 0 */
+#define DSP_BOOT_ADDR_BASE           0x02620040
+#define BOOTCOMPLETE                 0x262013C
+#define DSP_BOOT_ADDR(x)             (DSP_BOOT_ADDR_BASE + (x * 4))
+#define KICK0			     0x02620038
+#define KICK1			     0x0262003C
+
+/* Unlock code */
+#define KICK0_UNLOCK_CODE	     0x83e70b13
+#define KICK1_UNLOCK_CODE	     0x95a4f1e0
+
+/* Get the Power domain for core */
+#define PD_GEM0 8
+#define GET_PD(x)  (x + PD_GEM0) 
+#define MDCTL_NEXT_STATE_DIS	0
+#define MDCTL_NEXT_STATE_EN		3
+
+#define MDCTL_NEXT_STATE_MASK	0x1F
+#define MDCTL_LRSTZ_MASK		0x100
+
+#define MDSTAT_STATE_DIS	0
+#define MDSTAT_STATE_EN		3
+#define MDSTAT_STATE_MASK	0x1F
+
 #endif /* CONFIG_SOC_TMS320C6678 */
 #define PSC_DEBUGSS_TRC              5  /* Debug trace */
 #define PSC_TETB_TRC                 6
