@@ -30,10 +30,6 @@
 
 static int serdes_init(void)
 {
-	/* Unlock DSCR boot config */
-	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
-	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
-	
 #ifdef CONFIG_ARCH_BOARD_EVM6670
 	dscr_set_reg(DSCR_SGMII_SERDES_CFGPLL, 0x00000051);
 #else
@@ -48,10 +44,6 @@ static int serdes_init(void)
 	dscr_set_reg(DSCR_SGMII_SERDES_CFGTX1, 0x000108A1);
 
 	_c6x_delay(2000);
-
-	/* Lock DSCR */
-	dscr_set_reg(DSCR_KICK0, 0);
-	dscr_set_reg(DSCR_KICK1, 0);
 
 	return 0;
 }	

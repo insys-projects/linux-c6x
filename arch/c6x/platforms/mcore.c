@@ -23,8 +23,7 @@
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/percpu.h>
-
-#include <mach/dscr.h>
+#include <asm/dscr.h>
 
 #ifdef DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "MCORE: [%s] " fmt, __FUNCTION__ , ## args)
