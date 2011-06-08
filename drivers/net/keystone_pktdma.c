@@ -30,6 +30,7 @@
 
 #include <asm/system.h>
 #include <asm/irq.h>
+#include <asm/msmc.h>
 
 #include <mach/pa.h>
 #include <mach/netcp.h>
@@ -61,7 +62,7 @@
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
-#define DEVICE_QM_ACC_RAM_OFFSET        (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
+#define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
 #define KEYSTONE_CPSW_MIN_PACKET_SIZE	ETH_ZLEN
 #define KEYSTONE_CPSW_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
@@ -246,10 +247,13 @@ int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
 	
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_rx      = (u32 *) (DEVICE_QM_DESC_RAM_BASE
-					 + DEVICE_QM_ACC_RAM_OFFSET);
-	acc_list_phys_addr_rx = (u32 *) (DEVICE_QM_DESC_RAM_BASE_PHYS
-					 + DEVICE_QM_ACC_RAM_OFFSET);
+	acc_list_addr_rx = (u32*) qm_mem_alloc(num_acc_entries << 2,
+					       (u32*)&acc_list_phys_addr_rx);
+	if (acc_list_addr_rx == NULL) {
+		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
 	memset((void *) acc_list_addr_rx, 0, num_acc_entries << 2);
 
 	/*
@@ -922,6 +926,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
 #endif
+	u32                         acc_ram;
 	struct cpdma_rx_cfg	    c_rx_cfg;
 	struct cpdma_tx_cfg	    c_tx_cfg;
 	struct qm_config	    c_q_cfg;
@@ -970,12 +975,18 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	q_cfg->link_ram_base		= 0x00080000;
 	q_cfg->link_ram_size		= 0x3FFF;
 
-	/* Use device defined memory for descriptors */
-	q_cfg->mem_region_base		= DEVICE_QM_DESC_RAM_BASE_PHYS;
+	/* Allocate memory for descriptors */
+	acc_ram = qm_mem_alloc(DEVICE_QM_ACC_RAM_SIZE, (u32*)&q_cfg->mem_region_base);
+	if (!acc_ram) {
+		printk(KERN_ERR "%s: descriptor memory allocation failed\n", 
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
+	    
 	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
 	q_cfg->dest_q			= DEVICE_QM_ETH_FREE_Q;
 
-	memset((void *) DEVICE_QM_DESC_RAM_BASE, 0, DEVICE_QM_ACC_RAM_OFFSET);
+	memset((void *) acc_ram, 0, DEVICE_QM_ACC_RAM_SIZE);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* load QM PDSP firmwares for accumulators */
