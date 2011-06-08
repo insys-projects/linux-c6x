@@ -3,8 +3,8 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009, 2010 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
+ *  Copyright (C) 2007, 2009, 2010, 2011 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -24,7 +24,9 @@
 #include <asm/machdep.h>
 #include <asm/percpu.h>
 #include <asm/dscr.h>
-
+#ifdef ARCH_HAS_MSM
+#include <asm/msmc.h>
+#endif
 #ifdef DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "MCORE: [%s] " fmt, __FUNCTION__ , ## args)
 #else
@@ -268,6 +270,12 @@ static ssize_t ram_proc_write(struct file* file,
 	    ((*ppos + count) < (memory_end - RAM_MEMORY_START)))
 		return -EACCES;
 
+#ifdef ARCH_HAS_MSM
+	if ((data->start == RAM_MSM_CO_BASE) && 
+	    ((*ppos + count) < (msm_get_heap() - RAM_MSM_CO_BASE)))
+		return -EACCES;
+#endif
+
 	/* Eventually truncate the size */
 	if ((*ppos + count) > (size_t) data->size)
 		count = (size_t) data->size - *ppos;
@@ -382,6 +390,7 @@ static int mcore_init(void)
 		if (!core)
 			return -EBUSY;
 
+		/* L2 memory */
 		data = (struct ram_private_data *) 
 			kmalloc(sizeof(struct ram_private_data), GFP_KERNEL);
 
@@ -398,6 +407,22 @@ static int mcore_init(void)
 
 		printk(KERN_INFO "MCORE: create SRAM, core=%d, start=0x%x size=0x%x\n",
 		       data->core_id, data->start, data->size);
+
+#ifdef ARCH_HAS_MSM
+		/* MSM memory */
+		data = (struct ram_private_data *) 
+			kmalloc(sizeof(struct ram_private_data), GFP_KERNEL);
+
+		data->core_id = n;
+		data->start   = RAM_MSM_CO_BASE; /* coherent mapping of the MSM */
+		data->size    = RAM_MSM_SIZE;
+
+		if (ram_proc_create(core, "msm", &ram_proc_fops, data))
+			return -EBUSY;
+
+		printk(KERN_INFO "MCORE: create MSM, core=%d, start=0x%x size=0x%x\n",
+		       data->core_id, data->start, data->size);
+#endif /* ARCH_HAS_MSM */
 
 		if (n != get_coreid()) {
 			data = (struct ram_private_data *) 
