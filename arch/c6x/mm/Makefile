@@ -9,5 +9,4 @@
 
 obj-y	 := init.o fault.o memory.o kmap.o dma-coherent.o
 
-obj-$(CONFIG_ARCH_BOARD_EVM6678)    += msmc.o
-obj-$(CONFIG_ARCH_BOARD_EVM6670)    += msmc.o
+obj-$(CONFIG_TMS320C66X) += msmc.o
