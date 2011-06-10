@@ -64,7 +64,7 @@ static ssize_t control_proc_write(struct file* file,
 #ifdef CONFIG_SOC_TMS320C6472
 	psc_mdctl = PSC_MDCTL0;
 #endif
-#ifdef CONFIG_SOC_TMS320C6678
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
 	psc_mdctl = PSC_CORE0_TIMER0_BASE;
 #endif
 	DPRINTK("psc_mdctl = 0x%x\n", psc_mdctl);
@@ -82,7 +82,7 @@ static ssize_t control_proc_write(struct file* file,
 		/* First boot for the Faraday case */
 		assert_event(INTC_B_EVTPULSE4);
 #endif
-#ifdef CONFIG_SOC_TMS320C6678
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
         	if (size < 4)
 		      return -EFAULT;
 
@@ -121,7 +121,7 @@ static ssize_t control_proc_write(struct file* file,
 			/* set BOOT_COMPLETE_STAT */
 			*((volatile u32 *) 0x2ab0004 ) = 0x3f;
 #endif
-#ifdef CONFIG_SOC_TMS320C6678
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
 			/* set BOOT_COMPLETE_STAT */
 			*((volatile u32 *) DSCR_BOOTCOMPLETE) = 0x3f;
 #endif
@@ -138,7 +138,7 @@ static ssize_t control_proc_write(struct file* file,
 				/* set BOOT_COMPLETE_STAT */
 				*((volatile u32 *) 0x2ab0004 ) |= (1 << core_num);
 #endif
-#ifdef CONFIG_SOC_TMS320C6678
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
 			        reg  = (volatile u32 *)DSP_BOOT_ADDR(core_num);	
 				*reg = boot_addr;
 
@@ -186,7 +186,7 @@ static ssize_t control_proc_write(struct file* file,
 #ifdef CONFIG_SOC_TMS320C6472
 				*((volatile u32 *) (psc_mdctl) + core_num) &= ~0x100;
 #endif
-#ifdef CONFIG_SOC_TMS320C6678
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
 				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;

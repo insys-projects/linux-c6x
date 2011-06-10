@@ -172,6 +172,7 @@
 
 #ifdef CONFIG_SOC_TMS320C6678
 #define PSC_EMIF25_SPI               3  /* EMIF16 and SPI */
+#endif /* CONFIG_SOC_TMS320C6678 */
 #define PSC_CORE0_TIMER0_BASE        (PSC_MDCTL0 + (15 * 4)) /* Base of Core and Timer 0 */
 
 /* Get the Power domain for core */
@@ -187,7 +188,6 @@
 #define MDSTAT_STATE_EN		     3
 #define MDSTAT_STATE_MASK	     0x1F
 
-#endif /* CONFIG_SOC_TMS320C6678 */
 #define PSC_DEBUGSS_TRC              5  /* Debug trace */
 #define PSC_TETB_TRC                 6
 #define PSC_PA                       7  /* PA */
