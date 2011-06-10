@@ -123,6 +123,9 @@
 #define PSC_MDCTL9                   0x02ac0a24
 #define PSC_MDCTL10                  0x02ac0a28
 #define PSC_MDCTL11                  0x02ac0a2c
+
+#define PSC_MDCTL_CORE0_BASE         PSC_MDCTL3
+
 #endif  /* CONFIG_SOC_TMS320C6474 */
 
 #if defined(CONFIG_SOC_TMS320C6472)
@@ -160,6 +163,9 @@
 #define PSC_MDCTL11                  0x02ae0a2c
 #define PSC_MDCTL12                  0x02ae0a30
 #define PSC_MDCTL13                  0x02ae0a34
+
+#define PSC_MDCTL_CORE0_BASE         PSC_MDCTL0
+
 #endif  /* CONFIG_SOC_TMS320C6472 */
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
@@ -172,12 +178,18 @@
 
 #ifdef CONFIG_SOC_TMS320C6678
 #define PSC_EMIF25_SPI               3  /* EMIF16 and SPI */
+#define PSC_MDCTL_CORE0_BASE         (PSC_MDCTL0 + (15 * 4))
+#define PD_GEM0                      8
 #endif /* CONFIG_SOC_TMS320C6678 */
-#define PSC_CORE0_TIMER0_BASE        (PSC_MDCTL0 + (15 * 4)) /* Base of Core and Timer 0 */
+
+#ifdef CONFIG_SOC_TMS320C6670
+#define PSC_MDCTL_CORE0_BASE         (PSC_MDCTL0 + (23 * 4)) 
+#define PD_GEM0                      13
+#endif /* CONFIG_SOC_TMS320C6670 */
 
 /* Get the Power domain for core */
-#define PD_GEM0                      8
-#define GET_PD(x)                    (x + PD_GEM0) 
+#define GET_PD(x)                    ((x) + PD_GEM0) 
+
 #define MDCTL_NEXT_STATE_DIS	     0
 #define MDCTL_NEXT_STATE_EN	     3
 
@@ -202,6 +214,13 @@
 #define PSC_DISABLE                  0x0000
 #define PSC_ENABLE                   0x0003
 #endif /* CONFIG_SOC_TMS329C6670 || CONFIG_SOC_TMS320C6678 */
+
+#ifdef CONFIG_SOC_TMS320C6670
+/* On C6670 the mapping of MDCTL to core is not linear */
+#define PSC_MDCTL_CORE_OFFSET(c)     ((c) == 0 ? 0 : (((c) - 1) << 3) + 4)
+#else
+#define PSC_MDCTL_CORE_OFFSET(c)     ((c) << 2)
+#endif
 
 /*
  * TCI648x megamodules misc registers & constants

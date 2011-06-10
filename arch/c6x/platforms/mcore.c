@@ -6,7 +6,7 @@
  *  Copyright (C) 2007, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
- *  Part of the code for copied from fs/proc/nommu.c:
+ *  Part of the code copied from fs/proc/nommu.c:
  *
  *  Copyright (C) 2004 Red Hat, Inc. All Rights Reserved.
  *  Written by David Howells (dhowells@redhat.com)
@@ -246,6 +246,11 @@ static int enable_core_pd(int core_num)
 }
 #endif
 
+static inline unsigned int psc_mdctl(unsigned int core)
+{
+	return PSC_MDCTL_CORE0_BASE + PSC_MDCTL_CORE_OFFSET(core);
+}
+
 static ssize_t control_proc_write(struct file* file,
 				  const char*  buf,
 				  size_t       size,
@@ -253,25 +258,13 @@ static ssize_t control_proc_write(struct file* file,
 {
 	char cmd, num;
 	char bootaddr_str[32];
-	unsigned int psc_mdctl = 0;
 	unsigned long boot_addr, addr_size;
         volatile unsigned int *reg;
 	int res;
 
 	DPRINTK("size=%d\n", size);
 
-#ifdef CONFIG_SOC_TMS320C6474
-	psc_mdctl = PSC_MDCTL3;
-#endif
-#ifdef CONFIG_SOC_TMS320C6472
-	psc_mdctl = PSC_MDCTL0;
-#endif
-#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
-	psc_mdctl = PSC_CORE0_TIMER0_BASE;
-#endif
-	DPRINTK("psc_mdctl = 0x%x\n", psc_mdctl);
-
-	if ((!size) || (!psc_mdctl))
+	if (!size)
 		return 0;
 
 	get_user(cmd, buf);
@@ -319,7 +312,7 @@ static ssize_t control_proc_write(struct file* file,
 			for (i = 0; i < CORE_NUM; i++)
 				if (i != get_coreid()) {
 					DPRINTK("booting core %d\n", i);
-					*((volatile u32 *) (psc_mdctl) + i) |= 0x100;
+					*((volatile u32 *) (psc_mdctl(i))) |= 0x100;
 			}
 #ifdef CONFIG_SOC_TMS320C6472
 			/* set BOOT_COMPLETE_STAT */
@@ -338,21 +331,21 @@ static ssize_t control_proc_write(struct file* file,
 			    (core_num != get_coreid())) {
 
 #ifdef CONFIG_SOC_TMS320C6472
-				*((volatile u32 *) (psc_mdctl) + core_num) |= 0x100;
+				*((volatile u32 *) psc_mdctl(core_num)) |= 0x100;
 				/* set BOOT_COMPLETE_STAT */
 				*((volatile u32 *) 0x2ab0004 ) |= (1 << core_num);
 #endif
 #if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
 			        reg  = (volatile u32 *)DSP_BOOT_ADDR(core_num);	
 				*reg = boot_addr;
-
+				
 				DPRINTK("booting core %d, boot_addr %p, val read 0x%x\n", core_num, reg, *reg);
 
 				/* Set the boot completed */
 				*((volatile u32 *) DSCR_BOOTCOMPLETE) = (1 << core_num);
 
 				/* Take the core out of reset */
-				reg  = (unsigned int*)(psc_mdctl + (core_num * 4));
+				reg  = (unsigned int*) psc_mdctl(core_num);
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;
 
@@ -374,7 +367,7 @@ static ssize_t control_proc_write(struct file* file,
 			for (i = 0; i < CORE_NUM; i++)
 				if (i != get_coreid()) {
 					DPRINTK("reseting core %d\n", i);
-					*((volatile u32 *) (psc_mdctl) + i) &= ~0x100;
+					*((volatile u32 *) psc_mdctl(i)) &= ~0x100;
 				}
 		} else {
 			/* Reset a specific core */
@@ -385,15 +378,15 @@ static ssize_t control_proc_write(struct file* file,
 			    (core_num != get_coreid())) {
 				DPRINTK("reseting core %d\n", core_num);
 #ifdef CONFIG_SOC_TMS320C6472
-				*((volatile u32 *) (psc_mdctl) + core_num) &= ~0x100;
+				*((volatile u32 *) psc_mdctl(core_num)) &= ~0x100;
 #endif
 #if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
-				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
+				reg  = (unsigned int*) psc_mdctl(core_num);
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;
 
 				/* Place the core in reset */
-				reg = (unsigned int*)(psc_mdctl + (core_num * 4));
+				reg  = (unsigned int*)(psc_mdctl(core_num));
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK);
 
