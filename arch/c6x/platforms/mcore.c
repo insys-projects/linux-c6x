@@ -112,8 +112,6 @@ static void add_mcore_region(struct vm_region *region)
 		parent = *p;
 		pregion = rb_entry(parent, struct vm_region, vm_rb);
 
-		DPRINTK("%s: parent = 0x%x, p = 0x%x\n", __FUNCTION__, parent, p);
-
 		if (region->vm_start < pregion->vm_start)
 			p = &(*p)->rb_left;
 		else if (region->vm_start > pregion->vm_start)
@@ -217,6 +215,37 @@ static int maps_list_open(struct inode *inode, struct file *file)
 	return seq_open(file, &maps_list_seqop);
 }
 
+#if defined(CONFIG_SOC_TMS320C6678) || defined(CONFIG_SOC_TMS320C6670)
+static int enable_core_pd(int core_num)
+{
+        volatile unsigned int *reg;
+	unsigned int pd;
+	u64 time;
+
+	if ((core_num < 0) || (core_num >= CORE_NUM))
+		return -EINVAL;
+
+	/* Enable power domain module */
+	pd   = GET_PD(core_num);		
+	reg  = (unsigned int*)PSC_PTCMD;
+	*reg = (1 << pd);
+	time =  sched_clock();
+
+	/* Poll for transition done */
+	reg = (unsigned int*)PSC_PTSTAT;
+	while ((*reg & (1 << pd))) {
+		/* We expect to perform the transition in less than 1ms */
+		if ((sched_clock() - time) > 1000000UL) {
+			DPRINTK("timeout on transition polling\n");
+			return -EBUSY;
+		}
+	}
+
+	DPRINTK("transition time = %d\n", (int)(sched_clock() - time));
+	return 0;
+}
+#endif
+
 static ssize_t control_proc_write(struct file* file,
 				  const char*  buf,
 				  size_t       size,
@@ -225,8 +254,9 @@ static ssize_t control_proc_write(struct file* file,
 	char cmd, num;
 	char bootaddr_str[32];
 	unsigned int psc_mdctl = 0;
-	unsigned long boot_addr, addr_size, pd;
+	unsigned long boot_addr, addr_size;
         volatile unsigned int *reg;
+	int res;
 
 	DPRINTK("size=%d\n", size);
 
@@ -317,23 +347,20 @@ static ssize_t control_proc_write(struct file* file,
 				*reg = boot_addr;
 
 				DPRINTK("booting core %d, boot_addr %p, val read 0x%x\n", core_num, reg, *reg);
-				/* set BOOT_COMPLETE_STAT */
+
+				/* Set the boot completed */
 				*((volatile u32 *) DSCR_BOOTCOMPLETE) = (1 << core_num);
 
 				/* Take the core out of reset */
 				reg  = (unsigned int*)(psc_mdctl + (core_num * 4));
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK) | MDCTL_LRSTZ_MASK;
+
 				DPRINTK("reg = %p, val = %x\n", reg, *reg );
 
-				/* Enable power domain module */
-				pd   = GET_PD(core_num);		
-				reg  = (unsigned int*)PSC_PTCMD;
-				*reg = (1 << pd);
-
-				/* Poll for transition done */
-				reg = (unsigned int*)PSC_PTSTAT;
-				while ((*reg & (1 << pd)));
+				res = enable_core_pd(core_num);
+				if (res)
+					return res;
 #endif
 			}
 
@@ -370,14 +397,9 @@ static ssize_t control_proc_write(struct file* file,
 				*reg = (*reg & ~ MDCTL_NEXT_STATE_MASK) | MDCTL_NEXT_STATE_EN;
 				*reg = (*reg & ~ MDCTL_LRSTZ_MASK);
 
-				/* Enable power domain module */
-				pd = GET_PD(core_num);		
-				reg = (unsigned int*)PSC_PTCMD;
-				*reg = (1 << pd);
-
-				/* Poll for transition done */
-				reg = (unsigned int*)PSC_PTSTAT;
-				while ((*reg & (1 << pd)));
+				res = enable_core_pd(core_num);
+				if (res)
+					return res;
 #endif
 			}
 		}
