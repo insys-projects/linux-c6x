@@ -580,6 +580,12 @@ static int mcore_init(void)
 		return -EBUSY;
 	}
 
+	/*
+	 * Local SRAM memory. Mark it as available (with R/W perms) even if it is not 
+	 * true for our own core.
+	 */
+	register_mcore_region("SRAM", RAM_SRAM, RAM_SRAM_SIZE, 0);
+
 	/* Create each core entry */
 	for (n = 0; n < CORE_NUM; n ++) {
 		struct proc_dir_entry   *core;
@@ -628,17 +634,18 @@ static int mcore_init(void)
 
 		/* Look if we use part of the MSM in Linux */
 		if (msm_get_heap() > data->start)
-			register_mcore_region("MSM", data->start,
+			register_mcore_region("MSM", msm_virt_to_phys(data->start),
 					      msm_get_heap() - data->start, 1);
 		
+		/* MSM is registered in MCORE mapping info with physical addresses */
 		if (msm_get_heap())
-			register_mcore_region("MSM", msm_get_heap(),
+			register_mcore_region("MSM", msm_virt_to_phys(msm_get_heap()),
 					      data->size - (msm_get_heap() - data->start), 0);
 		else
-			register_mcore_region("MSM", data->start, data->size, 0);
+			register_mcore_region("MSM", msm_virt_to_phys(data->start), data->size, 0);
 		
 		DPRINTK("create MSM, core=%d, start=0x%x size=0x%x\n",
-		       data->core_id, data->start, data->size);
+			data->core_id, msm_virt_to_phys(data->start), data->size);
 
 #endif /* ARCH_HAS_MSM */
 
@@ -657,7 +664,8 @@ static int mcore_init(void)
 					      memory_end - data->start, 1);
 			if (memory_end < (data->start + data->size - 1))
 				register_mcore_region("DDR", memory_end, 
-						      data->size - (memory_end - data->start), 0);
+						      data->size - (memory_end - data->start),
+						      0);
 
 			DPRINTK("create DDR, core=%d, start=0x%x size=0x%x\n",
 			       data->core_id, data->start, data->size);
