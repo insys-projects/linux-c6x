@@ -105,8 +105,9 @@ config CPU_BIG_ENDIAN
 	  of your chipset/board/processor.
 
 config FORCE_MAX_ZONEORDER
-	int 
-	default "16" if TMS320C66X
+	
+	int "Page allocator power of two limit (MAX_ORDER)"
+	default "14" if TMS320C66X
 	default "13"
 
 menu "Processor type and features"
