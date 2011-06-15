@@ -991,7 +991,11 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* load QM PDSP firmwares for accumulators */
 	q_cfg->pdsp_firmware[0].id       = 0;
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	q_cfg->pdsp_firmware[0].firmware = &acc48_be;
+#else
 	q_cfg->pdsp_firmware[0].firmware = &acc48_le;
+#endif
 	q_cfg->pdsp_firmware[0].size     = sizeof(acc48_le);
 #else
 	q_cfg->pdsp_firmware[0].firmware = NULL;
