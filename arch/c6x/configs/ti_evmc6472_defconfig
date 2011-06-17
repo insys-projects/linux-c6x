@@ -171,6 +171,7 @@ CONFIG_CMDLINE="console=cio rw ip=dhcp"
 CONFIG_TI_C6X_COMPILER=y
 CONFIG_TI_C6X_LINKER=y
 # CONFIG_CPU_BIG_ENDIAN is not set
+CONFIG_FORCE_MAX_ZONEORDER=13
 
 #
 # Processor type and features
