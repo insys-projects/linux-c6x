@@ -42,17 +42,19 @@ static struct c6x_irq_chip           cpintc_mapped_chips[NR_CPINTC0_OUTPUTS];
 static struct c6x_irq_chip          *megamod_chips;
 static struct combiner_handler_info *megamod_handler_info;
 
+#define __host_irq_to_idx(irq) IRQ_SOC_HOST_IRQ_TO_IDX(irq)
+#define __idx_to_chan(i)       IRQ_SOC_IDX_TO_CHAN(i)
+
 /* Mapping from host int to INTC mapping */
 static uint8_t cpintc_host_irq_map[] = { 
-	IRQ_INTC0OUT0,
-	IRQ_INTC0OUT1,
-	IRQ_INTC0OUT2,
-	IRQ_INTC0OUT3,
-	IRQ_INTC0OUT4,
-	IRQ_INTC0OUT5,
-	IRQ_INTC0OUT6,
-	IRQ_INTC0OUT7,
-	IRQ_INTC0OUT8,
+	IRQ_INTC0OUT,
+	IRQ_INTC0OUT + 1,
+	IRQ_INTC0OUT + 2,
+	IRQ_INTC0OUT + 3,
+	IRQ_INTC0OUT + 4,
+	IRQ_INTC0OUT + 5,
+	IRQ_INTC0OUT + 6,
+	IRQ_INTC0OUT + 7,
 };
 
 /* Lock protecting irq mappings */
@@ -112,10 +114,8 @@ static inline void __cpintc_map_irq(int n, unsigned int src, unsigned int channe
 
 	CPINTC_CHMAP(n)[src >> 2] = val;
 
-#if 0
 	DPRINTK("mapping src %d IRQ to channel %d IRQ, *CPINTC_CHMAP (0x%x) = 0x%x\n",
 		src, channel, &CPINTC_CHMAP(n)[src >> 2], CPINTC_CHMAP(n)[src >> 2]);
-#endif
 }
 
 /*
@@ -132,8 +132,10 @@ static inline int __cpintc_get_host_irq(int n, unsigned int dst)
 		offset = (channel & 3) << 3;
 		val    = CPINTC_HINTMAP(n)[channel >> 2];
 		val   &= (0xff << offset);
-		if (val == ((dst & 0xff) << offset))
+		if (val == ((dst & 0xff) << offset)) {
+		    	DPRINTK("channel for host irq %d is %d\n", dst, channel);
 			return (int) channel;
+		}
 	}
 	
 	DPRINTK("channel for host irq %d not found\n", dst);
@@ -398,6 +400,7 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 	for (i = 0; i < NR_CPINTC0_COMBINERS; i++) {
 		int irq, parent_irq;
 		int j;
+		unsigned int chan = __idx_to_chan(i);
 		struct c6x_irq_chip *chip;
 
 		CPINTC_ENABLECLR(0)[i] = ~0;	/* mask all events */
@@ -419,10 +422,10 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 			    continue;
 	
 			/* Map the event (system interrupt) to the combined channel */
-			__cpintc_map_irq(0, evt, i);
+			__cpintc_map_irq(0, evt, chan);
 
 			/* Record the mapping */
-			cpintc_evt_to_output[evt] = i;
+			cpintc_evt_to_output[evt] = chan;
 			
 			/* Set the individiual CP_INTC IRQs to use combiner */
 			set_irq_chip(evt + IRQ_CPINTC0_START, (struct irq_chip *)&cpintc_chips[i]);
@@ -430,22 +433,22 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		}
 
 		/* Retrieve the mapping channel -> host irq */
-		irq = __cpintc_get_host_irq(0, i);
+		irq = __cpintc_get_host_irq(0, chan);
 		if (irq == -1) {
-			/* Map the corresponding channel to the same host interrupt */
-			__cpintc_map_channel(0, i, i);
+			/* Map the corresponding channel to the host interrupt */
+			__cpintc_map_channel(0, chan, i);
 			irq = i;
 		}
 
 		/* Enable the corresponding output host interrupt */
 		*CPINTC_HINTIDXSET(0) = irq;
 
-		cpintc_chips[i].minfo = &cpintc_mask_info[irq];
+		cpintc_chips[i].minfo = &cpintc_mask_info[__host_irq_to_idx(irq)];
 
 		/* Mapping of irq in the parent int controller (INTC) */
-		parent_irq = cpintc_host_irq_map[irq];
-		DPRINTK("irq = %d, channel = %d, parent_irq = %d\n",
-			irq, i, parent_irq);
+		parent_irq = cpintc_host_irq_map[__host_irq_to_idx(irq)];
+		DPRINTK("irq = %d, channel = %d, combiner = %d, parent_irq = %d\n",
+			irq, chan , i, parent_irq);
 
 		/* Chip info for parent int controller we are wired through (INTC) */
 		chip  = &parent_chips[parent_irq / 32];
@@ -453,7 +456,7 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 
 		set_irq_chip(parent_irq, (struct irq_chip *)chip);
 		DPRINTK("parent_irq = %d, chip = 0x%x\n",
-			irq, parent_irq);
+			parent_irq, chip);
 
 		set_irq_handler(parent_irq, handler);
 		set_irq_data(parent_irq, &cpintc_handler_info[i]);
