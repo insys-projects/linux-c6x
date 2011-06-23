@@ -47,10 +47,6 @@ config SOC_TMS320C6670
 	select INTC_C64XPLUS
 	select CP_INTC
 	select SGMII_C66X
-	select TI_KEYSTONE_PA
-	select TI_KEYSTONE_QM
-	select TI_KEYSTONE_PKTDMA
-	select TI_KEYSTONE_CPSW
 	
 config SOC_TMS320C6678
 	bool "TMS320C6678"
@@ -62,10 +58,6 @@ config SOC_TMS320C6678
 	select INTC_C64XPLUS
 	select CP_INTC
 	select SGMII_C66X
-	select TI_KEYSTONE_PA
-	select TI_KEYSTONE_QM
-	select TI_KEYSTONE_PKTDMA
-	select TI_KEYSTONE_CPSW
 
 comment "Board Selection"
 choice
