@@ -310,12 +310,12 @@ extern int cpintc_combined_irq(unsigned int irq);
  * Here it is computed based on INTC0OUT(32 + i + 11 * n) for irq 21 to 31
  *
  */
-#define IRQ_SOC_HOST_IRQ_TO_IDX(irq)   ((irq) - 32 - (get_coreid() * 11))
+#define IRQ_SOC_HOST_IRQ_TO_IDX(irq)   ((irq) - 32 - ((get_coreid() & 0x3) * 11))
 
 /*
  * This macro returns the channel number from a combiner index
  * Here it is computed based on INTC0OUT(32 + i + 11 * n) for irq 21 to 31
  */
-#define IRQ_SOC_IDX_TO_CHAN(i)         ((i) + 32 + (get_coreid() * 11))
+#define IRQ_SOC_IDX_TO_CHAN(i)         ((i) + 32 + ((get_coreid() & 0x3) * 11))
 
 #endif /* __MACH_IRQ_C6678_H */

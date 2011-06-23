@@ -45,6 +45,15 @@ static struct combiner_handler_info *megamod_handler_info;
 #define __host_irq_to_idx(irq) IRQ_SOC_HOST_IRQ_TO_IDX(irq)
 #define __idx_to_chan(i)       IRQ_SOC_IDX_TO_CHAN(i)
 
+/*
+ * There is one CP_INTC for 4 cores on C66x
+ */
+#if (CORE_NUM < 5)
+#define __get_cpintc_id()      0
+#else
+#define __get_cpintc_id()      (get_coreid() >> 2)
+#endif
+
 /* Mapping from host int to INTC mapping */
 static uint8_t cpintc_host_irq_map[] = { 
 	IRQ_INTC0OUT,
@@ -245,7 +254,7 @@ void cpintc_map(unsigned int irq_src, unsigned int irq_dst)
 	desc->chip = (struct irq_chip *)chip;
 
 	/* Do the mapping within the CP_INTC hw */
-	__cpintc_map_irq(0, src, output);
+	__cpintc_map_irq(__get_cpintc_id(), src, output);
 
 	spin_unlock_irqrestore(&map_lock, flags);
 }
@@ -348,10 +357,10 @@ int irq_soc_init(void)
 	for (i = 0; i < NR_CPINTC0_COMBINERS; i++) {
 		minfo->irq_base = IRQ_CPINTC0_START + (i * 32);
 		minfo->evtmask  = 0; 
-		minfo->evtset	= &CPINTC_ENABLE(0)[i];
-		minfo->evtclr	= &CPINTC_ENABLECLR(0)[i];
-		hinfo->mevtflag = &CPINTC_ENASTATUS(0)[i]; /* status*/
-		hinfo->evtclr   = &CPINTC_ENASTATUS(0)[i]; /* write 1 clean irq */
+		minfo->evtset	= &CPINTC_ENABLE(__get_cpintc_id())[i];
+		minfo->evtclr	= &CPINTC_ENABLECLR(__get_cpintc_id())[i];
+		hinfo->mevtflag = &CPINTC_ENASTATUS(__get_cpintc_id())[i]; /* status*/
+		hinfo->evtclr   = &CPINTC_ENASTATUS(__get_cpintc_id())[i]; /* write 1 clean irq */
 		for (j = 0; j < 32; j++)
 			/* Define the default mapping */
 			hinfo->irqmap[j] = minfo->irq_base + j;
@@ -378,10 +387,10 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 	struct combiner_handler_info *hinfo;
 
 	/* Disable all host interrupts */
-	*CPINTC_GLOBALHINTEN(0) = 0;
+	*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 0;
 
 	/* Configure CP_INTC with no nesting support */
-	*CPINTC_CTRL(0) = CPINTC_NO_NESTING;
+	*CPINTC_CTRL(__get_cpintc_id()) = CPINTC_NO_NESTING;
 
 	/* Default settings for CP-INTC host interrupt */
 	for (i = 0; i < IRQ_CPINTC0_MAPLEN; i++) {
@@ -403,8 +412,8 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		unsigned int chan = __idx_to_chan(i);
 		struct c6x_irq_chip *chip;
 
-		CPINTC_ENABLECLR(0)[i] = ~0;	/* mask all events */
-		CPINTC_ENASTATUS(0)[i] = ~0;	/* clear all events */
+		CPINTC_ENABLECLR(__get_cpintc_id())[i] = ~0;	/* mask all events */
+		CPINTC_ENASTATUS(__get_cpintc_id())[i] = ~0;	/* clear all events */
 
 		/*
 		 * CP_INTC has no default combiner, so we need to map all incoming
@@ -422,7 +431,7 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 			    continue;
 	
 			/* Map the event (system interrupt) to the combined channel */
-			__cpintc_map_irq(0, evt, chan);
+			__cpintc_map_irq(__get_cpintc_id(), evt, chan);
 
 			/* Record the mapping */
 			cpintc_evt_to_output[evt] = chan;
@@ -433,15 +442,15 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		}
 
 		/* Retrieve the mapping channel -> host irq */
-		irq = __cpintc_get_host_irq(0, chan);
+		irq = __cpintc_get_host_irq(__get_cpintc_id(), chan);
 		if (irq == -1) {
 			/* Map the corresponding channel to the host interrupt */
-			__cpintc_map_channel(0, chan, i);
+			__cpintc_map_channel(__get_cpintc_id(), chan, i);
 			irq = i;
 		}
 
 		/* Enable the corresponding output host interrupt */
-		*CPINTC_HINTIDXSET(0) = irq;
+		*CPINTC_HINTIDXSET(__get_cpintc_id()) = irq;
 
 		cpintc_chips[i].minfo = &cpintc_mask_info[__host_irq_to_idx(irq)];
 
@@ -467,7 +476,7 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 	}
 
 	/* Enable all host interrupts */
-	*CPINTC_GLOBALHINTEN(0) = 1;
+	*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 1;
 
 	megamod_chips        = parent_chips;
 	megamod_handler_info = parent_handler_info;
