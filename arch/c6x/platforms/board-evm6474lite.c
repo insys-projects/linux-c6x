@@ -119,7 +119,7 @@ static struct i2c_board_info evm_i2c_info[] = {
 #endif
 };
 
-#define I2C_UART_GPIO 12
+#define I2C_UART_GPIO 15
 
 static void __init board_setup_i2c(void)
 {
