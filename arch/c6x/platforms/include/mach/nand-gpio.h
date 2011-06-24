@@ -27,7 +27,7 @@
 
 #define GPIO_NAND_DATA_MASK 0xff
 
-#define xdelay()            ndelay(20)
+#define xdelay()            ndelay(25)
 
 #define GPIO_NAND_USE_READY_BUSY_PIN
 #define GPIO_NAND_USE_WRITE_PROTECT
