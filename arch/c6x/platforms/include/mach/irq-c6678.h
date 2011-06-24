@@ -34,7 +34,7 @@
 #define IRQ_TSIP0	18
 #define IRQ_TSIP1	19
 #define IRQ_RIOINT16    20  /* RapidIO interrupts */
-#define IRQ_INTC0OUT32  21  /* CP_INTC outputs: 21 to 31  */
+#define IRQ_INTC0OUT    21  /* CP_INTC per-core outputs: 21 to 31  */
 #define IRQ_QML         32  /* QM low: 32 to 47 */
 #define IRQ_QMH         48  /* QM high: 48 to 55 */
 #define IRQ_TSIP0RFS	52
@@ -280,7 +280,7 @@
 #define NR_CPINTC0_IRQS      160            /* number of source events */
 #define NR_CPINTC0_COMBINERS 8              /* number of combiners */
 #define NR_CPINTC0_CHANNELS  152            /* number of output channels */
-#define NR_CPINTC0_OUTPUTS   18             /* number of output host interrupts */
+#define NR_CPINTC0_OUTPUTS   17             /* number of output host interrupts */
 
 #define NR_CPINTC_IRQS       (NR_CPINTC0_IRQS) /* We only use INTC0 */
 #define NR_CPINTC_COMBINERS  (NR_CPINTC0_COMBINERS)
@@ -296,13 +296,26 @@ extern int cpintc_combined_irq(unsigned int irq);
 #define IRQ_SOC_COMBINER_PRE_ACK(irq)  1
 
 /*
- * This macro return 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
+ * This macro returns 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
  */
 #define IRQ_SOC_COMBINER(irq)          cpintc_irq(irq)
 
 /*
- * This macro return 1 if the irq number is a SoC combiner combined interrupt
+ * This macro returns 1 if the irq number is a SoC combiner combined interrupt
  */
 #define IRQ_SOC_COMBINER_COMBINED(irq) cpintc_combined_irq(irq)
+
+/*
+ * This macro returns the combiner index from an host irq
+ * Here it is computed based on INTC0OUT(32 + i + 11 * n) for irq 21 to 31
+ *
+ */
+#define IRQ_SOC_HOST_IRQ_TO_IDX(irq)   ((irq) - 32 - ((get_coreid() & 0x3) * 11))
+
+/*
+ * This macro returns the channel number from a combiner index
+ * Here it is computed based on INTC0OUT(32 + i + 11 * n) for irq 21 to 31
+ */
+#define IRQ_SOC_IDX_TO_CHAN(i)         ((i) + 32 + ((get_coreid() & 0x3) * 11))
 
 #endif /* __MACH_IRQ_C6678_H */

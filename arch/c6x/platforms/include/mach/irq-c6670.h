@@ -31,7 +31,7 @@
 #define IRQ_PCIEMSI0    17  /* PCIe MSI */
 #define IRQ_RIOINT16    20  /* RapidIO interrupts */
 #define IRQ_RIOINT20    21
-#define IRQ_INTC0OUT64  22  /* INTC outputs: 22 to 31 */
+#define IRQ_INTC0OUT    22  /* INTC per-core outputs: 22 to 31 */
 #define IRQ_QML         32  /* QM low: 32 to 47 */
 #define IRQ_QMH         48  /* QM high: 48 to 55 */
 #define IRQ_INTC0OUT0   56  /* CP_INTC outputs */
@@ -306,13 +306,25 @@ extern int cpintc_combined_irq(unsigned int irq);
 #define IRQ_SOC_COMBINER_PRE_ACK(irq)  1
 
 /*
- * This macro return 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
+ * This macro returns 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
  */
 #define IRQ_SOC_COMBINER(irq)          cpintc_irq(irq)
 
 /*
- * This macro return 1 if the irq number is a SoC combiner combined interrupt
+ * This macro returns 1 if the irq number is a SoC combiner combined interrupt
  */
 #define IRQ_SOC_COMBINER_COMBINED(irq) cpintc_combined_irq(irq)
+
+/*
+ * This macro returns the combiner index from an host irq
+ * Here it is computed based on INTC0OUT(64 + i + 10 * n) for irq 22 to 31
+ */
+#define IRQ_SOC_HOST_IRQ_TO_IDX(irq)   ((irq) - 64 - (get_coreid() * 10))
+
+/*
+ * This macro returns the channel number from a combiner index
+ * Here it is computed based on INTC0OUT(64 + i + 10 * n) for irq 22 to 31
+ */
+#define IRQ_SOC_IDX_TO_CHAN(i)         ((i) + 64 + (get_coreid() * 10))
 
 #endif /* __MACH_IRQ_C6670_H */
