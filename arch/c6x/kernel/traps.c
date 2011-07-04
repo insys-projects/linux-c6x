@@ -253,8 +253,8 @@ void do_trap(struct exception_info *except_info, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
-	if (except_info->code != TRAP_BRKPT)
-		printk(KERN_DEBUG "TRAP: %s PC[0x%lx] signo[%d] code[%d]\n",
+	if (except_info->signo != SIGTRAP)
+		printk(KERN_DEBUG "Exception: %s PC[0x%lx] signo[%d] code[0x%x]\n",
 		       except_info->kernel_str, regs->pc,
 		       except_info->signo, except_info->code);
 
@@ -277,8 +277,6 @@ static int process_iexcept(struct pt_regs *regs)
 	unsigned int iexcept_num;
 
 	ack_exception(EXCEPT_TYPE_IXF);
-
-	printk("IEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	while(iexcept_report) {
 		iexcept_num = __ffs(iexcept_report);
@@ -328,8 +326,6 @@ static void process_eexcept(struct pt_regs *regs)
 	unsigned int eexcept_num;
 	unsigned int bank = 0;
 	int i;
-
-	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	for (i = 0; i <= 3; i++) {
 		while (INTC_MEXPMASK[i]) {
