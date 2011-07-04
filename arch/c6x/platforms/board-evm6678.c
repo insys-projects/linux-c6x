@@ -49,7 +49,6 @@ static struct clk_lookup evm_clks[] = {
 	CLK("", NULL, NULL)
 };
 
-
 #ifdef CONFIG_EDMA3
 #include <asm/edma.h>
 
@@ -357,32 +356,41 @@ core_initcall(evm_init_nand);
 /*
  * FPGA support
  */
-
-#define FPGA_MISC_REG_OFFSET 0x0c
-
-#define FPGA_RD_CMD          (1 << 7)
-#define FPGA_WR_CMD          (0 << 7)
-
 static struct spi_device *fpga_spi_client;
 static struct mutex	  fpga_lock;
 static struct work_struct fpga_work;
 
+static inline int spi_rw(struct spi_device *spi, u8 *tx_buf, u8 *rx_buf, size_t len)
+{
+	struct spi_transfer t = {
+		.tx_buf		= tx_buf,
+		.rx_buf		= rx_buf,
+		.len		= len,
+	};
+	struct spi_message  m;
+
+	spi_message_init(&m);
+	spi_message_add_tail(&t, &m);
+	return spi_sync(spi, &m);
+}
+
 static inline int fpga_spi_write_reg(u8 reg, u8 data)
 {
-	u16 buf = ((FPGA_WR_CMD | reg) << 8) | data;
+	u16 buf;
+	u16 dummy = 0;
 
-	return spi_write(fpga_spi_client, (u8*) &buf, sizeof(buf));
+	buf = ((EVM_FPGA_WR_CMD | reg) << 8) | data;
+
+	return spi_rw(fpga_spi_client, (u8*) &buf, (u8*) &dummy, 2);
 }
 
 static inline int fpga_spi_read_reg(u8 reg, u8 *p_data)
 {
-	u16 cmd = ((FPGA_RD_CMD | reg) << 8);
-	u16 buf;
+	u16 cmd = ((EVM_FPGA_RD_CMD | reg) << 8);
+	u16 buf = 0;
 	int res;
 
-	res = spi_write_then_read(fpga_spi_client,
-				  (u8*) &cmd, sizeof(cmd),
-				  (u8*) &buf, sizeof(buf));
+	res = spi_rw(fpga_spi_client, (u8*) &cmd, (u8*) &buf, 2);
 
 	if (res < 0)
 		return res;
@@ -392,7 +400,7 @@ static inline int fpga_spi_read_reg(u8 reg, u8 *p_data)
 	return res;
 }
 
-static inline void evm_fpga_set(unsigned int state, u8 reg, u8 shift)
+static inline void evm_fpga_set(u8 state, u8 reg, u8 shift)
 {
 	u8  val = 0;
 	int res;
@@ -405,35 +413,29 @@ static inline void evm_fpga_set(unsigned int state, u8 reg, u8 shift)
 		return;
 	}
 
-	printk(KERN_INFO "FPGA reg 0x%x = 0x%x\n", reg, val);
-
 	val &= ~(1 << shift);
-	val |= state << shift;
+	val |= (state & 0x1) << shift;
 
 	(void) fpga_spi_write_reg(reg, val);
 
-	res = fpga_spi_read_reg(reg, &val);
-	if (res < 0) {
-		mutex_unlock(&fpga_lock);
-		return;
-	}
-
-	printk(KERN_INFO "FPGA reg 0x%x after write = 0x%x\n", reg, val);
-
 	mutex_unlock(&fpga_lock);
 }
+
+static int __init evm_init_leds(void);
+
 static void evm_fpga_work(struct work_struct *work)
 {
-#if 0
 	/* Disable NOR write protect */
-	evm_fpga_set(1, FPGA_MISC_REG_OFFSET, 4);
+	evm_fpga_set(0, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_NOR_WP);
 
 	/* Disable NAND write protect */
-	evm_fpga_set(0, FPGA_MISC_REG_OFFSET, 2);
+	evm_fpga_set(1, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_NAND_WP);
 
 	/* Disable EEPROM write protect */
-	evm_fpga_set(1, FPGA_MISC_REG_OFFSET, 5);
-#endif
+	evm_fpga_set(1, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_EEPROM_WP);
+
+	/* Initialize LEDs support */
+	(void) evm_init_leds();
 }
 
 static int __devinit evm_fpga_probe(struct spi_device *spi)
@@ -443,6 +445,8 @@ static int __devinit evm_fpga_probe(struct spi_device *spi)
 	INIT_WORK(&fpga_work, evm_fpga_work);
 
 	mutex_init(&fpga_lock);
+
+ 	schedule_work(&fpga_work);
 
 	return 0;
 }
@@ -461,6 +465,88 @@ static int __init evm_init_fpga(void)
 	return spi_register_driver(&evm_fpga_driver);
 }
 device_initcall(evm_init_fpga);
+
+/*
+ * LEDs management
+ */
+static struct work_struct leds_work;
+static char               evm_leds_state[4]    = { -1, -1, -1, -1 };
+static u8                 evm_leds_started     = 0;
+static u8                 evm_leds_initialized = 0;
+
+static void evm_leds_work(struct work_struct *work)
+{
+	if (unlikely(!evm_leds_initialized)) {
+		/* Set initial LED settings */
+		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED1);
+		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED2);
+		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED3);
+		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED4);
+
+		/* Intialization finished */
+		evm_leds_initialized = 1;
+
+	} else {
+		/* Set hw LEDs status */
+		if (evm_leds_state[0] != -1)
+			evm_fpga_set(evm_leds_state[0], EVM_FPGA_LED_REG, EVM_FPGA_LED1);
+
+		if (evm_leds_state[1] != -1)
+			evm_fpga_set(evm_leds_state[1], EVM_FPGA_LED_REG, EVM_FPGA_LED2);
+		
+		if (evm_leds_state[2] != -1)
+			evm_fpga_set(evm_leds_state[2], EVM_FPGA_LED_REG, EVM_FPGA_LED3);
+
+		if (evm_leds_state[3] != -1)
+			evm_fpga_set(evm_leds_state[3], EVM_FPGA_LED_REG, EVM_FPGA_LED4);
+	}
+}
+
+#ifdef CONFIG_IDLE_LED
+#include <linux/timer.h>
+static struct timer_list leds_timer;
+
+/*
+ * Timer LED
+ */
+static void evm_leds_timer(unsigned long dummy) 
+{
+	static unsigned char leds = 0;
+
+	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+
+	leds = (~leds) & 1;
+
+	if (leds)
+		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_ON;
+	else
+		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_OFF;
+
+	if (likely(evm_leds_started))
+		schedule_work(&leds_work);
+}
+
+/*
+ * Idle LED blink: LEDs are async due to SPI thus this feature cannot be impemented
+ */
+void c6x_arch_idle_led(int state) {}
+
+#endif /* CONFIG_IDLE_LED */
+
+static int __init evm_init_leds(void)
+{
+	INIT_WORK(&leds_work, evm_leds_work);
+
+	/* LEDs can be used now  */
+	evm_leds_started = 1;
+
+#ifdef CONFIG_IDLE_LED
+	init_timer(&leds_timer);
+	leds_timer.function = evm_leds_timer;
+	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+#endif
+	return 0;
+}
 
 /*
  * SPI NOR Flash support
@@ -485,6 +571,11 @@ static const struct flash_platform_data n25q128 = {
  * SPI
  */
 static struct spi_board_info evm_spi_info[] __initconst = {
+#ifndef CONFIG_IDLE_LED
+	/*
+	 * SPI access to the FPGA for LED blinking is today incompatible 
+	 * with the NOR flash access. So set them exclusive.
+	 */
 	{
 		.modalias	= "m25p80",
 		.platform_data	= &n25q128,
@@ -494,13 +585,14 @@ static struct spi_board_info evm_spi_info[] __initconst = {
 		.mode		= SPI_MODE_0,
 		.bits_per_word  = 8,
 	},
+#endif
 	{
 		.modalias	= "FPGA",
 		.platform_data	= NULL,
 		.max_speed_hz	= 25000000,
 		.bus_num	= 0,
 		.chip_select	= 1,
-		.mode		= SPI_MODE_0,
+		.mode		= SPI_MODE_1,
 		.bits_per_word  = 16,
 	},
 };
@@ -533,7 +625,7 @@ static struct davinci_spi_platform_data evm_spi0_pdata = {
 	.version 	= SPI_VERSION_1,
 	.num_chipselect = 2,
 	.clk_internal	= 1,
-	.cs_hold	= 1,
+	.cs_hold	= 0,
 	.intr_level	= 0,
 	.poll_mode	= 0, /* 0 -> interrupt mode, 1-> polling mode */
 	.c2tdelay	= 0,
