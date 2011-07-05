@@ -124,6 +124,9 @@ config TMS320C66X
 	select SERIAL_CORE
 	select SGMII_C66X
 
+config TI_KEYSTONE
+	bool
+
 config CIO_CONSOLE
        bool "CIO Console"
        help

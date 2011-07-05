@@ -41,6 +41,7 @@ config SOC_TMS320C6670
 	bool "TMS320C6670"
 	default n
 	select TMS320C66X
+	select TI_KEYSTONE
 	select PLL_C6X
 	select GPIO_C6X
 	select TIMER_C6X
@@ -52,6 +53,7 @@ config SOC_TMS320C6678
 	bool "TMS320C6678"
 	default n
 	select TMS320C66X
+	select TI_KEYSTONE
 	select PLL_C6X
 	select GPIO_C6X
 	select TIMER_C6X

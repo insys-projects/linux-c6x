@@ -13,15 +13,10 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __MACH_C6X_NETCP_H
-#define __MACH_C6X_NETCP_H
-#include <linux/netdevice.h>
+#ifndef __MACH_C6X_KEYSTONE_NETCP_H
+#define __MACH_C6X_KEYSTONE_NETCP_H
 
-#define BITMASK(x,y)	                (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
-					   - (u32)1 ))   <<  ((u32)y))
-#define READ_BITFIELD(z,x,y)	        ((((u32)z) & BITMASK(x,y)) >> (y))
-#define SET_BITFIELD(z,f,x,y)	        ((((u32)z) & ~BITMASK(x,y)) |	\
-					 ((((u32)f) << (y)) & BITMASK(x,y)))
+#include <linux/netdevice.h>
 
 /*
  * SGMII registers
@@ -142,5 +137,60 @@ static inline void streaming_switch_setup(void)
 		     DEVICE_PSTREAM_CFG_REG_ADDR);
 }
 
-#endif /* __MACH_C6X_NETCP_H */
+/* Register offsets */
+#define CPGMACSL_REG_ID		                0x00
+#define CPGMACSL_REG_CTL	                0x04
+#define CPGMACSL_REG_STATUS	                0x08
+#define CPGMACSL_REG_RESET	                0x0c
+#define CPGMACSL_REG_MAXLEN	                0x10
+#define CPGMACSL_REG_BOFF	                0x14
+#define CPGMACSL_REG_RX_PAUSE	                0x18
+#define CPGMACSL_REG_TX_PAURSE	                0x1c
+#define CPGMACSL_REG_EM_CTL	                0x20
+#define CPGMACSL_REG_PRI	                0x24
+
+/* Soft reset register values */
+#define CPGMAC_REG_RESET_VAL_RESET_MASK		(1 << 0)
+#define CPGMAC_REG_RESET_VAL_RESET		(1 << 0)
+
+/* Maxlen register values */
+#define CPGMAC_REG_MAXLEN_LEN			0x3fff
+
+#define GMACSL_RX_ENABLE_RCV_CONTROL_FRAMES	(1 << 24)
+#define GMACSL_RX_ENABLE_RCV_SHORT_FRAMES	(1 << 23)
+#define GMACSL_RX_ENABLE_RCV_ERROR_FRAMES	(1 << 22)
+#define GMACSL_RX_ENABLE_EXT_CTL		(1 << 18)
+#define GMACSL_RX_ENABLE_GIG_FORCE		(1 << 17)
+#define GMACSL_RX_ENABLE_IFCTL_B		(1 << 16)
+#define GMACSL_RX_ENABLE_IFCTL_A		(1 << 15)
+#define GMACSL_RX_ENABLE_CMD_IDLE		(1 << 11)
+#define GMACSL_TX_ENABLE_SHORT_GAP		(1 << 10)
+#define GMACSL_ENABLE_GIG_MODE			(1 <<  7)
+#define GMACSL_TX_ENABLE_PACE			(1 <<  6)
+#define GMACSL_ENABLE				(1 <<  5)
+#define GMACSL_TX_ENABLE_FLOW_CTL		(1 <<  4)
+#define GMACSL_RX_ENABLE_FLOW_CTL		(1 <<  3)
+#define GMACSL_ENABLE_LOOPBACK			(1 <<  1)
+#define GMACSL_ENABLE_FULL_DUPLEX		(1 <<  0)
+
+#define GMACSL_RET_OK				0
+#define GMACSL_RET_INVALID_PORT			-1
+#define GMACSL_RET_WARN_RESET_INCOMPLETE	-2
+#define GMACSL_RET_WARN_MAXLEN_TOO_BIG		-3
+#define GMACSL_RET_CONFIG_FAIL_RESET_ACTIVE	-4
+
+/*
+ * MAC Configuration information
+ */
+struct emac_config {
+	u32 flags;
+	u8  enetaddr[6];
+};
+
+struct mac_sliver {
+    u32 max_rx_len;	/* Maximum receive packet length */
+    u32 ctl;		/* Control bitfield */
+};
+
+#endif /* __MACH_C6X_KEYSTONE_NETCP_H */
 

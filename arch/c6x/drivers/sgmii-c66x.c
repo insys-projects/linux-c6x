@@ -22,7 +22,7 @@
 #include <asm/machdep.h>
 #include <asm/sgmii.h>
 
-#include <mach/netcp.h>
+#include <mach/keystone_netcp.h>
 
 extern int sgmii_reset(int port)
 {

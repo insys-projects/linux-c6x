@@ -12,11 +12,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ASM_C6X_KEYSTONE_CPSW_H_
-#define __ASM_C6X_KEYSTONE_CPSW_H_
-
-#define DEVICE_ETHERNET_SS_BASE		0x02090000
-#define KEYSTONE_CPSW_BASE		0x02090800
+#ifndef KEYSTONE_CPSW_H
+#define KEYSTONE_CPSW_H
 
 struct port_info {
 	u32 p_max_blks;
@@ -178,23 +175,23 @@ struct cpgmac_sl {
 #define CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_31_24_SHIFT	(0x00000010u)
 #define CPSW_3GF_SL_SA_HI_REG_MACSRCADDR_23_16_SHIFT	(0x00000018u)
 
-#define CPSW_3GF_CPSW_CONTROL_REG_P0_ENABLE	(0x00000004u)
-#define CPSW_3GF_CPSW_CONTROL_REG_VLAN_AWARE	(0x00000002u)
+#define CPSW_3GF_CPSW_CONTROL_REG_P0_ENABLE	        (0x00000004u)
+#define CPSW_3GF_CPSW_CONTROL_REG_VLAN_AWARE	        (0x00000002u)
 
-#define CPSW_3GF_STAT_PORT_EN_REG_P0A_STAT_EN	(0x00000001u)
-#define CPSW_3GF_STAT_PORT_EN_REG_P0B_STAT_EN	(0x00000002u)
-#define CPSW_3GF_STAT_PORT_EN_REG_P1_STAT_EN	(0x00000004u)
-#define CPSW_3GF_STAT_PORT_EN_REG_P2_STAT_EN	(0x00000008u)
+#define CPSW_3GF_STAT_PORT_EN_REG_P0A_STAT_EN	        (0x00000001u)
+#define CPSW_3GF_STAT_PORT_EN_REG_P0B_STAT_EN	        (0x00000002u)
+#define CPSW_3GF_STAT_PORT_EN_REG_P1_STAT_EN	        (0x00000004u)
+#define CPSW_3GF_STAT_PORT_EN_REG_P2_STAT_EN	        (0x00000008u)
 
-#define CPSW_3GF_ALE_CONTROL_REG_ENABLE_ALE	(0x80000000u)
-#define CPSW_3GF_ALE_CONTROL_REG_CLEAR_TABLE	(0x40000000u)
-#define CPSW_3GF_ALE_CONTROL_REG_ALE_VLAN_AWARE	(0x00000004u)
-#define CPSW_3GF_ALE_CONTROL_REG_RATE_LIMIT_TX	(0x00000008u)
+#define CPSW_3GF_ALE_CONTROL_REG_ENABLE_ALE	        (0x80000000u)
+#define CPSW_3GF_ALE_CONTROL_REG_CLEAR_TABLE 	        (0x40000000u)
+#define CPSW_3GF_ALE_CONTROL_REG_ALE_VLAN_AWARE	        (0x00000004u)
+#define CPSW_3GF_ALE_CONTROL_REG_RATE_LIMIT_TX	        (0x00000008u)
 	
-#define CPSW_3GF_ALE_PORTSTATE_DISABLED 	0
-#define CPSW_3GF_ALE_PORTSTATE_BLOCKED		1
-#define CPSW_3GF_ALE_PORTSTATE_LEARN		2
-#define CPSW_3GF_ALE_PORTSTATE_FORWARD		3
+#define CPSW_3GF_ALE_PORTSTATE_DISABLED 	        0
+#define CPSW_3GF_ALE_PORTSTATE_BLOCKED		        1
+#define CPSW_3GF_ALE_PORTSTATE_LEARN		        2
+#define CPSW_3GF_ALE_PORTSTATE_FORWARD		        3
 
 #define CPSW_3GF_ALE_PORT_CONTROL_REG_PORT_STATE_MASK	(0x00000003u)
 #define CPSW_3GF_ALE_PORT_CONTROL_REG_DROP_UNTAGGED	(0x00000004u)
@@ -235,20 +232,4 @@ struct cpgmac_sl {
 #define ALE_UCASTTYPE_UCAST_OUI		2
 #define ALE_UCASTTYPE_UCAST_AGETOUCH	3
 
-#define cpsw_setbit_reg(reg, val) \
-        *((volatile u32 *) (reg)) |= (u32) (val)
-	    
-#define cpsw_clearbit_reg(reg, val) \
-        *((volatile u32 *) (reg)) &= ~((u32) (val))
-        
-#define cpsw_set_reg(reg, val) \
-        *((volatile u32 *) (reg)) = (u32) (val)
-        
-#define cpsw_get_reg(reg) \
-        *((volatile u32 *) (reg))
-
-#define cpsw_addr_reg(reg) \
-        ((volatile u32 *) (reg))
-
-#endif /* __ASM_C6X_KEYSTONE_CPSW_H_ */
-
+#endif /* KEYSTONE_CPSW_H */

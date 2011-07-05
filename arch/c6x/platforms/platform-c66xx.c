@@ -221,7 +221,7 @@ static void init_power(void)
 	/* EMIF16 and SPI (C6678 only) */
 	set_psc_state(0, PSC_EMIF25_SPI, PSC_ENABLE);
 #endif
-#ifdef CONFIG_TI_KEYSTONE_PKTDMA
+#ifdef CONFIG_TI_KEYSTONE_NETCP
 	/* NetCP, PA and SA */
         set_psc_state(2, PSC_PA,     PSC_ENABLE);
         set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
@@ -242,8 +242,8 @@ static void init_power(void)
 #endif
 }
 
-#ifdef CONFIG_TI_KEYSTONE_PKTDMA
-#include <mach/netcp.h>
+#ifdef CONFIG_TI_KEYSTONE_NETCP
+#include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
 
 struct netcp_platform_data netcp_data = {
@@ -252,7 +252,7 @@ struct netcp_platform_data netcp_data = {
 };
 
 static struct platform_device netcp_dev0 = {
-	.name           = "keystone_pktdma",
+	.name           = "keystone_netcp",
         .id             = 0,
 	.dev = {
 		.platform_data = &netcp_data,

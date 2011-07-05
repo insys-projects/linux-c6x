@@ -940,29 +940,15 @@ config TI_DAVINCI_EMAC
 	  To compile this driver as a module, choose M here: the module
 	  will be called davinci_emac_driver.  This is recommended.
 
-config TI_KEYSTONE_PKTDMA
-	tristate "TI Keystone Packet DMA"
-	depends on TMS320C66X
+config TI_KEYSTONE_NETCP
+	tristate "TI Keystone NetCP"
+	depends on TI_KEYSTONE
+	select TI_KEYSTONE_PA
+	select TI_KEYSTONE_QM
+	select TI_KEYSTONE_CPSW
+	select TI_KEYSTONE_PKTDMA
 	help
-	  This driver supports TI's Keystone Packet DMA.
-
-config TI_KEYSTONE_PA
-	tristate "TI Keystone Packet Accelerator"
-	depends on TMS320C66X
-	help
-	  This driver supports TI's Keystone Packet Accelerator.
-
-config TI_KEYSTONE_QM
-	tristate "TI Keystone Packet Queue Manager"
-	depends on TMS320C66X
-	help
-	  This driver supports TI's Keystone Queue Manager.
-
-config TI_KEYSTONE_CPSW
-	tristate "TI Keystone CPSW "
-	depends on TMS320C66X
-	help
-	  This driver supports TI's Keystone CPSW.
+	  This driver supports TI's Keystone NetCP network controller
 
 config DM9000
 	tristate "DM9000 support"

@@ -19,14 +19,10 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 
-#include <mach/pa.h>
-#include <mach/netcp.h>
-#include <mach/keystone_qmss.h>
-
 #include <asm/system.h>
 #include <asm/bitops.h>
 
-#define QM_CMD_SIZE (5 * 4)
+#include <mach/keystone_qmss.h>
 
 static DEFINE_MUTEX(qmss_mutex);
 
@@ -87,7 +83,7 @@ u32 hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg)
 		return -EINVAL;
 
 	/* Use kmalloc here to be sure that buffer is aligned on cache line */
-	cmd = (volatile u32 *) kzalloc(QM_CMD_SIZE, GFP_KERNEL);
+	cmd = (volatile u32 *) kzalloc(QM_ACC_CMD_SIZE, GFP_KERNEL);
 	if (cmd == NULL)
 		return -1;
 
@@ -111,7 +107,7 @@ u32 hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg)
 
 	mutex_lock(&qmss_mutex);
 
-	for (index = 0; index < QM_CMD_SIZE; index += 4)
+	for (index = 0; index < QM_ACC_CMD_SIZE; index += 4)
 		*reg-- = *p_cmd--;
 	
 	/* Wait for the command to clear */

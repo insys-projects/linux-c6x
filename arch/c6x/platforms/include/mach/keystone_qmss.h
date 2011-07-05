@@ -91,6 +91,8 @@ enum qmss_queuetype
 #define QM_ACC_CMD_ENABLE       0x81
 #define QM_ACC_CMD_DISABLE      0x80
 
+#define QM_ACC_CMD_SIZE         (5 * 4)
+
 /* Accumulator command interface structure */
 struct qm_acc_cmd_config {
 	/* Accumulator channel affected (0-47) */
@@ -339,6 +341,12 @@ static inline u32 device_local_addr_to_global(u32 addr)
 	
 	return addr;
 }
+
+#define BITMASK(x,y)	                (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
+					   - (u32)1 ))   <<  ((u32)y))
+#define READ_BITFIELD(z,x,y)	        ((((u32)z) & BITMASK(x,y)) >> (y))
+#define SET_BITFIELD(z,f,x,y)	        ((((u32)z) & ~BITMASK(x,y)) |	\
+					 ((((u32)f) << (y)) & BITMASK(x,y)))
 
 /*
  * Use MSM for descriptor/accumulator memory

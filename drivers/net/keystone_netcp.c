@@ -12,7 +12,6 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/io.h>
@@ -32,12 +31,11 @@
 #include <asm/irq.h>
 #include <asm/msmc.h>
 
-#include <mach/pa.h>
-#include <mach/netcp.h>
+#include <mach/keystone_netcp.h>
+#include <mach/keystone_pktdma.h>
+#include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_qmss_firmware.h>
-
-#include "keystone_pktdma.h"
 
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG
@@ -46,7 +44,7 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-#define KEYSTONE_CPSW_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		| \
+#define NETCP_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		| \
 			 NETIF_MSG_DRV		| NETIF_MSG_LINK	| \
 			 NETIF_MSG_IFUP		| NETIF_MSG_INTR	| \
 			 NETIF_MSG_PROBE	| NETIF_MSG_TIMER	| \
@@ -64,20 +62,20 @@
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
 #define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
-#define KEYSTONE_CPSW_MIN_PACKET_SIZE	ETH_ZLEN
-#define KEYSTONE_CPSW_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
+#define NETCP_MIN_PACKET_SIZE	ETH_ZLEN
+#define NETCP_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
-static int rx_packet_max = KEYSTONE_CPSW_MAX_PACKET_SIZE;
+static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
 MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
 
 static int debug_level;
 module_param(debug_level, int, 0);
-MODULE_PARM_DESC(debug_level, "keystone cpsw debug level (NETIF_MSG bits)");
+MODULE_PARM_DESC(debug_level, "keystone NetCP debug level (NETIF_MSG bits)");
 
 static struct timer_list poll_timer;
 
-struct keystone_cpsw_priv {
+struct netcp_priv {
 	spinlock_t			lock;
 	struct platform_device		*pdev;
 	struct net_device		*ndev;
@@ -144,9 +142,9 @@ static int __init get_mac_addr_from_cmdline(char *str)
 __setup("emac_addr=", get_mac_addr_from_cmdline);
 
 /*
- * Cleanup queues used by the PKTDMA
+ * Cleanup queues used by the QMSS/PKTDMA
  */
-static void cpdma_cleanup_qs(struct net_device *ndev)
+static void netcp_cleanup_qs(struct net_device *ndev)
 {
 	struct qm_host_desc *hd = NULL;
 
@@ -155,16 +153,16 @@ static void cpdma_cleanup_qs(struct net_device *ndev)
 }
 
 /*
- * Initialize queues used by the PKTDMA
+ * Initialize queues used by the QMSS/PKTDMA
  */
-static void cpdma_init_qs(struct net_device *ndev)
+static void netcp_init_qs(struct net_device *ndev)
 {
 	u32 i;
 	struct qm_host_desc *hd;
 	struct sk_buff      *skb;
 
 	for (i = 0; i < DEVICE_NUM_RX_DESCS; i++) {
-		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
+		skb = netdev_alloc_skb_ip_align(ndev, NETCP_MAX_PACKET_SIZE);
 
 		hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
 
@@ -178,231 +176,8 @@ static void cpdma_init_qs(struct net_device *ndev)
 		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);		
 
 		L2_cache_block_writeback_invalidate((u32) skb->data,
-						    (u32) skb->data + KEYSTONE_CPSW_MAX_PACKET_SIZE);
+						    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 	}
-}
-
-/* 
- * Disable all rx channels and clear all the flow registers
- * The teardown is initiated and polled for completion. The function will
- * return an error if the teardown is never complete, but will not stay
- * in the function forever.
- */
-int cpdma_rx_disable(struct cpdma_rx_cfg *cfg)
-{
-	u32 i, v;
-	u32 done;
-
-	for (i = 0; i < cfg->n_rx_chans; i++) {
-		/* If enabled, set the teardown bit */
-		v = __raw_readl(cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
-		if ((v & CPDMA_REG_VAL_RCHAN_A_RX_ENABLE) == CPDMA_REG_VAL_RCHAN_A_RX_ENABLE ) {
-			v = v | CPDMA_REG_VAL_RCHAN_A_RX_TDOWN;
-			__raw_writel(v, cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
-		}
-	}
-
-	/* Poll for completion */
-	for (i = 0, done = 0; ( (i < cfg->tdown_poll_count) && (done == 0) ); i++) {
-		udelay(1000);
-		done = 1;
-		v = __raw_readl(cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
-		if ((v & CPDMA_REG_VAL_RCHAN_A_RX_ENABLE) == CPDMA_REG_VAL_RCHAN_A_RX_ENABLE)
-			done = 0;
-	}
-
-	if (done == 0)
-		return -1;
-
-	/* Clear all of the flow registers */
-	for (i = 0; i < cfg->nrx_flows; i++)  {
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, i));
-		__raw_writel(0, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, i));
-	}
-
-	return 0;
-}
-
-/*
- * Configure the CPDMA receive
- */
-int cpdma_rx_config(struct cpdma_rx_cfg *cfg)
-{
-	u32 v;
-	u32 i;
-	int ret = 0;
-#ifdef EMAC_ARCH_HAS_INTERRUPT
-	struct qm_acc_cmd_config acc_cmd_cfg;
-	int                      num_acc_entries = (DEVICE_RX_INT_THRESHOLD + 1) * 2;
-#endif
-
-	if (cpdma_rx_disable(cfg) != 0)
-		return -1;
-	
-#ifdef EMAC_ARCH_HAS_INTERRUPT
-	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_rx = (u32*) qm_mem_alloc(num_acc_entries << 2,
-					       (u32*)&acc_list_phys_addr_rx);
-	if (acc_list_addr_rx == NULL) {
-		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-	memset((void *) acc_list_addr_rx, 0, num_acc_entries << 2);
-
-	/*
-	 * Setup Rx accumulator configuration for receive 
-	 */
-	acc_cmd_cfg.channel          = DEVICE_QM_ETH_ACC_RX_CHANNEL;
-	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
-	acc_cmd_cfg.queue_mask       = 0;  /* none */
-	acc_cmd_cfg.list_addr        = (u32) acc_list_phys_addr_rx;
-	acc_cmd_cfg.queue_index      = cfg->queue_rx;
-	acc_cmd_cfg.max_entries      = DEVICE_RX_INT_THRESHOLD + 1;
-	acc_cmd_cfg.timer_count      = 40;
-	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
-	acc_cmd_cfg.list_entry_size  = 0;  /* D registers */
-	acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
-	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
-	
-	ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
-
-	if (ret != 0) {
-		printk(KERN_ERR "%s: NetCP accumulator config failed (%d)\n",
-		       __FUNCTION__, ret);
-		return ret;
-	}
-#endif
-
-	/*
-	 * Configure the flow
-	 * The flow is configured to not pass extended info
-	 * or psinfo, with descriptor type host
-	 */
-	v = CPDMA_REG_VAL_MAKE_RX_FLOW_A(1,                     /* extended info passed */
-                                         1,                     /* psinfo passed */
-                                         0,
-                                         CPDMA_DESC_TYPE_HOST,  /* Host type descriptor */
-                                         0,                     /* PS located in descriptor */
-                                         0,                     /* SOP offset */
-                                         cfg->qmnum_rx,
-                                         cfg->queue_rx);        /* Rx packet destination queue */
-
-
-	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_A, 0));
-
-	__raw_writel(CPDMA_REG_VAL_RX_FLOW_B_DEFAULT,
-		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_B, 0));
-
-	__raw_writel(CPDMA_REG_VAL_RX_FLOW_C_DEFAULT,
-		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_C, 0));
-
-	v = CPDMA_REG_VAL_MAKE_RX_FLOW_D(cfg->qmnum_free_buf,
-					 cfg->queue_free_buf,
-					 cfg->qmnum_free_buf,
-					 cfg->queue_free_buf);
-
-	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_D, 0));
-    
-	/* Register E uses the same setup as D */
-	__raw_writel(v, cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_E, 0));
-	
-	__raw_writel(CPDMA_REG_VAL_RX_FLOW_F_DEFAULT,
-		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_F, 0));
-	
-	__raw_writel(CPDMA_REG_VAL_RX_FLOW_G_DEFAULT,
-		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_G, 0));
-	
-	__raw_writel(CPDMA_REG_VAL_RX_FLOW_H_DEFAULT,
-		     cfg->flow_base + CPDMA_RX_FLOW_CFG(CPDMA_RX_FLOW_REG_H, 0));
-	
-	/* Enable the rx channels */
-	for (i = 0; i < cfg->n_rx_chans; i++) 
-		__raw_writel(CPDMA_REG_VAL_RCHAN_A_RX_ENABLE,
-			     cfg->rx_base + CPDMA_REG_RCHAN_CFG_REG_A(i));
-
-	return ret;
-}
-
-/*
- * The transmit channels are enabled
- */
-int cpdma_tx_config(struct cpdma_tx_cfg *cfg)
-{
-	u32                      i;
-#ifdef EMAC_ARCH_HAS_INTERRUPT
-	struct qm_acc_cmd_config acc_cmd_cfg;
-	int                      num_acc_entries = (DEVICE_TX_INT_THRESHOLD + 1) * 2;
-	int                      ret;
-
-	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_tx      = acc_list_addr_rx + ((DEVICE_RX_INT_THRESHOLD + 1) * 2);
-	acc_list_phys_addr_tx = acc_list_phys_addr_rx + ((DEVICE_RX_INT_THRESHOLD + 1) * 2);
-
-	memset((void *) acc_list_addr_tx , 0, num_acc_entries << 2);
-
-	/*
-	 * Setup Rx accumulator configuration for receive 
-	 */
-	acc_cmd_cfg.channel          = DEVICE_QM_ETH_ACC_TX_CHANNEL;
-	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
-	acc_cmd_cfg.queue_mask       = 0;  /* none */
-	acc_cmd_cfg.list_addr        = (u32) acc_list_phys_addr_tx;
-	acc_cmd_cfg.queue_index      = cfg->queue_tx;
-	acc_cmd_cfg.max_entries      = DEVICE_TX_INT_THRESHOLD + 1;
-	acc_cmd_cfg.timer_count      = 40;
-	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
-	acc_cmd_cfg.list_entry_size  = 0;  /* D registers */
-	acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
-	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
-	
-	ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
-
-	if (ret != 0) {
-		printk(KERN_ERR "%s: NetCP accumulator config failed (%d)\n",
-		       __FUNCTION__, ret);
-		return ret;
-	}
-#endif
-
-	/* Disable loopback in the tx direction */
-	__raw_writel(CPDMA_REG_VAL_EMU_CTL_NO_LOOPBACK,
-		     cfg->gbl_ctl_base + CPDMA_REG_EMU_CTL);
-
-	/* Enable all channels. The current state isn't important */
-	for (i = 0; i < cfg->n_tx_chans; i++) {
-		__raw_writel(0, cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_B(i));  /* Priority */
-		__raw_writel(CPDMA_REG_VAL_TCHAN_A_TX_ENABLE,
-			     cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
-	}
-
-	return 0;
-}
-
-/*
- * The transmit channels are disabled
- */
-int cpdma_tx_disable(struct cpdma_tx_cfg *cfg)
-{
-	u32 i, v;
-
-	for (i = 0; i < cfg->n_tx_chans; i++) {
-		v = __raw_readl(cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
-		
-		if ((v & CPDMA_REG_VAL_TCHAN_A_TX_ENABLE) ==
-		    CPDMA_REG_VAL_TCHAN_A_TX_ENABLE) {
-			v = v | CPDMA_REG_VAL_TCHAN_A_TX_TDOWN;
-			__raw_writel(v, cfg->tx_base + CPDMA_REG_TCHAN_CFG_REG_A(i));
-		}
-	}
-
-	return 0;
 }
 
 /*
@@ -536,7 +311,7 @@ static inline void netcp_tx_irq_ack(struct net_device *ndev)
 /*
  * Release transmitted packets
  */
-static int pktdma_tx(struct net_device *ndev)
+static int netcp_tx(struct net_device *ndev)
 {
 	struct qm_host_desc *hd       = NULL;
 	int                  released = 0;
@@ -557,14 +332,14 @@ static int pktdma_tx(struct net_device *ndev)
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	PKTDMA_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
+#define	NETCP_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
-#define PKTDMA_TX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)
+#define NETCP_TX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)
 #endif
 
 	/* Main loop */
-	while ((hd = PKTDMA_TX_LOOP_ITERATOR()) && (hd != NULL)) {
+	while ((hd = NETCP_TX_LOOP_ITERATOR()) && (hd != NULL)) {
 		struct sk_buff *skb = (struct sk_buff*) hd->private;
 
 		/* Release the attached sk_buff */
@@ -596,7 +371,7 @@ static int pktdma_tx(struct net_device *ndev)
 /*
  * Pop an incoming packet
  */
-static int pktdma_rx(struct net_device *ndev,
+static int netcp_rx(struct net_device *ndev,
 		     unsigned int *work_done,
 		     unsigned int work_to_do)
 {
@@ -621,14 +396,14 @@ static int pktdma_rx(struct net_device *ndev,
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	PKTDMA_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
+#define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
-#define PKTDMA_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
+#define NETCP_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
 #endif
 
 	/* Main loop */
-	while ((hd = PKTDMA_RX_LOOP_ITERATOR()) && (hd != NULL)) {
+	while ((hd = NETCP_RX_LOOP_ITERATOR()) && (hd != NULL)) {
 
 		if (unlikely(work_done && *work_done >= work_to_do))
 			return 0;
@@ -649,7 +424,7 @@ static int pktdma_rx(struct net_device *ndev,
 		skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
 		
 		/* Allocate a new skb */
-		skb = netdev_alloc_skb_ip_align(ndev, KEYSTONE_CPSW_MAX_PACKET_SIZE);
+		skb = netdev_alloc_skb_ip_align(ndev, NETCP_MAX_PACKET_SIZE);
 		if (skb != NULL) {
 			/* Attach the new one */
 			hd->buff_len      = skb_tailroom(skb);
@@ -661,7 +436,7 @@ static int pktdma_rx(struct net_device *ndev,
 			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
 
 			L2_cache_block_writeback_invalidate((u32) skb->data,
-							    (u32) skb->data + KEYSTONE_CPSW_MAX_PACKET_SIZE);
+							    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 		}
 		
 		/* Fill statistic */
@@ -680,10 +455,10 @@ static int pktdma_rx(struct net_device *ndev,
 /*
  * Rx interrupt handling functions
  */
-static irqreturn_t pktdma_rx_interrupt(int irq, void *netdev_id)
+static irqreturn_t netcp_rx_interrupt(int irq, void *netdev_id)
 {
 	struct net_device         *ndev = (struct net_device *) netdev_id;
-	struct keystone_cpsw_priv *p    = netdev_priv(ndev);
+	struct netcp_priv *p    = netdev_priv(ndev);
 
 	if (likely(napi_schedule_prep(&p->napi))) {
 		__napi_schedule(&p->napi);
@@ -694,11 +469,11 @@ static irqreturn_t pktdma_rx_interrupt(int irq, void *netdev_id)
 /*
  * Tx interrupt handling functions
  */
-static irqreturn_t pktdma_tx_interrupt(int irq, void *netdev_id)
+static irqreturn_t netcp_tx_interrupt(int irq, void *netdev_id)
 {
 	struct net_device *ndev = (struct net_device *) netdev_id;
 
-	pktdma_tx(ndev);
+	netcp_tx(ndev);
 	netcp_tx_irq_ack(ndev);
 
 	return IRQ_HANDLED;
@@ -707,13 +482,13 @@ static irqreturn_t pktdma_tx_interrupt(int irq, void *netdev_id)
 /*
  * NAPI poll
  */
-static int pktdma_poll(struct napi_struct *napi, int budget)
+static int netcp_poll(struct napi_struct *napi, int budget)
 {
-	struct keystone_cpsw_priv *p = 
-		container_of(napi, struct keystone_cpsw_priv, napi);
+	struct netcp_priv *p = 
+		container_of(napi, struct netcp_priv, napi);
 	unsigned int work_done = 0;
 
-	pktdma_rx(p->ndev, &work_done, budget);
+	netcp_rx(p->ndev, &work_done, budget);
 	
 	/* If budget not fully consumed, exit the polling mode */
 	if (work_done < budget) {
@@ -727,11 +502,11 @@ static int pktdma_poll(struct napi_struct *napi, int budget)
 /*
  * Poll the device
  */
-static void keystone_ndo_poll_controller(struct net_device *ndev)
+static void netcp_ndo_poll_controller(struct net_device *ndev)
 {
 	netcp_irq_disable(ndev);
-	pktdma_rx_interrupt(ndev->irq, ndev);
-	pktdma_tx_interrupt(ndev->irq, ndev);
+	netcp_rx_interrupt(ndev->irq, ndev);
+	netcp_tx_interrupt(ndev->irq, ndev);
 	netcp_irq_enable(ndev);
 
 	if (ndev->irq == -1) {
@@ -743,7 +518,7 @@ static void keystone_ndo_poll_controller(struct net_device *ndev)
 /*
  * Push an outcoming packet
  */
-static int keystone_ndo_start_xmit(struct sk_buff *skb,
+static int netcp_ndo_start_xmit(struct sk_buff *skb,
 				   struct net_device *ndev)
 {
 	int                  ret;
@@ -751,14 +526,14 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 	struct qm_host_desc *hd;
 	int                  loop = 0;
 
-	if (unlikely(pkt_len < KEYSTONE_CPSW_MIN_PACKET_SIZE)) {
-		ret = skb_padto(skb, KEYSTONE_CPSW_MIN_PACKET_SIZE);
+	if (unlikely(pkt_len < NETCP_MIN_PACKET_SIZE)) {
+		ret = skb_padto(skb, NETCP_MIN_PACKET_SIZE);
 		if (unlikely(ret < 0)) {
 			printk(KERN_WARNING "%s: packet padding failed\n", ndev->name);
 			netif_stop_queue(ndev);
 			return NETDEV_TX_BUSY;
 		}
-		pkt_len = KEYSTONE_CPSW_MIN_PACKET_SIZE;
+		pkt_len = NETCP_MIN_PACKET_SIZE;
 	}
 
 	/* Spin a little bit if free queue is empty until we get free desc */
@@ -811,7 +586,7 @@ static int keystone_ndo_start_xmit(struct sk_buff *skb,
 /*
  * Change receive flags
  */
-static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
+static void netcp_ndo_change_rx_flags(struct net_device *ndev, int flags)
 {
 	if ((flags & IFF_PROMISC) && (ndev->flags & IFF_PROMISC))
 		dev_err(&ndev->dev, "promiscuity ignored!\n");
@@ -823,9 +598,9 @@ static void keystone_ndo_change_rx_flags(struct net_device *ndev, int flags)
 /*
  * Open the device
  */
-static int keystone_ndo_open(struct net_device *ndev)
+static int netcp_ndo_open(struct net_device *ndev)
 {
-	struct keystone_cpsw_priv *p = netdev_priv(ndev);
+	struct netcp_priv *p = netdev_priv(ndev);
 	
 	/* Start EMAC */
 	cpmac_drv_start();
@@ -839,7 +614,7 @@ static int keystone_ndo_open(struct net_device *ndev)
 	if (ndev->irq == -1) {
 		/* Use timeout to poll */
 		init_timer(&poll_timer);
-		poll_timer.function = keystone_ndo_poll_controller;
+		poll_timer.function = netcp_ndo_poll_controller;
 		poll_timer.data     = (unsigned long) ndev;
 		mod_timer(&poll_timer,
 			  jiffies + msecs_to_jiffies(DEVICE_POLLING_PERIOD_MSEC));
@@ -852,9 +627,9 @@ static int keystone_ndo_open(struct net_device *ndev)
 /*
  * Close the device
  */
-static int keystone_ndo_stop(struct net_device *ndev)
+static int netcp_ndo_stop(struct net_device *ndev)
 {
-	struct keystone_cpsw_priv *p = netdev_priv(ndev);
+	struct netcp_priv *p = netdev_priv(ndev);
 
 	netcp_irq_disable(ndev);
 
@@ -869,7 +644,7 @@ static int keystone_ndo_stop(struct net_device *ndev)
 /*
  * Transmit timeout: if tx queue is stopped since a long time
  */
-static void keystone_ndo_tx_timeout(struct net_device *ndev)
+static void netcp_ndo_tx_timeout(struct net_device *ndev)
 {
 	printk(KERN_WARNING "%s: transmit timed out\n", ndev->name);
 	ndev->stats.tx_errors++;
@@ -878,70 +653,70 @@ static void keystone_ndo_tx_timeout(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
-static void keystone_cpsw_get_drvinfo(struct net_device *ndev,
+static void netcp_get_drvinfo(struct net_device *ndev,
 			     struct ethtool_drvinfo *info)
 {
-	strcpy(info->driver, "TI KEYSTONE CPSW Driver");
+	strcpy(info->driver, "TI KeyStone NetCP Driver");
 	strcpy(info->version, "v1.0");
 }
 
-static u32 keystone_cpsw_get_msglevel(struct net_device *ndev)
+static u32 netcp_get_msglevel(struct net_device *ndev)
 {
-	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
+	struct netcp_priv *priv = netdev_priv(ndev);
 	return priv->msg_enable;
 }
 
-static void keystone_cpsw_set_msglevel(struct net_device *ndev, u32 value)
+static void netcp_set_msglevel(struct net_device *ndev, u32 value)
 {
-	struct keystone_cpsw_priv *priv = netdev_priv(ndev);
+	struct netcp_priv *priv = netdev_priv(ndev);
 	priv->msg_enable = value;
 }
 
-static const struct ethtool_ops keystone_cpsw_ethtool_ops = {
-	.get_drvinfo	= keystone_cpsw_get_drvinfo,
-	.get_msglevel	= keystone_cpsw_get_msglevel,
-	.set_msglevel	= keystone_cpsw_set_msglevel
+static const struct ethtool_ops netcp_ethtool_ops = {
+	.get_drvinfo	= netcp_get_drvinfo,
+	.get_msglevel	= netcp_get_msglevel,
+	.set_msglevel	= netcp_set_msglevel
 };
 
 static const struct net_device_ops keystone_netdev_ops = {
-	.ndo_open		= keystone_ndo_open,
-	.ndo_stop		= keystone_ndo_stop,
-	.ndo_start_xmit		= keystone_ndo_start_xmit,
-	.ndo_change_rx_flags	= keystone_ndo_change_rx_flags,
+	.ndo_open		= netcp_ndo_open,
+	.ndo_stop		= netcp_ndo_stop,
+	.ndo_start_xmit		= netcp_ndo_start_xmit,
+	.ndo_change_rx_flags	= netcp_ndo_change_rx_flags,
 	.ndo_change_mtu		= eth_change_mtu,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_tx_timeout		= keystone_ndo_tx_timeout,
+	.ndo_tx_timeout		= netcp_ndo_tx_timeout,
 #ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller	= keystone_ndo_poll_controller,
+	.ndo_poll_controller	= netcp_ndo_poll_controller,
 #endif
 };
 
-static int __devinit pktdma_probe(struct platform_device *pdev)
+static int __devinit netcp_probe(struct platform_device *pdev)
 {
 	struct netcp_platform_data *data = pdev->dev.platform_data;
 	struct net_device	   *ndev;
-	struct keystone_cpsw_priv  *priv;
+	struct netcp_priv  *priv;
 	int                         i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
 #endif
 	u32                         acc_ram;
-	struct cpdma_rx_cfg	    c_rx_cfg;
-	struct cpdma_tx_cfg	    c_tx_cfg;
+	struct pktdma_rx_cfg	    c_rx_cfg;
+	struct pktdma_tx_cfg	    c_tx_cfg;
 	struct qm_config	    c_q_cfg;
-	struct cpdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
-	struct cpdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
+	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
+	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
 	struct qm_config	   *q_cfg  = &c_q_cfg; 
 
 	if (!data) {
-		pr_err("keystone cpsw: platform data missing\n");
+		pr_err("KeyStone NetCP: platform data missing\n");
 		return -ENODEV;
 	}
 
-	ndev = alloc_etherdev(sizeof(struct keystone_cpsw_priv));
+	ndev = alloc_etherdev(sizeof(struct netcp_priv));
 	if (!ndev) {
-		pr_err("keystone cpsw: error allocating net_device\n");
+		pr_err("KeyStone NetCP: error allocating net_device\n");
 		return -ENOMEM;
 	}
 
@@ -952,7 +727,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	priv->pdev = pdev;
 	priv->ndev = ndev;
 	priv->dev  = &ndev->dev;
-	priv->msg_enable = netif_msg_init(debug_level, KEYSTONE_CPSW_DEBUG);
+	priv->msg_enable = netif_msg_init(debug_level, NETCP_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
@@ -1015,19 +790,59 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	rx_cfg->qmnum_rx         = 0;
 	rx_cfg->queue_rx         = DEVICE_QM_ETH_RX_Q;
 	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
+#ifndef EMAC_ARCH_HAS_INTERRUPT
+	rx_cfg->use_acc          = 0;
+#else
+	rx_cfg->use_acc          = 1;
+	rx_cfg->acc_threshold    = DEVICE_RX_INT_THRESHOLD;
+	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
+	
+	/* Set the accumulator list memory in the descriptor memory */
+	acc_list_addr_rx = (u32*) qm_mem_alloc(((rx_cfg->acc_threshold + 1) * 2) << 2,
+					       (u32*)&acc_list_phys_addr_rx);
+	if (acc_list_addr_rx == NULL) {
+		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
+	memset((void *) acc_list_addr_rx, 0, ((rx_cfg->acc_threshold + 1) * 2) << 2);
+	
+	rx_cfg->acc_list_addr      = (u32) acc_list_addr_rx;
+	rx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_rx;
+#endif
 
-	cpdma_rx_config(rx_cfg);
+	pktdma_rx_config(rx_cfg);
 
 	tx_cfg->gbl_ctl_base     = DEVICE_PA_CDMA_GLOBAL_CFG_BASE;
 	tx_cfg->tx_base          = DEVICE_PA_CDMA_TX_CHAN_CFG_BASE;
 	tx_cfg->n_tx_chans       = DEVICE_PA_CDMA_TX_NUM_CHANNELS;
 	tx_cfg->queue_tx         = DEVICE_QM_ETH_TX_CP_Q;
+#ifndef EMAC_ARCH_HAS_INTERRUPT
+	tx_cfg->use_acc          = 0;
+#else
+	tx_cfg->use_acc          = 1;
+	tx_cfg->acc_threshold    = DEVICE_TX_INT_THRESHOLD;
+	tx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_TX_CHANNEL;
+	
+	/* Set the accumulator list memory in the descriptor memory */
+	acc_list_addr_tx = (u32*) qm_mem_alloc(((tx_cfg->acc_threshold + 1) * 2) << 2,
+					       (u32*)&acc_list_phys_addr_tx);
+	if (acc_list_addr_tx == NULL) {
+		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
+	memset((void *) acc_list_addr_tx, 0, ((tx_cfg->acc_threshold + 1) * 2) << 2);
+	
+	tx_cfg->acc_list_addr      = (u32) acc_list_addr_tx;
+	tx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_tx;
+#endif
 
-	cpdma_tx_config(tx_cfg);
+	pktdma_tx_config(tx_cfg);
 
-	/* Initialize PKTDMA queues */
-	cpdma_cleanup_qs(ndev);
-	cpdma_init_qs(ndev);
+	/* Initialize QMSS/PKTDMA queues */
+	netcp_cleanup_qs(ndev);
+	netcp_init_qs(ndev);
 
 	/* Stop EMAC */
 	cpmac_drv_stop();
@@ -1046,13 +861,13 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	ether_setup(ndev);
 
 	/* NAPI register */
-	netif_napi_add(ndev, &priv->napi, pktdma_poll, DEVICE_NAPI_WEIGHT);
+	netif_napi_add(ndev, &priv->napi, netcp_poll, DEVICE_NAPI_WEIGHT);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* Register interrupts */
-	ret = request_irq(data->rx_irq, pktdma_rx_interrupt, 0, ndev->name, ndev);
+	ret = request_irq(data->rx_irq, netcp_rx_interrupt, 0, ndev->name, ndev);
 	if (ret == 0) {
-		ret = request_irq(data->tx_irq, pktdma_tx_interrupt, 0, ndev->name, ndev);
+		ret = request_irq(data->tx_irq, netcp_tx_interrupt, 0, ndev->name, ndev);
 		if (ret != 0) {
 			printk(KERN_ERR "%s: irq %d register failed (%d)\n",
 			       __FUNCTION__, data->tx_irq, ret);
@@ -1074,7 +889,7 @@ static int __devinit pktdma_probe(struct platform_device *pdev)
 	ndev->watchdog_timeo = DEVICE_TX_TIMEOUT;
 	ndev->netdev_ops     = &keystone_netdev_ops;
 
-	SET_ETHTOOL_OPS(ndev, &keystone_cpsw_ethtool_ops);
+	SET_ETHTOOL_OPS(ndev, &netcp_ethtool_ops);
 	SET_NETDEV_DEV(ndev, &pdev->dev);
 
 	ret = register_netdev(ndev);
@@ -1091,7 +906,7 @@ clean_ndev_ret:
 	return ret;
 }
 
-static int __devexit pktdma_remove(struct platform_device *pdev)
+static int __devexit netcp_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	
@@ -1103,42 +918,42 @@ static int __devexit pktdma_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int pktdma_suspend(struct device *dev)
+static int netcp_suspend(struct device *dev)
 {
 	return 0;
 }
 
-static int pktdma_resume(struct device *dev)
+static int netcp_resume(struct device *dev)
 {
 	return 0;
 }
 
-static const struct dev_pm_ops pktdma_pm_ops = {
-	.suspend	= pktdma_suspend,
-	.resume		= pktdma_resume,
+static const struct dev_pm_ops netcp_pm_ops = {
+	.suspend	= netcp_suspend,
+	.resume		= netcp_resume,
 };
 
-static struct platform_driver pktdma_driver = {
+static struct platform_driver netcp_driver = {
 	.driver = {
-		.name	 = "keystone_pktdma",
+		.name	 = "keystone_netcp",
 		.owner	 = THIS_MODULE,
-		.pm	 = &pktdma_pm_ops,
+		.pm	 = &netcp_pm_ops,
 	},
-	.probe = pktdma_probe,
-	.remove = __devexit_p(pktdma_remove),
+	.probe = netcp_probe,
+	.remove = __devexit_p(netcp_remove),
 };
 
-static int __init pktdma_init(void)
+static int __init netcp_init(void)
 {
-	return platform_driver_register(&pktdma_driver);
+	return platform_driver_register(&netcp_driver);
 }
-module_init(pktdma_init);
+module_init(netcp_init);
 
-static void __exit pktdma_exit(void)
+static void __exit netcp_exit(void)
 {
-	platform_driver_unregister(&pktdma_driver);
+	platform_driver_unregister(&netcp_driver);
 }
-module_exit(pktdma_exit);
+module_exit(netcp_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("TI Keystone Packet DMA driver");
+MODULE_DESCRIPTION("TI Keystone NetCP driver");
