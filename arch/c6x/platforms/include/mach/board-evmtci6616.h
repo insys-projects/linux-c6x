@@ -14,7 +14,7 @@
 /* 
  * Board memory
  */
-#define BOARD_RAM_SIZE	0x20000000
+#define BOARD_RAM_SIZE	  0x20000000
 
 /* 
  * PLL settings
@@ -22,20 +22,20 @@
 #define PLL_MUL           8
 #define PLL_DIV2          3
 #define PLL_DIV5          5
-#define PLL_DIV8         64
+#define PLL_DIV8          64
 #define PLL_OUTDIV        2
 
 /* 
  * I2C bus specs 
  */
-#define ARCH_I2C_FREQ   100   /* KHz  */
+#define ARCH_I2C_FREQ     100 /* KHz  */
 #define ARCH_I2C_DELAY    0   /* usec */
 
 /*
  * Timer definitions
  */
-#define LINUX_TIMER_SRC (TIMER_0 + get_coreid())
-#define LINUX_TIMER_IRQ IRQ_TINT
+#define LINUX_TIMER_SRC   (TIMER_0 + get_coreid())
+#define LINUX_TIMER_IRQ   IRQ_TINT
 
 /*
  * EVM FPGA and LED definitions

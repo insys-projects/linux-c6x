@@ -332,7 +332,7 @@ static struct davinci_spi_platform_data evm_spi0_pdata = {
 	.poll_mode	= 0, /* 0 -> interrupt mode, 1-> polling mode */
 	.c2tdelay	= 0,
 	.t2cdelay	= 0,
-	.use_dma        = 1, /* use EDMA */
+	.use_dma        = 0, /* use EDMA */
 };
 
 static struct platform_device evm_spi0_device = {
@@ -462,7 +462,7 @@ static struct i2c_driver evm_fpga_driver = {
  */
 static struct mutex	  leds_lock;
 static struct work_struct leds_work;
-static u8                 evm_leds_state[3]    = { -1, -1, -1 };
+static char               evm_leds_state[3]    = { -1, -1, -1 };
 static u8                 evm_leds_started     = 0;
 static u8                 evm_leds_initialized = 0;
 
@@ -539,20 +539,9 @@ static void evm_leds_timer(unsigned long dummy)
 }
 
 /*
- * Idle LED blink
+ * Idle LED blink: LEDs are async due to I2C thus this feature cannot be impemented
  */
-void c6x_arch_idle_led(int state)
-{
-#if 0
-	if (state)
-		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_RED;
-	else
-		evm_leds_state[EVM_LED_IDLE_NUM] = EVM_LED_OFF;
-
-	if (likely(evm_leds_started))
-		schedule_work(&leds_work);
-#endif
-}
+void c6x_arch_idle_led(int state) {}
 
 #endif /* CONFIG_IDLE_LED */
 
