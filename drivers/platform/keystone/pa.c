@@ -18,9 +18,11 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 
-#include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
+#include <mach/keystone_pa.h>
 #include <mach/keystone_netcp.h>
+#include <linux/keystone/pa.h>
+#include <linux/keystone/qmss.h>
 
 int keystone_pa_reset(void)
 {

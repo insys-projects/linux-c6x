@@ -232,4 +232,9 @@ struct cpgmac_sl {
 #define ALE_UCASTTYPE_UCAST_OUI		2
 #define ALE_UCASTTYPE_UCAST_AGETOUCH	3
 
+/* 
+ * Prototypes
+ */
+int cpsw_init (u8 macaddress[2][6]);
+
 #endif /* KEYSTONE_CPSW_H */

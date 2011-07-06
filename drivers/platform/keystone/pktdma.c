@@ -17,10 +17,10 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 
-#include <mach/keystone_pktdma.h>
 #include <mach/keystone_qmss.h>
-
-#include "pktdma.h"
+#include <mach/keystone_pktdma.h>
+#include <linux/keystone/pktdma.h>
+#include <linux/keystone/qmss.h>
 
 /* 
  * Disable all rx channels and clear all the flow registers

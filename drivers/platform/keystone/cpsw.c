@@ -17,13 +17,14 @@
 #include <linux/types.h>
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
+#include <linux/keystone/cpsw.h>
 
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 
 #include <mach/keystone_cpsw.h>
-#include "cpsw.h"
+
 
 static int find_ale_next_free_entry(void)
 {

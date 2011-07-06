@@ -21,34 +21,34 @@
 /*
  * SGMII registers
  */
-#define SGMII_BASE_ADDRESS	        { 0x02090100, 0x02090200 }
-#define SGMII_IDVER_REG(x)	        (0x02090100 + (x * 0x100) + 0x000)
-#define SGMII_SRESET_REG(x)	        (0x02090100 + (x * 0x100) + 0x004)
-#define SGMII_CTL_REG(x)	        (0x02090100 + (x * 0x100) + 0x010)
-#define SGMII_STATUS_REG(x)	        (0x02090100 + (x * 0x100) + 0x014)
-#define SGMII_MRADV_REG(x)	        (0x02090100 + (x * 0x100) + 0x018)
-#define SGMII_LPADV_REG(x)	        (0x02090100 + (x * 0x100) + 0x020)
-#define SGMII_TXCFG_REG(x)	        (0x02090100 + (x * 0x100) + 0x030)
-#define SGMII_RXCFG_REG(x)	        (0x02090100 + (x * 0x100) + 0x034)
-#define SGMII_AUXCFG_REG(x)	        (0x02090100 + (x * 0x100) + 0x038)
+#define SGMII_BASE_ADDRESS	                { 0x02090100, 0x02090200 }
+#define SGMII_IDVER_REG(x)	                (0x02090100 + (x * 0x100) + 0x000)
+#define SGMII_SRESET_REG(x)	                (0x02090100 + (x * 0x100) + 0x004)
+#define SGMII_CTL_REG(x)	                (0x02090100 + (x * 0x100) + 0x010)
+#define SGMII_STATUS_REG(x)	                (0x02090100 + (x * 0x100) + 0x014)
+#define SGMII_MRADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x018)
+#define SGMII_LPADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x020)
+#define SGMII_TXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x030)
+#define SGMII_RXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x034)
+#define SGMII_AUXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x038)
 
-#define SGMII_REG_STATUS_FIELD_LOCK	(1<<4)
+#define SGMII_REG_STATUS_FIELD_LOCK	        (1<<4)
 
-#define CPSW_CTL_P2_PASS_PRI_TAGGED	(1 << 5)
-#define CPSW_CTL_P1_PASS_PRI_TAGGED	(1 << 4)
-#define CPSW_CTL_P0_PASS_PRI_TAGGED	(1 << 3)
-#define CPSW_CTL_P0_ENABLE		(1 << 2)
-#define CPSW_CTL_VLAN_AWARE		(1 << 1)
-#define CPSW_CTL_FIFO_LOOPBACK		(1 << 0)
+#define CPSW_CTL_P2_PASS_PRI_TAGGED	        (1 << 5)
+#define CPSW_CTL_P1_PASS_PRI_TAGGED	        (1 << 4)
+#define CPSW_CTL_P0_PASS_PRI_TAGGED	        (1 << 3)
+#define CPSW_CTL_P0_ENABLE		        (1 << 2)
+#define CPSW_CTL_VLAN_AWARE		        (1 << 1)
+#define CPSW_CTL_FIFO_LOOPBACK		        (1 << 0)
 
-#define DEVICE_CPSW_BASE		(0x02090800)
+#define DEVICE_CPSW_BASE		        (0x02090800)
 
 /* Register offsets */
-#define CPSW_REG_CTL			0x004
-#define CPSW_REG_STAT_PORT_EN		0x00c
-#define CPSW_REG_MAXLEN			0x040
-#define CPSW_REG_ALE_CONTROL		0x608
-#define CPSW_REG_ALE_PORTCTL(x)		(0x640 + (x)*4)
+#define CPSW_REG_CTL			        0x004
+#define CPSW_REG_STAT_PORT_EN		        0x00c
+#define CPSW_REG_MAXLEN			        0x040
+#define CPSW_REG_ALE_CONTROL		        0x608
+#define CPSW_REG_ALE_PORTCTL(x)		        (0x640 + (x)*4)
 
 /* Register values */
 #define CPSW_REG_VAL_STAT_ENABLE_ALL		0xf
@@ -107,7 +107,7 @@ struct netcp_platform_data {
 #define EMAC_ARCH_HAS_INTERRUPT
 #define EMAC_ARCH_HAS_MAC_ADDR
 #define EFUSE_REG_MAC_ADDR	        0x2620110
-#define emac_arch_get_mac_addr	emac_arch_get_mac_addr_from_efuse
+#define emac_arch_get_mac_addr  	emac_arch_get_mac_addr_from_efuse
 
 /* Read the e-fuse value as 32 bit values to be endian independent */
 static int inline emac_arch_get_mac_addr_from_efuse(char *x)

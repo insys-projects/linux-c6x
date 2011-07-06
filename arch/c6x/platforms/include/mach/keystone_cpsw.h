@@ -36,6 +36,4 @@
 #define cpsw_addr_reg(reg) \
         ((volatile u32 *) (reg))
 
-int cpsw_init (u8 macaddress[2][6]);
-
 #endif /* __MACH_C6X_KEYSTONE_CPSW_H */

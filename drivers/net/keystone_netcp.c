@@ -32,10 +32,12 @@
 #include <asm/msmc.h>
 
 #include <mach/keystone_netcp.h>
-#include <mach/keystone_pktdma.h>
-#include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_qmss_firmware.h>
+#include <linux/keystone/qmss.h>
+#include <linux/keystone/pa.h>
+#include <linux/keystone/pktdma.h>
+#include <linux/keystone/cpsw.h>
 
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG

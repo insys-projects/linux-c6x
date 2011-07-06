@@ -23,50 +23,9 @@
 #include <asm/bitops.h>
 
 #include <mach/keystone_qmss.h>
+#include <linux/keystone/qmss.h>
 
 static DEFINE_MUTEX(qmss_mutex);
-
-struct qm_host_desc *hw_qm_queue_pop(u32 qnum)
-{
-	u32 uhd;
-
-	/* Strip the descriptor size info */
-	uhd = __raw_readl(DEVICE_QM_MANAGER_QUEUES_BASE + QM_REG_QUEUE_REGD(qnum));
-	uhd = uhd & ~0xf;
-
-	return (struct qm_host_desc *) qm_desc_ptov(uhd);
-}
-
-u32 hw_qm_queue_count(u32 qnum)
-{
-	u32 rega;
-
-	rega = __raw_readl(DEVICE_QM_QUEUE_STATUS_BASE +
-			   QM_REG_QUEUE_REGA(qnum));
-	rega = READ_BITFIELD (rega, QM_QA_ENTRY_COUNT_MSB,
-			      QM_QA_ENTRY_COUNT_LSB);
-	
-	return rega;
-}
-
-int hw_qm_init_threshold(u32 qnum)
-{
-	__raw_writel(0x81, (DEVICE_QM_QUEUE_STATUS_BASE +
-			    QM_REG_STAT_CFG_REGD(qnum)));
-	
-	return 0;
-}	
-
-void hw_qm_queue_push (struct qm_host_desc *hd, u32 qnum, u32 desc_size)
-{
-	u32 regd;
-
-	regd = (qm_desc_vtop((u32) hd)) | ((desc_size >> 4) - 1);
-	
-	/* Push the descriptor onto the queue */
-	__raw_writel(regd, (DEVICE_QM_MANAGER_QUEUES_BASE +
-			    QM_REG_QUEUE_REGD(qnum)));
-}
 
 /*
  * This function programs the accumulator with values passed in the cfg structure
