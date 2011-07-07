@@ -23,7 +23,7 @@ config SOC_TMS320C6472
 	default n
 	select TMS320C64XPLUS
 	select PLL_C6X
-	select GPIO_C6x
+	select GPIO_C6X
 	select TIMER_C6X
 	select INTC_C64XPLUS
 
