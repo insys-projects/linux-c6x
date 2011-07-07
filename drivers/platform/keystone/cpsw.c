@@ -15,20 +15,21 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/types.h>
+#include <linux/if_ether.h>
+#include <linux/if_vlan.h>
+#include <linux/keystone/cpsw.h>
 
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 
-#include "keystone_cpsw.h"
+#include <mach/keystone_cpsw.h>
 
-#define CPPI_PORT_NUM	0
-#define ETHERNET_MTU	1518
 
 static int find_ale_next_free_entry(void)
 {
 	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-					0x600);
+						   0x600);
 	unsigned int tmp, i;
 
 	/* 
@@ -74,8 +75,8 @@ static int find_ale_next_free_entry(void)
  *                      address should be dropped if the received port is
  *                      not same as table entry.
  */
-int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
-				u32 blocked, u32 secure)
+static int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
+				  u32 blocked, u32 secure)
 {
 	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
 					0x600);
@@ -130,14 +131,13 @@ int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
  * fwd_state		The state in which matching multicast packets will be
  *                      forwarded.
  */
-int add_multicast_ale_entry(u32 port_mask, u8 mac_address[6],
-				u32 super, u32 fwd_state)
+static int add_multicast_ale_entry(u32 port_mask, u8 mac_address[6],
+				   u32 super, u32 fwd_state)
 {
 	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
 					0x600);
 	unsigned int tmp;
 	int ale_tbl_index;
-
 
 	//TODO:  No update ALE address supported yet. Only permanent addresses
 
@@ -173,7 +173,8 @@ int add_multicast_ale_entry(u32 port_mask, u8 mac_address[6],
 	return 0;
 }
 
-unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu)
+static unsigned int init_mac(unsigned int macportnum, u8* mac_address,
+			     unsigned int mtu)
 {
 
 	struct cpgmac_sl *mac_sl = (struct cpgmac_sl *)(KEYSTONE_CPSW_BASE +
@@ -246,12 +247,12 @@ unsigned int init_mac(unsigned int macportnum, u8* mac_address, unsigned int mtu
 	return 0;
 }
 
-void init_mdio (unsigned int macportnum)
+static void init_mdio (unsigned int macportnum)
 {
 	/* PHYs already enabled. Do nothing. Return success. */
 }
 
-void init_switch(unsigned int mtu)
+static void init_switch(unsigned int mtu)
 {
 
 	struct cpsw_regs *cpsw = (struct cpsw_regs *)(KEYSTONE_CPSW_BASE);
@@ -322,7 +323,7 @@ void init_switch(unsigned int mtu)
 	/* Done with switch configuration */
 }
 
-void setup_ale_portconfig (unsigned int portnum)
+static void setup_ale_portconfig (unsigned int portnum)
 {
 	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
 					0x600);

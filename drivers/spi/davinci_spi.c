@@ -71,6 +71,8 @@
 
 /* SPIDAT1 */
 #define SPIDAT1_CSHOLD_SHIFT	28
+#define SPIDAT1_WDEL_SHIFT      26
+#define SPIDAT1_DFSEL_SHIFT     24
 #define SPIDAT1_CSNR_SHIFT	16
 #define SPIGCR1_CLKMOD_MASK	BIT(1)
 #define SPIGCR1_MASTER_MASK     BIT(0)
@@ -696,12 +698,19 @@ static int davinci_spi_bufs_pio(struct spi_device *spi, struct spi_transfer *t)
 
 	count = davinci_spi->count;
 	data1_reg_val = pdata->cs_hold << SPIDAT1_CSHOLD_SHIFT;
+#ifdef CONFIG_TMS320C66X
+	tmp = spi->chip_select;
+
+	clear_io_bits(davinci_spi->base + SPIDEF, (0x1 << spi->chip_select));
+
+	data1_reg_val |= (tmp << SPIDAT1_CSNR_SHIFT) | (tmp << SPIDAT1_DFSEL_SHIFT);
+#else
 	tmp = ~(0x1 << spi->chip_select);
 
 	clear_io_bits(davinci_spi->base + SPIDEF, ~tmp);
 
 	data1_reg_val |= tmp << SPIDAT1_CSNR_SHIFT;
-
+#endif
 	while ((ioread32(davinci_spi->base + SPIBUF)
 				& SPIBUF_RXEMPTY_MASK) == 0)
 		cpu_relax();
@@ -856,13 +865,20 @@ static int davinci_spi_bufs_dma(struct spi_device *spi, struct spi_transfer *t)
 	count = davinci_spi->count;	/* the number of elements */
 	data1_reg_val = pdata->cs_hold << SPIDAT1_CSHOLD_SHIFT;
 
+#ifdef CONFIG_TMS320C66X
+	tmp = spi->chip_select;
+
+	clear_io_bits(davinci_spi->base + SPIDEF, (0x1 << spi->chip_select));
+
+	data1_reg_val |= (tmp << SPIDAT1_CSNR_SHIFT) | (tmp << SPIDAT1_DFSEL_SHIFT);
+#else
 	/* CS default = 0xFF */
 	tmp = ~(0x1 << spi->chip_select);
 
 	clear_io_bits(davinci_spi->base + SPIDEF, ~tmp);
 
 	data1_reg_val |= tmp << SPIDAT1_CSNR_SHIFT;
-
+#endif
 	/* disable all interrupts for dma transfers */
 	clear_io_bits(davinci_spi->base + SPIINT, SPIINT_MASKALL);
 	/* Disable SPI to write configuration bits in SPIDAT */

@@ -188,7 +188,7 @@ static int __init ipc_int_init(void)
 	res = request_irq(IRQ_IPCLOCAL,
 			  ipc_int_rx_interrupt,
 			  IRQF_DISABLED,
-			  "IPC",
+			  "ipc",
 			  NULL);
 	if (res != 0)
 		return res;

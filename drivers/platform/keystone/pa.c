@@ -18,11 +18,11 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 
-#include <mach/pa.h>
-#include <mach/netcp.h>
 #include <mach/keystone_qmss.h>
-
-#define PA_CMD_SIZE 16
+#include <mach/keystone_pa.h>
+#include <mach/keystone_netcp.h>
+#include <linux/keystone/pa.h>
+#include <linux/keystone/qmss.h>
 
 int keystone_pa_reset(void)
 {
@@ -192,4 +192,3 @@ int keystone_pa_config(u8* mac_addr)
 		
 	return 0;
 }
-

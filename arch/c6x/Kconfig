@@ -124,6 +124,9 @@ config TMS320C66X
 	select SERIAL_CORE
 	select SGMII_C66X
 
+config TI_KEYSTONE
+	bool
+
 config CIO_CONSOLE
        bool "CIO Console"
        help
@@ -234,7 +237,7 @@ endif
 config IPC
 	bool "Inter Processor Communication low-level driver"
 	default y
-	depends on (SOC_TMS320C6472 || SOC_TMS320C6474)
+	depends on (SOC_TMS320C6472 || SOC_TMS320C6474 || SOC_TMS320C6678 || SOC_TMS320C6670)
 
 config VIRTIO_IPC
 	bool "IPC driver for virtio devices"
