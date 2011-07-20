@@ -34,6 +34,7 @@
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_qmss_firmware.h>
+#include <mach/keystone_pa_firmware.h>
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>
 #include <linux/keystone/pktdma.h>
@@ -852,8 +853,15 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	/* Streaming switch configuration */
 	streaming_switch_setup();
 
-	/* Configure the PA */
-	ret = keystone_pa_config(ndev->dev_addr);
+	/* Reset the PA */
+	ret = keystone_pa_reset();
+	if (ret != 0) {
+		printk(KERN_ERR "%s: PA reset failed d\n", __FUNCTION__);
+		return ret;
+	}
+
+	/* Configure the PA (PDSP0 with default firmware) */
+	ret = keystone_pa_config(0, __pdsp_code, sizeof(__pdsp_code), ndev->dev_addr);
 	if (ret != 0) {
 		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;

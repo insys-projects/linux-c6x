@@ -59,6 +59,9 @@ int keystone_pa_enable(int pdsp)
 	u32 i;
 	int v;
 
+	if ((pdsp < 0) || (pdsp > DEVICE_PA_NUM_PDSPS))
+		return -EINVAL;
+
 	/* Check the PDSP state */
 	v = __raw_readl(DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp));
 	if (v & PA_REG_VAL_PDSP_CTL_STATE) {
@@ -78,27 +81,44 @@ int keystone_pa_enable(int pdsp)
 	return 0;
 }
     
-int keystone_pa_disable(void)
+int keystone_pa_disable(int pdsp)
 {
 	u32 i, j;
 
-	/* Disable all pdsps, clear all mailboxes */
-	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++)  {
+	if (pdsp > DEVICE_PA_NUM_PDSPS)
+		return -EINVAL;
+
+	if (pdsp < 0) {
+		/* Disable all pdsps, clear all mailboxes */
+		for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++)  {
+			__raw_writel(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
+				     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(i)));
+
+			for (j = 0; j < PA_NUM_MAILBOX_SLOTS; j++)
+				__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(i, j)));
+		}
+	} else {
 		__raw_writel(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
-			     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(i)));
+			     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp)));
 
 		for (j = 0; j < PA_NUM_MAILBOX_SLOTS; j++)
-			__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(i, j)));
-	}
+			__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(pdsp, j)));
 
+	}
 	return 0;
 }
 
-int keystone_pa_config(u8* mac_addr)
+int keystone_pa_config(int pdsp, unsigned int *pdsp_code, int len, u8* mac_addr)
 {
 	struct pa_config     pa_cfg;
 	struct qm_host_desc *hd;
 	int                  ret = 0;
+
+	if ((pdsp < 0) || (pdsp > DEVICE_PA_NUM_PDSPS))
+		return -EINVAL;
+
+	if ((len > PAGE_SIZE) || (len < 0))
+		return -EINVAL;
 
 	/*
 	 * Filter everything except the desired mac address
@@ -126,19 +146,12 @@ int keystone_pa_config(u8* mac_addr)
 		return -ENOMEM;
 	}
 
-	/* Reset all PDSP */
-	ret = keystone_pa_reset();
-	if (ret != 0) {
-		printk(KERN_DEBUG "PA: reset failed ret = %d\n", ret);
-		return ret;
-	}
-
 	/* Download the firmware in PDSP0 */
-	memcpy((unsigned int *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(0)),
-	       pdsp_code, sizeof(pdsp_code));
+	memcpy((unsigned int *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
+	       pdsp_code, len);
 	
 	/* Enable PDSP0 */
-	ret = keystone_pa_enable(0);
+	ret = keystone_pa_enable(pdsp);
 	if (ret != 0) {
 		printk(KERN_DEBUG "PA: enabling failed ret = %d\n", ret);
 		return ret;

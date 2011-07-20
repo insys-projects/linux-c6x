@@ -41,9 +41,9 @@ struct pa_config {
  * Prototypes
  */
 int keystone_pa_enable(int pdsp);
-int keystone_pa_disable(void);
+int keystone_pa_disable(int pdsp);
 int keystone_pa_reset(void);
-int keystone_pa_config(u8 *mac_addr);
+int keystone_pa_config(int pdsp, unsigned int *pdsp_code, int len, u8* mac_addr);
 
 #endif /* KEYSTONE_PA_H */
 
