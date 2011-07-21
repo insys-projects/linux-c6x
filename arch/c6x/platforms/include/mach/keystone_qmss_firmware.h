@@ -36,7 +36,7 @@
 #ifndef __MACH_C6X_KEYSTONE_QMSS_FIRMWARE_H
 #define __MACH_C6X_KEYSTONE_QMSS_FIRMWARE_H
 
-static const unsigned int acc48_le[] =  {
+static const unsigned int __acc48_le[] =  {
 	0x241117e0,
 	0x81042280,
 	0x248003e0,
@@ -366,7 +366,9 @@ static const unsigned int acc48_le[] =  {
 	0x209e0000
 };
 
-static const unsigned int acc48_be[] =  {
+DECLARE_BUILTIN_FIRMWARE("QMSS_PDSP_ACC48_LE", __acc48_le);
+
+static const unsigned int __acc48_be[] =  {
 	0x241117e0,
 	0x81042280,
 	0x248003e0,
@@ -695,4 +697,7 @@ static const unsigned int acc48_be[] =  {
 	0x10dede9e,
 	0x209e0000 
 };
+
+DECLARE_BUILTIN_FIRMWARE("QMSS_PDSP_ACC48_BE", __acc48_be);
+
 #endif /* __MACH_C6X_KEYSTONE_QMSS_FIRMWARE_H */

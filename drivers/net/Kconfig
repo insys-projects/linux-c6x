@@ -947,6 +947,7 @@ config TI_KEYSTONE_NETCP
 	select TI_KEYSTONE_QM
 	select TI_KEYSTONE_CPSW
 	select TI_KEYSTONE_PKTDMA
+	select FW_LOADER
 	help
 	  This driver supports TI's Keystone NetCP network controller
 

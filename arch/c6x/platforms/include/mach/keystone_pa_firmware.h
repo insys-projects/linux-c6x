@@ -92,4 +92,7 @@ static const unsigned int __pdsp_code[] =  {
 	0x2f000384,
 	0x21000200
 };
+
+DECLARE_BUILTIN_FIRMWARE("PA_PDSP_DEFAULT", __pdsp_code);
+
 #endif /* __MACH_C6X_KEYSTONE_PA_FIRMWARE_H */

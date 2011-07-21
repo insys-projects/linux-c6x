@@ -26,6 +26,7 @@
 #include <linux/phy.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/firmware.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -33,13 +34,13 @@
 
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
-#include <mach/keystone_qmss_firmware.h>
-#include <mach/keystone_pa_firmware.h>
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>
 #include <linux/keystone/pktdma.h>
 #include <linux/keystone/cpsw.h>
 
+#define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
+#define NETCP_DRIVER_VERSION "v1.1"
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
@@ -47,14 +48,14 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-#define NETCP_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		| \
-			 NETIF_MSG_DRV		| NETIF_MSG_LINK	| \
-			 NETIF_MSG_IFUP		| NETIF_MSG_INTR	| \
-			 NETIF_MSG_PROBE	| NETIF_MSG_TIMER	| \
-			 NETIF_MSG_IFDOWN	| NETIF_MSG_RX_ERR	| \
-			 NETIF_MSG_TX_ERR	| NETIF_MSG_TX_DONE	| \
-			 NETIF_MSG_PKTDATA	| NETIF_MSG_TX_QUEUED	| \
-			 NETIF_MSG_RX_STATUS)
+#define NETCP_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		|	\
+		     NETIF_MSG_DRV	| NETIF_MSG_LINK	|	\
+		     NETIF_MSG_IFUP	| NETIF_MSG_INTR	|	\
+		     NETIF_MSG_PROBE	| NETIF_MSG_TIMER	|	\
+		     NETIF_MSG_IFDOWN	| NETIF_MSG_RX_ERR	|	\
+		     NETIF_MSG_TX_ERR	| NETIF_MSG_TX_DONE	|	\
+		     NETIF_MSG_PKTDATA	| NETIF_MSG_TX_QUEUED	|	\
+		     NETIF_MSG_RX_STATUS)
 
 #define DEVICE_NAPI_WEIGHT              16
 #define DEVICE_POLLING_PERIOD_MSEC      10
@@ -65,8 +66,8 @@
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
 #define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
-#define NETCP_MIN_PACKET_SIZE	ETH_ZLEN
-#define NETCP_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
+#define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
+#define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
@@ -80,17 +81,17 @@ static struct timer_list poll_timer;
 
 struct netcp_priv {
 	spinlock_t			lock;
-	struct platform_device		*pdev;
-	struct net_device		*ndev;
-	struct resource			*res;
+	struct platform_device	       *pdev;
+	struct net_device	       *ndev;
+	struct resource		       *res;
 	struct napi_struct		napi;
-	struct device			*dev;
+	struct device		       *dev;
 	struct netcp_platform_data	data;
 	u32				msg_enable;
 	struct net_device_stats		stats;
 	int				rx_packet_max;
 	int				host_port;
-	struct clk			*clk;
+	struct clk		       *clk;
 };
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
@@ -657,10 +658,12 @@ static void netcp_ndo_tx_timeout(struct net_device *ndev)
 }
 
 static void netcp_get_drvinfo(struct net_device *ndev,
-			     struct ethtool_drvinfo *info)
+			      struct ethtool_drvinfo *info)
 {
-	strcpy(info->driver, "TI KeyStone NetCP Driver");
-	strcpy(info->version, "v1.0");
+	struct netcp_priv *priv = netdev_priv(ndev);
+	strcpy(info->driver, NETCP_DRIVER_NAME);
+	strcpy(info->version, NETCP_DRIVER_VERSION);
+	sprintf(info->fw_version, "%d", priv->data.pa_pdsp.firmware_version);
 }
 
 static u32 netcp_get_msglevel(struct net_device *ndev)
@@ -675,10 +678,43 @@ static void netcp_set_msglevel(struct net_device *ndev, u32 value)
 	priv->msg_enable = value;
 }
 
+static int netcp_flash_device(struct net_device *netdev, struct ethtool_flash *efl)
+{
+	char                  file_name[ETHTOOL_FLASH_MAX_FILENAME];
+	int                   pdsp;
+	int                   res = 0;
+	const struct firmware *fw;
+
+	file_name[ETHTOOL_FLASH_MAX_FILENAME - 1] = 0;
+	strcpy(file_name, efl->data);
+	pdsp = efl->region;
+
+	/* Request the firmware */
+	res = request_firmware(&fw, file_name, &netdev->dev);
+	if (res)
+		return res;
+
+	/* Stop the wanted PDSP, load the firmware then enable it */
+	res = keystone_pa_disable(pdsp);
+	if (res)
+		goto error;
+	
+	res = keystone_pa_set_firmware(pdsp, (const unsigned int*) fw->data,
+				       fw->size);
+	if (res)
+		goto error;
+	
+	return keystone_pa_enable(pdsp);
+error:
+	release_firmware(fw);
+	return res;
+}
+
 static const struct ethtool_ops netcp_ethtool_ops = {
 	.get_drvinfo	= netcp_get_drvinfo,
 	.get_msglevel	= netcp_get_msglevel,
-	.set_msglevel	= netcp_set_msglevel
+	.set_msglevel	= netcp_set_msglevel,
+	.flash_device	= netcp_flash_device,
 };
 
 static const struct net_device_ops keystone_netdev_ops = {
@@ -699,7 +735,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 {
 	struct netcp_platform_data *data = pdev->dev.platform_data;
 	struct net_device	   *ndev;
-	struct netcp_priv  *priv;
+	struct netcp_priv          *priv;
 	int                         i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
@@ -711,6 +747,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
 	struct qm_config	   *q_cfg  = &c_q_cfg; 
+	const struct firmware      *fw;
 
 	if (!data) {
 		pr_err("KeyStone NetCP: platform data missing\n");
@@ -767,14 +804,17 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	memset((void *) acc_ram, 0, DEVICE_QM_ACC_RAM_SIZE);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
+	/* Request QM accumulator firmware */
+	ret = request_firmware(&fw, data->qm_pdsp.firmware, &pdev->dev);
+	if (ret != 0) {
+		printk(KERN_ERR "QM: Cannot find  %s firmware\n", data->qm_pdsp.firmware);
+		return ret;
+	}
+
 	/* load QM PDSP firmwares for accumulators */
-	q_cfg->pdsp_firmware[0].id       = 0;
-#ifdef CONFIG_CPU_BIG_ENDIAN
-	q_cfg->pdsp_firmware[0].firmware = &acc48_be;
-#else
-	q_cfg->pdsp_firmware[0].firmware = &acc48_le;
-#endif
-	q_cfg->pdsp_firmware[0].size     = sizeof(acc48_le);
+	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
+	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
+	q_cfg->pdsp_firmware[0].size     = fw->size;;
 #else
 	q_cfg->pdsp_firmware[0].firmware = NULL;
 #endif
@@ -782,6 +822,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	/* Initialize QM */
 	hw_qm_setup(q_cfg);
+	release_firmware(fw);
 
 	/* Configure Rx and Tx PKTDMA */
 	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
@@ -860,12 +901,22 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* Configure the PA (PDSP0 with default firmware) */
-	ret = keystone_pa_config(0, __pdsp_code, sizeof(__pdsp_code), ndev->dev_addr);
+	/* Request PA firmware */
+	ret = request_firmware(&fw, data->pa_pdsp.firmware, &pdev->dev);
+	if (ret != 0) {
+		printk(KERN_ERR "PA: Cannot find  %s firmware\n", data->pa_pdsp.firmware);
+		return ret;
+	}
+
+	/* Configure the PA */
+	ret = keystone_pa_config(data->pa_pdsp.pdsp, (const unsigned int*) fw->data,
+				 fw->size, ndev->dev_addr);
 	if (ret != 0) {
 		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;
 	}
+
+	release_firmware(fw);
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);

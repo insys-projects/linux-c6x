@@ -80,28 +80,24 @@
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
-struct netcp_platform_data {
-	unsigned int rx_irq;
-	unsigned int tx_irq;
+struct pdsp_platform_data {
+	unsigned int pdsp;
+	char        *firmware;
+	int          firmware_version;
 };
 
-/* Accumulator channel definition */
-#define DEVICE_QM_ETH_ACC_RX_IDX        0   /* Rx Ethernet accumulator channel index */
-#define DEVICE_QM_ETH_ACC_TX_IDX        1   /* Tx Ethernet accumulator channel index */
+struct netcp_platform_data {
 
-/* Accumulator channels */
-#define DEVICE_QM_ETH_ACC_RX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX)
-#define DEVICE_QM_ETH_ACC_TX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX)
+	/* Rx/tx interrupts */
+	unsigned int rx_irq;
+	unsigned int tx_irq;
 
-/* Queue definitions */
-#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
+	/* PA PDSP */
+	struct pdsp_platform_data pa_pdsp;
 
-/* Ethernet (NetCP) queues */
-#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
-#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
-#define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL)  /* Ethernet Tx completion queue (filled by PA) */
+	/* QM PDSP */
+	struct pdsp_platform_data qm_pdsp;
+};
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
 #define EMAC_ARCH_HAS_INTERRUPT
@@ -126,6 +122,17 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 
 	return 0;
 }
+#endif
+
+/*
+ * Firmware 
+ */
+#include <asm/byteorder.h>
+#define DEVICE_PA_PDSP_FIRMWARE "PA_PDSP_DEFAULT"
+#ifdef CONFIG_CPU_BIG_ENDIAN
+#define DEVICE_QM_PDSP_FIRMWARE "QMSS_PDSP_ACC48_BE"
+#else
+#define DEVICE_QM_PDSP_FIRMWARE "QMSS_PDSP_ACC48_LE"
 #endif
 
 /*

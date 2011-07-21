@@ -59,7 +59,7 @@ int keystone_pa_enable(int pdsp)
 	u32 i;
 	int v;
 
-	if ((pdsp < 0) || (pdsp > DEVICE_PA_NUM_PDSPS))
+	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
 	/* Check the PDSP state */
@@ -85,7 +85,7 @@ int keystone_pa_disable(int pdsp)
 {
 	u32 i, j;
 
-	if (pdsp > DEVICE_PA_NUM_PDSPS)
+	if (pdsp >= DEVICE_PA_NUM_PDSPS)
 		return -EINVAL;
 
 	if (pdsp < 0) {
@@ -108,13 +108,38 @@ int keystone_pa_disable(int pdsp)
 	return 0;
 }
 
-int keystone_pa_config(int pdsp, unsigned int *pdsp_code, int len, u8* mac_addr)
+/*
+ * download/upload firmware
+ */
+int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len)
+{
+	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
+		return -EINVAL;
+
+	memcpy((void *) buffer, (void *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
+	       len);
+
+	return 0;
+}
+
+int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len)
+{
+	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
+		return -EINVAL;
+
+	memcpy((void *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
+	       (void *) buffer, len);
+
+	return 0;
+}
+
+int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac_addr)
 {
 	struct pa_config     pa_cfg;
 	struct qm_host_desc *hd;
 	int                  ret = 0;
 
-	if ((pdsp < 0) || (pdsp > DEVICE_PA_NUM_PDSPS))
+	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
 	if ((len > PAGE_SIZE) || (len < 0))
@@ -147,9 +172,8 @@ int keystone_pa_config(int pdsp, unsigned int *pdsp_code, int len, u8* mac_addr)
 	}
 
 	/* Download the firmware in PDSP0 */
-	memcpy((unsigned int *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
-	       pdsp_code, len);
-	
+	keystone_pa_set_firmware(pdsp, pdsp_code, len);
+
 	/* Enable PDSP0 */
 	ret = keystone_pa_enable(pdsp);
 	if (ret != 0) {
