@@ -15,77 +15,23 @@
 #ifndef __MACH_C6X_KEYSTONE_QMSS_H
 #define __MACH_C6X_KEYSTONE_QMSS_H
 
-#define QMSS_LOW_PRIORITY_QUEUE_BASE       	0
-#define QMSS_MAX_LOW_PRIORITY_QUEUE         	512
-#define QMSS_AIF_QUEUE_BASE                     512         
-#define QMSS_MAX_AIF_QUEUE                  	128    
-#define QMSS_PASS_QUEUE_BASE                    640
-#define QMSS_MAX_PASS_QUEUE                 	12
-#define QMSS_INTC_QUEUE_BASE                    652
-#define QMSS_MAX_INTC_QUEUE                 	20
-#define QMSS_SRIO_QUEUE_BASE                    672
-#define QMSS_MAX_SRIO_QUEUE                 	16
-#define QMSS_FFTC_A_QUEUE_BASE                  688
-#define QMSS_MAX_FFTC_A_QUEUE               	4
-#define QMSS_FFTC_B_QUEUE_BASE                  692
-#define QMSS_MAX_FFTC_B_QUEUE               	4
-#define QMSS_HIGH_PRIORITY_QUEUE_BASE           704
-#define QMSS_MAX_HIGH_PRIORITY_QUEUE        	32
-#define QMSS_STARVATION_COUNTER_QUEUE_BASE  	736
-#define QMSS_MAX_STARVATION_COUNTER_QUEUE   	64
-#define QMSS_INFRASTRUCTURE_QUEUE_BASE      	800
-#define QMSS_MAX_INFRASTRUCTURE_QUEUE       	32
-#define QMSS_TRAFFIC_SHAPING_QUEUE_BASE     	832
-#define QMSS_MAX_TRAFFIC_SHAPING_QUEUE      	32
-#define QMSS_FFTC_C_QUEUE_BASE			864
-#define QMSS_MAX_FFTC_C_QUEUE               	4
-#define QMSS_BCP_QUEUE_BASE			868
-#define QMSS_MAX_BCP_QUEUE               	8
-#define QMSS_VUSR_QUEUE_BASE			864
-#define QMSS_MAX_VUSR_QUEUE			32
-#define QMSS_MAX_GENERAL_PURPOSE_QUEUE      	7296
-#define QMSS_MAX_PDSP                           2
-
-enum qmss_queuetype
-{
-	/* Low priority queue */
-	QMSS_QUEUETYPE_LOW_PRIORITY_QUEUE = 0,
-	/* AIF queue */
-	QMSS_QUEUETYPE_AIF_QUEUE,
-	/* PASS queue */
-	QMSS_QUEUETYPE_PASS_QUEUE,
-	/* INTC pending queue */
-	QMSS_QUEUETYPE_INTC_QUEUE,
-	/* SRIO queue */
-	QMSS_QUEUETYPE_SRIO_QUEUE,
-	/* FFTC queue A */
-	QMSS_QUEUETYPE_FFTC_A_QUEUE,
-	/* FFTC queue B */
-	QMSS_QUEUETYPE_FFTC_B_QUEUE,
-	/* High priority queue */
-	QMSS_QUEUETYPE_HIGH_PRIORITY_QUEUE,
-	/* starvation counter queue */
-	QMSS_QUEUETYPE_STARVATION_COUNTER_QUEUE,
-	/* Infrastructure queue */
-	QMSS_QUEUETYPE_INFRASTRUCTURE_QUEUE,
-	/* Traffic shaping queue */
-	QMSS_QUEUETYPE_TRAFFIC_SHAPING_QUEUE,
-	/* General purpose queue */
-	QMSS_QUEUETYPE_GENERAL_PURPOSE_QUEUE
-};
-
 /* Memory alignment requirements (bytes) */
-#define QM_LINKRAM_ALIGN	4 
-#define QM_MEMR_ALIGN		16      /* Not specified in the doc */
+#define QM_LINKRAM_ALIGN	        4 
+#define QM_MEMR_ALIGN		        16      /* Not specified in the doc */
 
 /* The driver supports only a single descriptor size */
-#define QM_DESC_SIZE_BYTES	64
+#define QM_DESC_SIZE_BYTES	        64
 
-#define QM_ACC_CMD_ENABLE       0x81
-#define QM_ACC_CMD_DISABLE      0x80
+/* Accumulator commands */
+#define QM_ACC_CMD_ENABLE               0x81
+#define QM_ACC_CMD_DISABLE              0x80
 
-#define QM_ACC_CMD_SIZE         (5 * 4)
+#define QM_ACC_CMD_SIZE                 (5 * 4)
 
+/* pDSP number */
+#define QM_MAX_PDSP                     2
+
+/* QMSS register memory map */
 #define DEVICE_QM
 #define DEVICE_QM_QUEUE_STATUS_BASE	0x02a00000
 #define DEVICE_QM_MANAGER_QUEUES_BASE	0x02a20000
@@ -188,16 +134,46 @@ enum qmss_queuetype
 #define QM_REG_INTD_EOI_HIGH_PRIO_INDEX 2
 #define QM_REG_INTD_EOI_LOW_PRIO_INDEX  34
 
-/* Queue definitions */
-#define QM_LOW_PRIO_QUEUE               0
-#define QM_HIGH_PRIO_QUEUE              704
-#define QM_STARV_QUEUE                  736
-
 /* Return queue for a given accumulation channel  */
-#define QM_HIGH_PRIO_CHAN_MAP(c)        (QM_HIGH_PRIO_QUEUE + (c))
+#define QM_HIGH_PRIO_CHAN_MAP(c)        (DEVICE_QM_HIGH_PRIO_Q + (c))
 
 /* Return the channel for a given channel idx on the current core */
 #define QM_HIGH_PRIO_IDX_MAP(i)         (((i) * CORE_NUM) + get_coreid())
+
+/* Queue definitions for the device */
+#define DEVICE_QM_LOW_PRIO_Q            0
+#define DEVICE_QM_AIF_Q                 512
+#define DEVICE_QM_PA_Q		        640
+#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
+#define DEVICE_QM_PA_TX_Q               648 /* PA transmit queue */
+#define DEVICE_QM_INTC_Q                652
+#define DEVICE_QM_SRIO_Q                672
+#define DEVICE_QM_FFTC_A_Q              688
+#define DEVICE_QM_FFTC_B_Q              692
+#define DEVICE_QM_HIGH_PRIO_Q           704
+#define DEVICE_QM_STARV_Q               736
+#define DEVICE_QM_INFRASTRUCTURE_Q 	800
+#define DEVICE_QM_TRAFFIC_SHAPING_Q	832
+#define DEVICE_QM_FFTC_C_Q		864
+#define DEVICE_QM_BCP_Q		        868
+#define DEVICE_QM_VUSR_Q		864
+#define DEVICE_QM_VUSR_ALLOC_Q          4096 /* First allocable queue */
+#define DEVICE_QM_VUSR_ALLOC_END_Q      8191 /* Last allocable queue */
+
+/* Ethernet (NetCP) queues */
+#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
+#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_Q                                   /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL) /* Ethernet Tx completion queue (filled by PA) */
+
+/* Accumulator channel definitions */
+#define DEVICE_QM_ETH_ACC_RX_IDX        0   /* Rx Ethernet accumulator channel index */
+#define DEVICE_QM_ETH_ACC_TX_IDX        1   /* Tx Ethernet accumulator channel index */
+
+/* Accumulator channels */
+#define DEVICE_QM_ETH_ACC_RX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX)
+#define DEVICE_QM_ETH_ACC_TX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX)
 
 /* Helper functions */
 static inline int address_is_local(u32 addr)

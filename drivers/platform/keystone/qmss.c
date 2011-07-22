@@ -18,6 +18,7 @@
 #include <linux/io.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/bitmap.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -26,6 +27,48 @@
 #include <linux/keystone/qmss.h>
 
 static DEFINE_MUTEX(qmss_mutex);
+
+#define QUEUE_BITMAP_SIZE (DEVICE_QM_VUSR_ALLOC_END_Q - DEVICE_QM_VUSR_ALLOC_Q + 31)
+
+static unsigned long queue_bitmap[(QUEUE_BITMAP_SIZE) >> 5];
+
+/*
+ * Queue number allocator
+ */
+int hw_qm_alloc_queue(u32 num)
+{
+	static int    initialized = 0;
+	unsigned long start;
+
+	mutex_lock(&qmss_mutex);
+
+	if (!initialized) {
+		bitmap_clear(queue_bitmap, 0, QUEUE_BITMAP_SIZE);
+		initialized = 1;
+	}
+
+	start = bitmap_find_next_zero_area(queue_bitmap, QUEUE_BITMAP_SIZE, 0, num, 0);
+	if (start > DEVICE_QM_VUSR_ALLOC_END_Q)
+		return -ENOSPC;
+
+	bitmap_set(queue_bitmap, start, num);
+
+	mutex_unlock(&qmss_mutex);
+	
+	return start + DEVICE_QM_VUSR_ALLOC_Q;
+}
+
+void hw_qm_free_queue(u32 queue)
+{
+	int start = queue - DEVICE_QM_VUSR_ALLOC_Q;
+
+	if ((start < 0) || (start > DEVICE_QM_VUSR_ALLOC_END_Q))
+		return;
+
+	mutex_lock(&qmss_mutex);
+	bitmap_clear(queue_bitmap, start, 1);
+	mutex_unlock(&qmss_mutex);
+}
 
 /*
  * This function programs the accumulator with values passed in the cfg structure
@@ -132,7 +175,7 @@ int hw_qm_setup (struct qm_config *cfg)
 	struct qm_host_desc *hd;
 
 	/* Reset the QM PDSP */
-	for (i = 0; i < QMSS_MAX_PDSP; i++)
+	for (i = 0; i < QM_MAX_PDSP; i++)
 		__raw_writel(QM_REG_VAL_PDSP_CTL_DISABLE,
 			     DEVICE_QM_PDSP_CTRL_BASE(cfg->pdsp_firmware[i].id));
 
@@ -222,7 +265,7 @@ int hw_qm_setup (struct qm_config *cfg)
 	mutex_unlock(&qmss_mutex);
     
 	/* Download optional firmware to QM PDSP */
-	for (i = 0; i < QMSS_MAX_PDSP; i++) {
+	for (i = 0; i < QM_MAX_PDSP; i++) {
 		if (cfg->pdsp_firmware[i].firmware != NULL) {
 			int ret;
 
