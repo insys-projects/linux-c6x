@@ -116,8 +116,8 @@ int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len)
 	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
-	memcpy((void *) buffer, (void *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
-	       len);
+	pdsp_fw_get(buffer, (u32 *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
+		    len >> 2);
 
 	return 0;
 }
@@ -127,8 +127,8 @@ int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len)
 	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
-	memcpy((void *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
-	       (void *) buffer, len);
+	pdsp_fw_put((u32 *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)), buffer,
+		    len >> 2);
 
 	return 0;
 }

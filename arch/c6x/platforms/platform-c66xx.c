@@ -248,9 +248,6 @@ static void init_power(void)
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
 
-#include <mach/keystone_qmss_firmware.h>
-#include <mach/keystone_pa_firmware.h>
-
 struct netcp_platform_data netcp_data = {
 	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
 	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,

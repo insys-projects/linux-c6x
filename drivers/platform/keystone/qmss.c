@@ -146,8 +146,8 @@ int hw_qm_download_firmware (u32 pdsp_id, void *image, u32 size)
 	while(__raw_readl(DEVICE_QM_PDSP_CTRL_BASE(pdsp_id))
 	      & QM_REG_VAL_PDSP_CTL_STATE);
 	
-	/* Download the firmware */
-	memcpy ((unsigned int *) DEVICE_QM_PDSP_IRAM_BASE(pdsp_id), image, size);
+	/* upload the firmware */
+	pdsp_fw_put((u32 *) DEVICE_QM_PDSP_IRAM_BASE(pdsp_id), (u32 *) image, size >> 2);
 	
 	/* Use the command register to sync the PDSP */
 	__raw_writel(0xFFFFFFFF, DEVICE_QM_PDSP_CMD_BASE(pdsp_id));

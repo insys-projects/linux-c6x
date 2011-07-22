@@ -201,6 +201,26 @@ static inline u32 device_local_addr_to_global(u32 addr)
 	return addr;
 }
 
+/*
+ * Copy a PDSP firmware image from/to PDSP memory. 
+ * Firmware images are always little-endian.
+ */
+static inline void pdsp_fw_put(u32 *dest, const u32 *src, u32 wc)
+{
+	int i;
+
+	for (i = 0; i < wc; i++)
+		*dest++ = le32_to_cpu(*src++);
+}
+
+static inline void pdsp_fw_get(u32 *dest, const u32 *src, u32 wc)
+{
+	int i;
+
+	for (i = 0; i < wc; i++)
+		*dest++ = cpu_to_le32(*src++);
+}
+
 #define BITMASK(x,y)	                (((((u32)1 << (((u32)x)-((u32)y)+(u32)1)) \
 					   - (u32)1 ))   <<  ((u32)y))
 #define READ_BITFIELD(z,x,y)	        ((((u32)z) & BITMASK(x,y)) >> (y))

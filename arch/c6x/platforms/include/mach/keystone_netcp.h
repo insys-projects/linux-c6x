@@ -89,11 +89,11 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
  * Firmware 
  */
 #include <asm/byteorder.h>
-#define DEVICE_PA_PDSP_FIRMWARE "PA_PDSP_DEFAULT"
+#define DEVICE_PA_PDSP_FIRMWARE "keystone-pdsp/pa_pdsp_default.fw"
 #ifdef CONFIG_CPU_BIG_ENDIAN
-#define DEVICE_QM_PDSP_FIRMWARE "QMSS_PDSP_ACC48_BE"
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_be.fw"
 #else
-#define DEVICE_QM_PDSP_FIRMWARE "QMSS_PDSP_ACC48_LE"
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_le.fw"
 #endif
 
 /*
