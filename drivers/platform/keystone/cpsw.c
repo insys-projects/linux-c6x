@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Texas Instruments Incorporated
- * Author: Sandeep Paulraj <s-paulraj@ti.com>
+ * Authors: Sandeep Paulraj <s-paulraj@ti.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -25,11 +26,9 @@
 
 #include <mach/keystone_cpsw.h>
 
-
 static int find_ale_next_free_entry(void)
 {
-	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-						   0x600);
+	struct ale_regs *ale = (struct ale_regs *)(DEVICE_CPSW_BASE + 0x600);
 	unsigned int tmp, i;
 
 	/* 
@@ -78,8 +77,7 @@ static int find_ale_next_free_entry(void)
 static int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
 				  u32 blocked, u32 secure)
 {
-	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-					0x600);
+	struct ale_regs *ale = (struct ale_regs *)(DEVICE_CPSW_BASE + 0x600);
 	unsigned int tmp;
 	int ale_tbl_index;
 
@@ -134,8 +132,7 @@ static int add_unicast_ale_entry (u32 port_num, u8 mac_address[6],
 static int add_multicast_ale_entry(u32 port_mask, u8 mac_address[6],
 				   u32 super, u32 fwd_state)
 {
-	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-					0x600);
+	struct ale_regs *ale = (struct ale_regs *)(DEVICE_CPSW_BASE + 0x600);
 	unsigned int tmp;
 	int ale_tbl_index;
 
@@ -177,10 +174,10 @@ static unsigned int init_mac(unsigned int macportnum, u8* mac_address,
 			     unsigned int mtu)
 {
 
-	struct cpgmac_sl *mac_sl = (struct cpgmac_sl *)(KEYSTONE_CPSW_BASE +
-					0x100 + 0x40 * macportnum);
-	struct port_info *p_info = (struct port_info *)(KEYSTONE_CPSW_BASE +
-					0x60 + 0x30 * macportnum);
+	struct cpgmac_sl *mac_sl = (struct cpgmac_sl *)(DEVICE_CPSW_BASE +
+							0x100 + 0x40 * macportnum);
+	struct port_info *p_info = (struct port_info *)(DEVICE_CPSW_BASE +
+							0x60 + 0x30 * macportnum);
 	
 	unsigned int tmp;
 
@@ -255,9 +252,8 @@ static void init_mdio (unsigned int macportnum)
 static void init_switch(unsigned int mtu)
 {
 
-	struct cpsw_regs *cpsw = (struct cpsw_regs *)(KEYSTONE_CPSW_BASE);
-	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-					0x600);
+	struct cpsw_regs *cpsw = (struct cpsw_regs *)(DEVICE_CPSW_BASE);
+	struct ale_regs *ale   = (struct ale_regs *)(DEVICE_CPSW_BASE + 0x600);
 	unsigned int tmp;
 
 	/*
@@ -325,8 +321,7 @@ static void init_switch(unsigned int mtu)
 
 static void setup_ale_portconfig (unsigned int portnum)
 {
-	struct ale_regs *ale = (struct ale_regs *)(KEYSTONE_CPSW_BASE +
-					0x600);
+	struct ale_regs *ale = (struct ale_regs *)(DEVICE_CPSW_BASE + 0x600);
 	unsigned int tmp;
 
 	/* Configure the address in "Learning"/"Forward" state */
