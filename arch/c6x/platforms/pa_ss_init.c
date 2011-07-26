@@ -20,7 +20,6 @@
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/gmdio.h>
 #include <asm/sgmii.h>
 #include <asm/dscr.h>
 

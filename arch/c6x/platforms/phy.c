@@ -18,7 +18,7 @@
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/gmdio.h>
+#include <asm/mdio.h>
 #include <asm/sgmii.h>
 
 int phy_init(void)

@@ -40,7 +40,6 @@
 #include <asm/edma.h>
 #include <asm/dscr.h>
 
-#include <mach/gmdio.h>
 #include <mach/board.h>
 #include <mach/emif.h>
 

@@ -18,31 +18,12 @@
 #define ETHERNET_MTU	                        VLAN_ETH_FRAME_LEN
 
 #define CPSW_NUM_PORTS		                3
-
-#define CPPI_PORT_NUM	                        0
-#define SGMII0_PORT_NUM                         1
-#define SGMII1_PORT_NUM                         2
-
+#define CPSW_CPPI_PORT_NUM	                0
+#define CPSW_SGMII0_PORT_NUM                    1
+#define CPSW_SGMII1_PORT_NUM                    2
 #define CPSW_NUM_STATS_MODULES                  2
-
 #define CPSW_STATSA_MODULE                      0 /* For switch port 0 */
 #define CPSW_STATSB_MODULE                      1 /* For switch port 1 and 2 */
-
-/*
- * SGMII registers
- */
-#define SGMII_BASE_ADDRESS	                { 0x02090100, 0x02090200 }
-#define SGMII_IDVER_REG(x)	                (0x02090100 + (x * 0x100) + 0x000)
-#define SGMII_SRESET_REG(x)	                (0x02090100 + (x * 0x100) + 0x004)
-#define SGMII_CTL_REG(x)	                (0x02090100 + (x * 0x100) + 0x010)
-#define SGMII_STATUS_REG(x)	                (0x02090100 + (x * 0x100) + 0x014)
-#define SGMII_MRADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x018)
-#define SGMII_LPADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x020)
-#define SGMII_TXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x030)
-#define SGMII_RXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x034)
-#define SGMII_AUXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x038)
-
-#define SGMII_REG_STATUS_FIELD_LOCK	        (1<<4)
 
 /*
  * CPSW registers

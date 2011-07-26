@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-c6x/gmdio.h
+ *  linux/include/asm-c6x/mdio.h
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
@@ -10,12 +10,11 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
-#ifndef __ASM_C6X_GMDIO_H_
-#define __ASM_C6X_GMDIO_H_
+#ifndef __ASM_C6X_MDIO_H_
+#define __ASM_C6X_MDIO_H_
 
 #ifdef __KERNEL__
 #include <asm/dscr.h>
-#include <mach/gmdio.h>
 
 #define MDIO_VERSION              0x000 /* Module Version Register */
 #define MDIO_CONTROL              0x004 /* Module Control Register */
@@ -32,13 +31,13 @@
 #define MDIO_USERACCESS1          0x088 /* User Access Register 1 */
 #define MDIO_USERPHYSEL1          0x08c /* User PHY Select Register 1 */
 
-#define EMAC_M_CLKDIV            ((1 << 16) - 1)
+#define MDIO_M_CLKDIV            ((1 << 16) - 1)
 
-#define EMAC_B_FAULTENB          (1 << 18)
-#define EMAC_B_FAULT             (1 << 19)
-#define EMAC_B_PREAMBLE          (1 << 20)
-#define EMAC_B_ENABLE            (1 << 30)
-#define EMAC_B_IDLE              (1 << 31)
+#define MDIO_B_FAULTENB          (1 << 18)
+#define MDIO_B_FAULT             (1 << 19)
+#define MDIO_B_PREAMBLE          (1 << 20)
+#define MDIO_B_ENABLE            (1 << 30)
+#define MDIO_B_IDLE              (1 << 31)
 
 #define MDIO_B_ACK               (1 << 29)
 #define MDIO_B_WRITE             (1 << 30)
@@ -210,5 +209,5 @@ extern unsigned int mdio_timer_tick(void);
 extern unsigned int mdio_get_macsel(void);
 
 #endif /* __KERNEL__ */
-#endif /* __ASM_C6X_GMDIO_H_ */
+#endif /* __ASM_C6X_MDIO_H_ */
 

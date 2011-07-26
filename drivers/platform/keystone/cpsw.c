@@ -341,7 +341,7 @@ static void setup_ale_portconfig (unsigned int portnum)
 	 * disabled on the GMAC ports, i.e.,Ports 1 and 2.
 	 * Learning should be enabled only on Port 0, i.e., CPPI Port
 	 */
-	if (portnum != CPPI_PORT_NUM)
+	if (portnum != CPSW_CPPI_PORT_NUM)
 		tmp |= CPSW_3GF_ALE_PORT_CONTROL_REG_NO_LEARN;
 	else
 		tmp &= ~CPSW_3GF_ALE_PORT_CONTROL_REG_NO_LEARN;
