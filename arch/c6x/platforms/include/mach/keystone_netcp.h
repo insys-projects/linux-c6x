@@ -58,6 +58,10 @@ struct netcp_platform_data {
 
 	/* QM PDSP */
 	struct pdsp_platform_data qm_pdsp;
+
+	/* PHY and SGMII indexes */
+	unsigned int sgmii_port;
+	unsigned int phy_id;
 };
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)

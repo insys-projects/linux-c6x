@@ -27,10 +27,12 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
+#include <linux/mii.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/msmc.h>
+#include <asm/mdio.h>
 
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
@@ -90,6 +92,7 @@ struct netcp_priv {
 	struct netcp_platform_data	data;
 	u32				msg_enable;
 	struct net_device_stats		stats;
+	struct mii_if_info              mii;
 	int				rx_packet_max;
 	int				host_port;
 	struct clk		       *clk;
@@ -658,6 +661,78 @@ static void netcp_ndo_tx_timeout(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
+/*
+ * Standard MII ioctl()
+ */
+static int netcp_ndo_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	if (!netif_running(ndev))
+		return -EINVAL;
+	
+	return generic_mii_ioctl(&priv->mii, if_mii(req), cmd, NULL);
+}
+
+/*
+ * MDIO management
+ */
+static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
+{	
+	int val;
+	int ack = 0;
+
+	mdio_phy_wait();
+	mdio_phy_read(reg, phy_id);
+	mdio_phy_wait_res_ack(val, ack);
+
+	if (!ack)
+		val = -1;
+
+	return val;
+}
+
+static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int value)
+{
+
+	mdio_phy_wait();
+	mdio_phy_write(reg, phy_id, value);
+	mdio_phy_wait();
+	
+	return;
+}
+
+static void netcp_mdio_init(void)
+{
+	mdio_set_reg(MDIO_CONTROL, MDIO_B_ENABLE | (VBUSCLK & MDIO_M_CLKDIV));
+}
+
+/*
+ * Ethtool management
+ */
+static int netcp_get_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+	
+	mii_ethtool_gset(&priv->mii, ecmd);
+	
+	return 0;
+}
+
+static int netcp_nway_reset(struct net_device *ndev)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	return mii_nway_restart(&priv->mii);
+}
+
+static u32 netcp_get_link(struct net_device *ndev)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	return mii_link_ok(&priv->mii);
+}
+
 static void netcp_get_drvinfo(struct net_device *ndev,
 			      struct ethtool_drvinfo *info)
 {
@@ -861,9 +936,12 @@ static void netcp_get_ethtool_stats(struct net_device *netdev,
 }
 
 static const struct ethtool_ops netcp_ethtool_ops = {
+	.get_settings      = netcp_get_settings,
 	.get_drvinfo	   = netcp_get_drvinfo,
 	.get_msglevel	   = netcp_get_msglevel,
 	.set_msglevel	   = netcp_set_msglevel,
+	.nway_reset	   = netcp_nway_reset,
+	.get_link	   = netcp_get_link,
 	.flash_device	   = netcp_flash_device,
 	.get_strings       = netcp_get_stat_strings,
 	.get_sset_count    = netcp_get_sset_count,
@@ -875,6 +953,7 @@ static const struct net_device_ops keystone_netdev_ops = {
 	.ndo_stop		= netcp_ndo_stop,
 	.ndo_start_xmit		= netcp_ndo_start_xmit,
 	.ndo_change_rx_flags	= netcp_ndo_change_rx_flags,
+	.ndo_do_ioctl           = netcp_ndo_ioctl,
 	.ndo_change_mtu		= eth_change_mtu,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -922,6 +1001,20 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->dev  = &ndev->dev;
 	priv->msg_enable = netif_msg_init(debug_level, NETCP_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
+
+	/* MII/MDIO init */
+	priv->msg_enable        = NETIF_MSG_LINK;
+	priv->mii.phy_id        = data->phy_id;
+	priv->mii.phy_id_mask   = 0x1f;
+	priv->mii.reg_num_mask  = 0x1f;
+	priv->mii.force_media   = 0;
+	priv->mii.full_duplex   = 0;
+	priv->mii.supports_gmii = 1;
+	priv->mii.dev	        = ndev;
+	priv->mii.mdio_read     = netcp_mdio_read;
+	priv->mii.mdio_write    = netcp_mdio_write;
+
+	netcp_mdio_init();
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */

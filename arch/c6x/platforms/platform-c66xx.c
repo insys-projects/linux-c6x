@@ -261,6 +261,8 @@ struct netcp_platform_data netcp_data = {
 		 .firmware          = DEVICE_QM_PDSP_FIRMWARE,
 		 .firmware_version  = 1,
 	},
+	.sgmii_port        = 1,
+	.phy_id            = 1,
 };
 
 static struct platform_device netcp_dev0 = {

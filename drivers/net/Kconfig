@@ -948,6 +948,8 @@ config TI_KEYSTONE_NETCP
 	select TI_KEYSTONE_CPSW
 	select TI_KEYSTONE_PKTDMA
 	select FW_LOADER
+	select MII
+	select PHYLIB
 	help
 	  This driver supports TI's Keystone NetCP network controller
 
