@@ -719,6 +719,15 @@ static int netcp_get_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
+static int netcp_set_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+	
+	mii_ethtool_sset(&priv->mii, ecmd);
+	
+	return 0;
+}
+
 static int netcp_nway_reset(struct net_device *ndev)
 {
 	struct netcp_priv *priv = netdev_priv(ndev);
@@ -937,6 +946,7 @@ static void netcp_get_ethtool_stats(struct net_device *netdev,
 
 static const struct ethtool_ops netcp_ethtool_ops = {
 	.get_settings      = netcp_get_settings,
+	.set_settings      = netcp_set_settings,
 	.get_drvinfo	   = netcp_get_drvinfo,
 	.get_msglevel	   = netcp_get_msglevel,
 	.set_msglevel	   = netcp_set_msglevel,
