@@ -21,7 +21,7 @@
 /*
  * L2 used as cache
  */
-#define L2MODE_SIZE       L2MODE_256K_CACHE
+#define L2MODE_SIZE       L2MODE_MAX_CACHE  /* Use all possible L2 as cache */
 
 /*
  * Internal Memory Control Registers for caches
@@ -98,7 +98,12 @@
 #define IMCR_L2PDSTAT1    0x0184c064
 
 /* 
+ * MAR register bits
+ */
+#define IMCR_MAR_PC       (1 << 0)
+#define IMCR_MAR_PFX      (1 << 3)
+
+/* 
  * Physical memory granularity for MAR registers 
  */
 #define IMCR_MAR_SIZE     0x01000000
-

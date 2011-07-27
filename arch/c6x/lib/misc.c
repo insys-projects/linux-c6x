@@ -58,7 +58,7 @@ void *alloca (size_t size)
 	 */
 	if ((((unsigned) __alloca_buffer + size + 7) & PAGE_MASK) !=
 	    (((unsigned) __alloca_buffer) & PAGE_MASK))
-		__alloca_buffer = ((unsigned) __alloca_buffer & PAGE_MASK);
+	    __alloca_buffer = (u8*)((unsigned) __alloca_buffer & PAGE_MASK);
 	
 	free_buf = (void *) __alloca_buffer;
 	__alloca_buffer =

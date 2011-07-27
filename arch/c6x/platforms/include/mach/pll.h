@@ -3,8 +3,9 @@
  *
  *  PLL definitions for Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -15,68 +16,24 @@
 #define __MACH_C6X_PLL_H
 
 #if defined(CONFIG_SOC_TMS320C6455)
-#define ARCH_PLL1_BASE 0x029A0000
-#define ARCH_PLL2_BASE 0x029C0000
-
-/*
- * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
- * PLL has switched to bypass mode. Delay of 1us ensures we are good for
- * all > 4MHz CLKIN inputs. Typically the input is ~25MHz.
- * Units are micro seconds.
- */
-#define PLL_BYPASS_TIME		1
-
-#define PLL_RESET_TIME		128
-#define PLL_LOCK_TIME		2000
-
+#include <mach/pll-c6455.h>
 #elif defined(CONFIG_SOC_TMS320C6457)
-#define ARCH_PLL1_BASE 0x029A0000
-
-/*
- * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
- * PLL has switched to bypass mode. Delay of 1us ensures we are good for
- * all > 4MHz CLKIN inputs. Typically the input is ~25MHz.
- * Units are micro seconds.
- */
-#define PLL_BYPASS_TIME		1
-
-#define PLL_RESET_TIME		1000
-#define PLL_LOCK_TIME		2000
-
+#include <mach/pll-c6457.h>
 #elif defined(CONFIG_SOC_TMS320C6472)
-#define ARCH_PLL1_BASE 0x029A0000
-#define ARCH_PLL2_BASE 0x029C0000
-#define ARCH_PLL3_BASE 0x029C0400
-
-/*
- * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
- * PLL has switched to bypass mode. Delay of 1us ensures we are good for
- * all > 4MHz CLKIN inputs. Typically the input is ~25MHz.
- * Units are micro seconds.
- */
-#define PLL_BYPASS_TIME		1
-
-#define PLL_RESET_TIME		256
-#define PLL_LOCK_TIME		2000
-
+#include <mach/pll-c6472.h>
 #elif defined(CONFIG_SOC_TMS320C6474)
-#define ARCH_PLL1_BASE 0x029A0000
-
-/*
- * Datasheet recommends a wait for 4 CLKIN cycles to ensure that the
- * PLL has switched to bypass mode. Delay of 1us ensures we are good for
- * all > 4MHz CLKIN inputs. Typically the input is ~25MHz.
- * Units are micro seconds.
- */
-#define PLL_BYPASS_TIME		1
-
-#define PLL_RESET_TIME		256
-#define PLL_LOCK_TIME		2000
-
+#include <mach/pll-c6474.h>
+#elif defined(CONFIG_SOC_TMS320C6670)
+#include <mach/pll-c6670.h>
+#elif defined(CONFIG_SOC_TMS320C6678)
+#include <mach/pll-c6678.h>
+#else
+#error "No machine PLL definitions"
 #endif
 
 /* PLL/Reset register offsets */
 #define PLLCTL          0x100
+#define SECCTL          0x108
 #define PLLM		0x110
 #define PREDIV          0x114
 #define PLLDIV1         0x118

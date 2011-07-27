@@ -40,10 +40,10 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr);
 
 void __init unmask_eexception(void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	/* Unmask events number 119 to 127 */
 	__dint();
-	IC_EXPMASK[3] &= 0x00ffffff;
+	INTC_EXPMASK[3] &= 0x00ffffff;
 	__rint();
 
 	/* 
@@ -56,7 +56,7 @@ void __init unmask_eexception(void)
 
 void __init trap_init (void)
 {
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	ack_exception(EXCEPT_TYPE_NXF);
 	ack_exception(EXCEPT_TYPE_EXC);
 	ack_exception(EXCEPT_TYPE_IXF);
@@ -97,8 +97,7 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr)
 	die(str, fp ,nr);
 }
 
-
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 
 /* Internal exceptions */
 static struct exception_info iexcept_table[10] = {
@@ -254,8 +253,8 @@ void do_trap(struct exception_info *except_info, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
-	if (except_info->code != TRAP_BRKPT)
-		printk(KERN_DEBUG "TRAP: %s PC[0x%lx] signo[%d] code[%d]\n",
+	if (except_info->signo != SIGTRAP)
+		printk(KERN_DEBUG "Exception: %s PC[0x%lx] signo[%d] code[0x%x]\n",
 		       except_info->kernel_str, regs->pc,
 		       except_info->signo, except_info->code);
 
@@ -278,8 +277,6 @@ static int process_iexcept(struct pt_regs *regs)
 	unsigned int iexcept_num;
 
 	ack_exception(EXCEPT_TYPE_IXF);
-
-	printk("IEXCEPT: PC[0x%lx]\n", regs->pc);
 
 	while(iexcept_report) {
 		iexcept_num = __ffs(iexcept_report);
@@ -330,13 +327,11 @@ static void process_eexcept(struct pt_regs *regs)
 	unsigned int bank = 0;
 	int i;
 
-	printk("EEXCEPT: PC[0x%lx]\n", regs->pc);
-
 	for (i = 0; i <= 3; i++) {
-		while (IC_MEXPMASK[i]) {
+		while (INTC_MEXPMASK[i]) {
 			__dint();
-			eexcept_num = __ffs(IC_MEXPMASK[i]);
-			IC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
+			eexcept_num = __ffs(INTC_MEXPMASK[i]);
+			INTC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
 			__rint();
 			do_trap(&eexcept_table[eexcept_num + (bank << 5)], regs);
 		}
@@ -387,8 +382,7 @@ asmlinkage int process_exception(struct pt_regs *regs)
 	return 0;
 }
 
-#endif /* CONFIG_TMS320C64XPLUS */
-
+#endif /* CONFIG_TMS320C64XPLUS || CONFIG_TMS320C66X */
 
 int kstack_depth_to_print = 48;
 

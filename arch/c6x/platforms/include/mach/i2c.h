@@ -32,6 +32,10 @@ struct davinci_i2c_platform_data {
 /*
  * I2C registers base
  */
+#ifdef CONFIG_TMS320C66X
+#define ARCH_I2C_BASE    0x02530000
+#else
 #define ARCH_I2C_BASE    0x02B04000
+#endif
 
 #endif  /* __MACH_C6X_I2C_H */

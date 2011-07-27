@@ -13,6 +13,9 @@ DEFINES	        := -D__linux__ -DNO_MM -D__TMS320C6X__
 ifdef CONFIG_TMS320C64XPLUS
 DEFINES         += -D__TMS320C6XPLUS__
 endif
+ifdef CONFIG_TMS320C66X
+DEFINES         += -D__TMS320C6XPLUS__ -D__TMS320C66X__
+endif
 
 LDSCRIPT = $(obj)/arch/c6x/kernel/vmlinux.lds
 
@@ -26,6 +29,7 @@ be-flags-y                := 1
 
 arch-$(CONFIG_TMS320C64X)     := -march=6400
 arch-$(CONFIG_TMS320C64XPLUS) := -march=6400+
+arch-$(CONFIG_TMS320C66X)     := -march=6600
 
 CFLAGS_MODULE   += -mlarge-memory-model=3 --visibility=default
 AFLAGS_MODULE   += -mlarge-memory-model=3
@@ -43,6 +47,7 @@ NM		= /usr/bin/nm
 else
 arch-$(CONFIG_TMS320C64X)     := -march=c64x
 arch-$(CONFIG_TMS320C64XPLUS) := -march=c64x+ -msdata=none -mno-dsbt
+arch-$(CONFIG_TMS320C66X)     := -march=c64x+ -msdata=none -mno-dsbt
 
 CFLAGS_MODULE   += -mlong-calls
 endif

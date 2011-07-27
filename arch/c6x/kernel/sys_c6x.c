@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -136,7 +136,7 @@ asmlinkage int old_select(struct sel_arg_struct __user *arg)
    asm ("	.global kernel_execve\n"
 	"kernel_execve:\n"
 	" 	MVK	.S2	" __stringify(__NR_execve) ",B0\n"
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	"	SWE\n"
 	"	BNOP	.S2	B3,5\n"
 #else

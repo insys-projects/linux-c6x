@@ -116,7 +116,7 @@ int evm_phy_init(void)
 	struct sgmii_config_s sgmiic;
 
 	/* SGMII setup */
-	sgmii_reset();
+	sgmii_reset(0);
 
 	sgmiic.master    = 1;
 	sgmiic.loopback  = 0;
@@ -130,7 +130,7 @@ int evm_phy_init(void)
 	sgmiic.txconfig  |= 0x80;
 #endif /* CONFIG_ARCH_BOARD_EVM6474 */
 
-	sgmii_config(&sgmiic);
+	sgmii_config(0, &sgmiic);
 
 #endif /* !defined(CONFIG_ARCH_BOARD_EVM6472) */
 

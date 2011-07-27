@@ -8,3 +8,5 @@
 # Note 2! The CFLAGS definition is now in the main makefile...
 
 obj-y	 := init.o fault.o memory.o kmap.o dma-coherent.o
+
+obj-$(CONFIG_TMS320C66X) += msmc.o

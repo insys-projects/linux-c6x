@@ -22,8 +22,8 @@ struct sgmii_config_s {
 	unsigned int auxconfig;
 };
 
-extern int sgmii_reset(void);
-extern int sgmii_config(struct sgmii_config_s *);
+extern int sgmii_reset(int port);
+extern int sgmii_config(int port, struct sgmii_config_s *config);
 
 #ifdef __KERNEL__
 #include <asm/hardware.h>

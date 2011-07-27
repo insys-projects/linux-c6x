@@ -1,10 +1,11 @@
 /*
- *  linux/arch/c6x/mach-evm6486/include/mach/hardware.h
+ *  linux/arch/c6x/platforms/include/mach/hardware.h
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Mark Salter <msalter@redhat.com>
+ *          Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -28,7 +29,6 @@
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
 #elif defined(CONFIG_SOC_TMS320C6457)
 #define RAM_EMIFA_CE2     0xa0000000
 #define RAM_EMIFA_CE3     0xb0000000
@@ -36,31 +36,44 @@
 #define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
 #define RAM_SRAM_OFFSET   0x01000000
-#define RAM_SRAM_SIZE     0x00100000
-#define RAM_EMIFA_CE2     0xa0000000
-#define RAM_EMIFA_CE3     0xb0000000
-#define RAM_EMIFA_CE4     0xc0000000
-#define RAM_EMIFA_CE5     0xd0000000
+#define RAM_SRAM_SIZE     0x00080000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
 #elif defined(CONFIG_SOC_TMS320C6474)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
 #define RAM_SRAM_OFFSET   0x01000000
 #define RAM_SRAM_SIZE     0x00100000
-#define RAM_EMIFA_CE2     0xa0000000
-#define RAM_EMIFA_CE3     0xb0000000
-#define RAM_EMIFA_CE4     0xc0000000
-#define RAM_EMIFA_CE5     0xd0000000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
-
+#elif defined(CONFIG_SOC_TMS320C6670)
+#define RAM_SRAM          0x00800000
+#define RAM_SRAM_BASE     0x10800000
+#define RAM_SRAM_OFFSET   0x01000000
+#define RAM_SRAM_SIZE     0x00100000
+#define RAM_DDR2_CE0      0x80000000
+#define RAM_MSM_BASE      0x0c000000
+#define RAM_MSM_SIZE      0x00200000
+#define RAM_MSM_CO_BASE   0x2c000000
+#define RAM_MEMORY_START  RAM_DDR2_CE0
+#elif defined(CONFIG_SOC_TMS320C6678)
+#define RAM_SRAM          0x00800000
+#define RAM_SRAM_BASE     0x10800000
+#define RAM_SRAM_OFFSET   0x01000000
+#define RAM_SRAM_SIZE     0x00080000
+#define RAM_EMIFA_CE2     0x70000000
+#define RAM_EMIFA_CE3     0x74000000
+#define RAM_EMIFA_CE4     0x78000000
+#define RAM_EMIFA_CE5     0x7c000000
+#define RAM_DDR2_CE0      0x80000000
+#define RAM_MSM_BASE      0x0c000000
+#define RAM_MSM_SIZE      0x00400000
+#define RAM_MSM_CO_BASE   0x2c000000
+#define RAM_MEMORY_START  RAM_DDR2_CE0
 #else
 #error "No SoC memory address space defines"
 #endif
@@ -69,11 +82,6 @@
  * VBUS clock Rate in MHz (1-255)
  */
 #define VBUSCLK           165
-
-/* 
- * GPIO registers base
- */
-#define GPIO_REG_BASE     0x02b00000
 
 /*
  * PSC Registers
@@ -115,6 +123,9 @@
 #define PSC_MDCTL9                   0x02ac0a24
 #define PSC_MDCTL10                  0x02ac0a28
 #define PSC_MDCTL11                  0x02ac0a2c
+
+#define PSC_MDCTL_CORE0_BASE         PSC_MDCTL3
+
 #endif  /* CONFIG_SOC_TMS320C6474 */
 
 #if defined(CONFIG_SOC_TMS320C6472)
@@ -152,7 +163,64 @@
 #define PSC_MDCTL11                  0x02ae0a2c
 #define PSC_MDCTL12                  0x02ae0a30
 #define PSC_MDCTL13                  0x02ae0a34
+
+#define PSC_MDCTL_CORE0_BASE         PSC_MDCTL0
+
 #endif  /* CONFIG_SOC_TMS320C6472 */
+
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define PSC_BASE                     0x02350000
+#define PSC_PTCMD                    0x02350120
+#define PSC_PTSTAT                   0x02350128
+#define PSC_PDCTL0                   0x02350300
+#define PSC_MDSTAT0                  0x02350800
+#define PSC_MDCTL0                   0x02350a00
+
+#ifdef CONFIG_SOC_TMS320C6678
+#define PSC_EMIF25_SPI               3  /* EMIF16 and SPI */
+#define PSC_MDCTL_CORE0_BASE         (PSC_MDCTL0 + (15 * 4))
+#define PD_GEM0                      8
+#endif /* CONFIG_SOC_TMS320C6678 */
+
+#ifdef CONFIG_SOC_TMS320C6670
+#define PSC_MDCTL_CORE0_BASE         (PSC_MDCTL0 + (23 * 4)) 
+#define PD_GEM0                      13
+#endif /* CONFIG_SOC_TMS320C6670 */
+
+/* Get the Power domain for core */
+#define GET_PD(x)                    ((x) + PD_GEM0) 
+
+#define MDCTL_NEXT_STATE_DIS	     0
+#define MDCTL_NEXT_STATE_EN	     3
+
+#define MDCTL_NEXT_STATE_MASK	     0x1F
+#define MDCTL_LRSTZ_MASK	     0x100
+
+#define MDSTAT_STATE_DIS	     0
+#define MDSTAT_STATE_EN		     3
+#define MDSTAT_STATE_MASK	     0x1F
+
+#define PSC_DEBUGSS_TRC              5  /* Debug trace */
+#define PSC_TETB_TRC                 6
+#define PSC_PA                       7  /* PA */
+#define PSC_CPGMAC                   8  /* SGMII */
+#define PSC_SA                       9  /* SA */
+#define PSC_PCIE                     10 /* PCIe */
+#define PSC_SRIO                     11 /* sRIO */
+#define PSC_HYPERLINK                12 /* HyperLink */
+#define PSC_MSMCSRAM                 14 /* MSMC RAM */
+
+#define PSC_SYNCRESET                0x1000
+#define PSC_DISABLE                  0x0000
+#define PSC_ENABLE                   0x0003
+#endif /* CONFIG_SOC_TMS329C6670 || CONFIG_SOC_TMS320C6678 */
+
+#ifdef CONFIG_SOC_TMS320C6670
+/* On C6670 the mapping of MDCTL to core is not linear */
+#define PSC_MDCTL_CORE_OFFSET(c)     ((c) == 0 ? 0 : (((c) - 1) << 3) + 4)
+#else
+#define PSC_MDCTL_CORE_OFFSET(c)     ((c) << 2)
+#endif
 
 /*
  * TCI648x megamodules misc registers & constants
@@ -164,6 +232,10 @@
 #define C6X_SOC_HAS_CORE_REV
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define CORE_NUM                     6
+#elif defined(CONFIG_SOC_TMS320C6670)
+#define CORE_NUM                     4
+#elif defined(CONFIG_SOC_TMS320C6678)
+#define CORE_NUM                     8
 #else
 #define CORE_NUM                     1
 #endif
@@ -180,6 +252,13 @@
 #define IPCGR_BASE                   0x02a80540
 #define IPCAR_BASE                   0x02a80580
 #endif
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define NMIGR_BASE                   0x02620200
+#define IPCGR_BASE                   0x02620240
+#define IPCGRH                       0x0262027c
+#define IPCAR_BASE                   0x02620280
+#define IPCARH                       0x026202bc
+#endif
 
 #if defined(CONFIG_SOC_TMS320C6474)
 /*
@@ -190,5 +269,18 @@
 #define MCBSP0_EDMA_BASE_ADDR        0x30000000
 #define MCBSP1_EDMA_BASE_ADDR        0x34000000
 #endif
+
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define UART_BASE_ADDR               0x02540000
+#endif
+
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+/*
+ * KeyStone specific features
+ */
+#define ARCH_HAS_XMC_PREFETCHW       /* Use prefetch buffers */
+#define ARCH_HAS_XMC_MPAX            /* Use XMC address extension  */
+#define ARCH_HAS_MSM                 /* Architecture has MSM */
+#endif /* (CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678) */
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

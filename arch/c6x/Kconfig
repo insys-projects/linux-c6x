@@ -105,7 +105,9 @@ config CPU_BIG_ENDIAN
 	  of your chipset/board/processor.
 
 config FORCE_MAX_ZONEORDER
-	int
+	
+	int "Page allocator power of two limit (MAX_ORDER)"
+	default "14" if TMS320C66X
 	default "13"
 
 menu "Processor type and features"
@@ -117,23 +119,35 @@ config TMS320C64XPLUS
 	bool "TMS320C64X+"
 	select SERIAL_CORE
 
-config HPI_CONSOLE
-       bool "Host Port Interface Console"
+config TMS320C66X
+	bool "TMS320C66X"
+	select SERIAL_CORE
+	select SGMII_C66X
+
+config TI_KEYSTONE
+	bool
+
+config CIO_CONSOLE
+       bool "CIO Console"
        help
-         Say Y if you want a write-only console on the Host Port Interface.
+         Say Y if you want a write-only console over CIO.
          This is only useful for running kernels from a debugger or simulator.
 
-config PLL_TCI648X
-	bool "PLL_TCI648X"
+config PLL_C6X
+	bool "PLL driver"
 	depends on COMMON_CLKDEV
 
-config TIMER_TCI648X
-	bool "TIMER_TCI648X"
+config TIMER_C6X
+	bool "Timer driver"
 
-config PIC_C64XPLUS
-	bool "C64X+ Megamodule Interrupt Controller"
+config INTC_C64XPLUS
+	bool "C64x+ Megamodule Interrupt Controller"
 
-config GPIO_TCI648X
+config CP_INTC
+	bool "Communication Port Interrupt Controller"
+	depends on TMS320C66X
+	
+config GPIO_C6X
 	bool
 
 source "arch/c6x/platforms/Kconfig"
@@ -142,12 +156,10 @@ config USE_RT_TIMER
 	bool "Compensate for lost ticks"
 	default n
 
-config SGMII
-	bool "Ethernet SGMII support"
-	default n
-
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
+	depends on !TMS320C66X
+	select SGMII
 	default n
 
 config TMS320C64X_GEMAC_0
@@ -158,6 +170,16 @@ config TMS320C64X_GEMAC_0
 config TMS320C64X_GEMAC_1
 	bool "Second Ethernet interface"
 	depends on TMS320C64X_GEMAC && SOC_TMS320C6472
+	default n
+
+config SGMII
+	bool "Ethernet SGMII support for C64x"
+	depends on TMS320C64X_GEMAC
+	default n
+
+config SGMII_C66X
+	bool "Ethernet SGMII support for C66x"
+	depends on TMS320C66X
 	default n
 
 config EDMA3
@@ -215,7 +237,7 @@ endif
 config IPC
 	bool "Inter Processor Communication low-level driver"
 	default y
-	depends on (SOC_TMS320C6472 || SOC_TMS320C6474)
+	depends on (SOC_TMS320C6472 || SOC_TMS320C6474 || SOC_TMS320C6678 || SOC_TMS320C6670)
 
 config VIRTIO_IPC
 	bool "IPC driver for virtio devices"
@@ -248,13 +270,13 @@ config CONTIGUOUS_PAGE_ALLOC
 	bool
 	default y
 
-config PGCACHE_LIMIT
-	bool "page cache limit"
-	depends on CONTIGUOUS_PAGE_ALLOC
+#config PGCACHE_LIMIT
+#	bool "page cache limit"
+#	depends on CONTIGUOUS_PAGE_ALLOC
 
 config IDLE_LED
        bool "Use LED activity indicator based on idle loop"
-       depends on !(MTD_NAND_EVM6488 && (ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6457))
+       depends on !(MTD_NAND_GPIO_C6X && (ARCH_BOARD_EVM6472 || ARCH_BOARD_EVM6457))
        default n
 
 source "mm/Kconfig"

@@ -3,8 +3,8 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2006, 2009, 2010 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+ *  Copyright (C) 2006, 2009, 2010, 2011 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -13,6 +13,9 @@
 #ifndef __MACH_IRQ_C6474_H
 #define __MACH_IRQ_C6474_H
 
+/* 
+ * C64x+ core INTC event definitions
+ */
 #define IRQ_EVT0        0   /* combined events */
 #define IRQ_EVT1        1
 #define IRQ_EVT2        2
@@ -191,9 +194,37 @@
 #define IRQ_RACDEVENT1  (IRQ_CIC_START + 57)
 #define IRQ_SEMERR      (IRQ_CIC_START + 58)
 
-#define NR_CIC_IRQS	64
+#define NR_CIC_IRQS	   64
+#define NR_CIC_COMBINERS   2
+#define NR_CIC_OUTPUTS     16
 
-#define NR_SOC_IRQS	(IRQ_CIC_START + NR_CIC_IRQS)
+#define NR_SOC_IRQS        (IRQ_CIC_START + NR_CIC_IRQS) /* Total number of SoC IRQ */
+
+/*
+ * Level 2 INTC combiner definition
+ */
+#define NR_SOC_COMBINERS   (NR_CIC_COMBINERS) /* Number of combiners */
+
+/* 
+ * This macros return 1 if ack must be performed before handling irq.
+ * When handling IRQs through the CIC (but only the combined ones), ack after
+ * the handler runs.
+ */
+#define IRQ_SOC_COMBINER_PRE_ACK(irq)	        \
+	((irq) < IRQ_CIC_START || (irq) >= (IRQ_CIC_START + NR_CIC_COMBINERS))
+
+/*
+ * This macro return 1 if the irq number is a SoC combiner interrupt
+ */
+#define IRQ_SOC_COMBINER(irq)			\
+	((irq) >= CIC_MAPBASE &&		\
+	 (irq) < (CIC_MAPBASE + CIC_MAPLEN))
+
+/*
+ * This macro return 1 if the irq number is a SoC combiner combined interrupt
+ */
+#define IRQ_SOC_COMBINER_COMBINED(irq)		\
+	(((irq) - CIC_MAPBASE) < NR_CIC_COMBINERS)
 
 /*
  * C6x Chip Interrupt Controller (CIC) register layout
@@ -319,5 +350,9 @@
 #define CIC_TPCC_CIC1E15  61
 #define CIC_TPCC_CIC2E14  62
 #define CIC_TPCC_CIC2E15  63
+
+extern void irq_cic_map(unsigned int irq_src, unsigned int irq_dst);
+extern void irq_cic_unmap(unsigned int irq_src);
+extern void cic_raw_map(unsigned int src, unsigned int dst, int core);
 
 #endif /* __MACH_IRQ_C6474_H */

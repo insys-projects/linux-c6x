@@ -65,8 +65,12 @@
 #include <mach/edma-c6472.h>
 #elif defined(CONFIG_SOC_TMS320C6474)
 #include <mach/edma-c6474.h>
+#elif defined(CONFIG_SOC_TMS320C6670)
+#include <mach/edma-c6670.h>
+#elif defined(CONFIG_SOC_TMS320C6678)
+#include <mach/edma-c6678.h>
 #else
-#error "No machine IRQ definitions"
+#error "No machine EDMA definitions"
 #endif
 
 /* PaRAM slots are laid out like this */
@@ -106,6 +110,8 @@ struct edmacc_param {
 /*
  * EDMA3 base register addresses
  */
+#ifndef CONFIG_TMS320C66X
+
 #define EDMA_REGISTER_BASE	0x02a00000
 #define EDMA_TC0_BASE		0x02a20000
 #define EDMA_TC1_BASE		0x02a28000
@@ -113,6 +119,24 @@ struct edmacc_param {
 #define EDMA_TC3_BASE		0x02a38000
 #define EDMA_TC4_BASE		0x02a40000
 #define EDMA_TC5_BASE		0x02a48000
+
+#else /* CONFIG_TMS320C66X */
+
+#define EDMA0_REGISTER_BASE	0x02700000
+#define EDMA0_TC0_BASE		0x02760000
+#define EDMA0_TC1_BASE		0x02768000
+#define EDMA1_REGISTER_BASE	0x02720000
+#define EDMA1_TC0_BASE		0x02770000
+#define EDMA1_TC1_BASE		0x02778000
+#define EDMA1_TC2_BASE		0x02780000
+#define EDMA1_TC3_BASE		0x02788000
+#define EDMA2_REGISTER_BASE	0x02740000
+#define EDMA2_TC0_BASE		0x02790000
+#define EDMA2_TC1_BASE		0x02798000
+#define EDMA2_TC2_BASE		0x027a0000
+#define EDMA2_TC3_BASE		0x027a8000
+
+#endif /* CONFIG_TMS320C66X */
 
 #ifdef MACH_EDMA_REGION
 #define EDMA_REGION             MACH_EDMA_REGION
@@ -212,7 +236,7 @@ enum sync_dimension {
 #define EDMA_CONT_PARAMS_FIXED_EXACT	 1002
 #define EDMA_CONT_PARAMS_FIXED_NOT_EXACT 1003
 
-#define EDMA_MAX_CC               2
+#define EDMA_MAX_CC                      3
 
 /* alloc/free DMA channels and their dedicated parameter RAM slots */
 int edma_alloc_channel(int channel,

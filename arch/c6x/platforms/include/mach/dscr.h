@@ -169,6 +169,44 @@
 
 #endif   /* CONFIG_SOC_TMS320C6472 */
 
+#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#define DSCR_JTAGID                  0x02620018
+#define DSCR_DEVSTAT                 0x02620020
+#define DSCR_KICK0                   0x02620038
+#define DSCR_KICK1                   0x0262003c
+#define DSCR_BOOTADDR                0x02620040
+#define DSCR_BOOTCOMPLETE            0x0262013C
+#define DSCR_DEVCFG                  0x0262014c
+#define DSCR_MACID                   0x02620110
+#define DSCR_TINPSEL                 0x02620300
+#define DSCR_TOUTPSEL                0x02620304
+#define DSCR_MAINPLLCTL0             0x02620328
+#define DSCR_MAINPLLCTL1             0x0262032c
+#define DSCR_DDR3PLLCTL0	     0x02620330
+#define DSCR_DDR3PLLCTL1	     0x02620334
+#define DSCR_PAPLLCTL0	             0x02620338
+#define DSCR_SGMII_SERDES_CFGPLL     0x02620340
+#define DSCR_SGMII_SERDES_CFGRX0     0x02620344
+#define DSCR_SGMII_SERDES_CFGTX0     0x02620348
+#define DSCR_SGMII_SERDES_CFGRX1     0x0262034C
+#define DSCR_SGMII_SERDES_CFGTX1     0x02620350
+#define DSCR_OBSCLKCTL               0x026203ac
+#define DSCR_PRI_ALLOC               0x0288091c
+
+#define DSCR_KICK0_KEY               0x83E70B13
+#define DSCR_KICK1_KEY               0x95A4F1E0
+
+#define DSCR_B_DEVSTAT_LENDIAN       BIT(0)
+#define DSCR_B_DEVSTAT_PCIESSEN      BIT(16)
+
+#define DSP_BOOT_ADDR(x)             (DSCR_BOOTADDR + (x * 4))
+
+/* Using SGMII */
+#define DEVSTAT_MACSEL_OFFSET        0
+#define DEVSTAT_MACSEL_MASK          0
+
+#endif  /* CONFIG_SOC_TMS320C6670 */
+
 /*
  * MDIO interfaces
  */

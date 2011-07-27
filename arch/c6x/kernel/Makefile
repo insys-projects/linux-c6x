@@ -22,6 +22,8 @@ config-c64-y     += "CONFIG_TMS320C64X 		.set 1"
 config-c64-      += "CONFIG_TMS320C64X 		.set 0"
 config-c64plus-y += "CONFIG_TMS320C64XPLUS	.set 1"
 config-c64plus-  += "CONFIG_TMS320C64XPLUS	.set 0"
+config-c66-y     += "CONFIG_TMS320C66X		.set 1"
+config-c66-      += "CONFIG_TMS320C66X		.set 0"
 config-mtduclinux-y += "CONFIG_MTD_UCLINUX	.set 1"
 config-mtduclinux-  += "CONFIG_MTD_UCLINUX	.set 0"
 
@@ -33,6 +35,7 @@ $(obj)/c6x_config.inc: include/generated/autoconf.h
 	@echo $(config-preempt-$(CONFIG_PREEMPT)) > $(obj)/c6x_config.inc
 	@echo $(config-c64-$(CONFIG_TMS320C64X)) >> $(obj)/c6x_config.inc
 	@echo $(config-c64plus-$(CONFIG_TMS320C64XPLUS)) >> $(obj)/c6x_config.inc
+	@echo $(config-c66-$(CONFIG_TMS320C66X)) >> $(obj)/c6x_config.inc
 	@echo $(config-mtduclinux-$(CONFIG_MTD_UCLINUX)) >> $(obj)/c6x_config.inc
 
 endif

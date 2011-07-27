@@ -3,39 +3,63 @@ config SOC_TMS320C6455
 	bool "TMS320C6455"
 	default n
 	select TMS320C64XPLUS
-	select PLL_TCI648X
-	select GPIO_TCI648X
-	select TIMER_TCI648X
-	select PIC_C64XPLUS
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
 
 config SOC_TMS320C6457
 	bool "TMS320C6457"
 	default n
 	select TMS320C64XPLUS
-	select PLL_TCI648X
-	select GPIO_TCI648X
-	select TIMER_TCI648X
-	select PIC_C64XPLUS
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
 	select SGMII
 
 config SOC_TMS320C6472
 	bool "TMS320C6472"
 	default n
 	select TMS320C64XPLUS
-	select PLL_TCI648X
-	select GPIO_TCI648X
-	select TIMER_TCI648X
-	select PIC_C64XPLUS
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
 
 config SOC_TMS320C6474
 	bool "TMS320C6474"
 	default n
 	select TMS320C64XPLUS
-	select PLL_TCI648X
-	select GPIO_TCI648X
-	select TIMER_TCI648X
-	select PIC_C64XPLUS
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
 	select SGMII
+
+config SOC_TMS320C6670
+	bool "TMS320C6670"
+	default n
+	select TMS320C66X
+	select TI_KEYSTONE
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
+	select CP_INTC
+	select SGMII_C66X
+	
+config SOC_TMS320C6678
+	bool "TMS320C6678"
+	default n
+	select TMS320C66X
+	select TI_KEYSTONE
+	select PLL_C6X
+	select GPIO_C6X
+	select TIMER_C6X
+	select INTC_C64XPLUS
+	select CP_INTC
+	select SGMII_C66X
 
 comment "Board Selection"
 choice
@@ -43,7 +67,7 @@ choice
 	help
 	  This option specifies the specific board for which the kernel will be
 	  compiled.
-	
+
 config ARCH_BOARD_DSK6455
 	bool "DSK6455"
 	select SOC_TMS320C6455
@@ -63,5 +87,17 @@ config ARCH_BOARD_EVM6474
 config ARCH_BOARD_EVM6474L
 	bool "EVM6474L"
 	select SOC_TMS320C6474
+
+config ARCH_BOARD_EVMTCI6616
+	bool "EVMTCI6616"
+	select SOC_TMS320C6670
+
+config ARCH_BOARD_EVM6678
+	bool "EVM6678"
+	select SOC_TMS320C6678
+
+config ARCH_BOARD_EVM6670
+	bool "EVM6670"
+	select SOC_TMS320C6670
 
 endchoice

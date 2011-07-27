@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2006, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -42,8 +42,10 @@
 #include <asm/machdep.h>
 #include <asm/io.h>
 #include <asm/cache.h>
+#include <asm/xmc.h>
 #include <asm/pm.h>
 #include <asm/hardware.h>
+#include <asm/msmc.h>
 
 #include <mach/board.h>
 
@@ -66,7 +68,9 @@ static char c6x_command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __section(.cmdline) = CONFIG_CMDLINE;
 static const char *cpu_name, *cpu_voltage, *mmu, *fpu, *soc_rev;
 static char __cpu_rev[5], *cpu_rev;
+#ifdef CONFIG_BLK_DEV_INITRD
 static size_t initrd_size = CONFIG_BLK_DEV_RAM_SIZE*1024;
+#endif
 static unsigned int core_id = 0;
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
@@ -160,6 +164,16 @@ static void __init get_cpuinfo(void)
 		cpu_voltage = "1.2";
 		fpu = "none";
 		break;
+	case 20:
+		cpu_name = "C674x";
+		cpu_voltage = "1.2";
+		fpu = "yes";
+		break;
+	case 21:
+		cpu_name = "C66x";
+		cpu_voltage = "1.2";
+		fpu = "yes";
+		break;
 	default:
 		cpu_name = "unknown";
 		fpu = "none";
@@ -201,10 +215,10 @@ static void __init get_cpuinfo(void)
 		}
 	} else {
 		cpu_rev = __cpu_rev;
-		snprintf(__cpu_rev, sizeof(__cpu_rev), "0x%x", cpu_id);
+		snprintf(__cpu_rev, sizeof(__cpu_rev), "0x%x", rev_id);
 	}
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	core_id = get_coreid();
 #endif
 	printk(KERN_INFO "CPU%d: %s rev %s, %s volts, %uMHz\n",
@@ -468,6 +482,11 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Initialize the coherent memory */
 	coherent_mem_init();
+
+#ifdef ARCH_HAS_MSM
+	/* Initialize the MSM memory */
+	msm_mem_init();
+#endif /* ARCH_HAS_MSM */
 
 	/*
 	 * Give all the memory to the bootmap allocator,  tell it to put the

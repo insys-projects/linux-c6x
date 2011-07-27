@@ -17,8 +17,10 @@
 #define EMIFA_BASE 0x70000000
 #elif defined(CONFIG_SOC_TMS320C6457)
 #define EMIFA_BASE 0x70000000
+#elif defined(CONFIG_SOC_TMS320C6678)
+#define EMIFA_BASE 0x20C00000
 #else
-#error "EMIFA not supported on this SoC"
+#error "EMIF not supported on this SoC"
 #endif
 
 #define EMIFA_MIDR	__REG(EMIFA_BASE + 0x00)
@@ -58,6 +60,5 @@
 #define EMIFA_CFG_R_STROBE(n)	((((n) - 1) & 0x3f) << 5)
 #define EMIFA_CFG_R_HOLD(n)	((((n) - 1) & 0x07) << 2)
 /* Bus width same as Sync mode */
-
 
 #endif /* __MACH_C6X_EMIF_H */

@@ -35,7 +35,7 @@
 #define FP	A15
 #define SP	B15
 
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS)
+#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 #define HAVE_32_REGS 1
 #endif
 
@@ -148,7 +148,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
  ||	STDW	.D1T1	A11:A10,*A15--[1]
  ||	MVC	.S2	CSR,B12
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	STDW	.D2T2	B9:B8,*SP--[1]
  ||	STDW	.D1T1	A9:A8,*A15--[1]
  ||	MVC	.S2	RILC,B11
@@ -194,7 +194,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 
 	STDW	.D2T2	B13:B12,*SP--[1]	; save PC and CSR
 
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	STW	.D2T2	A4,*SP--[2]		; orig A4
 #else
 	STDW	.D2T2	B11:B10,*SP--[1]	; save RILC and ILC
@@ -210,7 +210,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 	.endm
 
 _DEFINE_MACRO(SAVE_ALL_EXCEPT)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	SAVE_ALL IRP
 #else
 	SAVE_ALL NRP,NTSR
@@ -218,7 +218,7 @@ _DEFINE_MACRO(SAVE_ALL_EXCEPT)
 	.endm
 
 _DEFINE_MACRO(SAVE_ALL_INT)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	SAVE_ALL IRP
 #else
 	SAVE_ALL IRP,ITSR
@@ -227,7 +227,7 @@ _DEFINE_MACRO(SAVE_ALL_INT)
 
 _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	LDDW	.D2T2	*++SP[1],B9:B8		; get TSR (B9)
 	LDDW	.D2T2	*++SP[1],B11:B10	; get RILC (B11) and ILC (B10)
 	LDDW	.D2T2	*++SP[1],B13:B12	; get PC (B13) and CSR (B12)
@@ -307,7 +307,7 @@ _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 	.endm
 
 _DEFINE_MACRO(RESTORE_ALL_EXCEPT)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	RESTORE_ALL IRP
 #else
 	RESTORE_ALL NRP,NTSR
@@ -315,7 +315,7 @@ _DEFINE_MACRO(RESTORE_ALL_EXCEPT)
 	.endm
 
 _DEFINE_MACRO(RESTORE_ALL_INT)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	RESTORE_ALL IRP
 #else
 	RESTORE_ALL IRP,ITSR
@@ -323,7 +323,7 @@ _DEFINE_MACRO(RESTORE_ALL_INT)
 	.endm
 
 _DEFINE_MACRO(MASK_SYSCALL)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	MVC	.S2	IER,B1
 	CLR	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
 	MVC	.S2	B1,IER
@@ -331,7 +331,7 @@ _DEFINE_MACRO(MASK_SYSCALL)
 	.endm
 
 _DEFINE_MACRO(UNMASK_SYSCALL)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	MVC	.S2	IER,B1
 	SET	.S2	B1,INT_SYSCALL,INT_SYSCALL,B1
 	MVC	.S2	B1,IER
@@ -351,7 +351,7 @@ _DEFINE_MACRO(UNMASK_INT,reg)
 	MVC	.S2	reg,CSR
 	.endm
 
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 #define SWITCH_STACK_SIZE (12*4+8)
 #else
 #define SWITCH_STACK_SIZE (14*4+8)
@@ -362,7 +362,7 @@ _DEFINE_MACRO(UNMASK_INT,reg)
 	;; B3 must contain the return addresse
 	;;
 _DEFINE_MACRO(SAVE_SWITCH_STACK)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	STW	.D2T2	B3,*SP--[12]		; push return address
 	STDW	.D2T2	B13:B12,*+SP[5]
 	STDW	.D2T2	B11:B10,*+SP[4]
@@ -383,7 +383,7 @@ _DEFINE_MACRO(SAVE_SWITCH_STACK)
 	.endm
 
 _DEFINE_MACRO(RESTORE_SWITCH_STACK)
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	LDDW	.D2T1	*+SP[1],A11:A10
 	LDDW	.D2T1	*+SP[2],A13:A12
 	LDDW	.D2T1	*+SP[3],A15:A14
@@ -531,7 +531,7 @@ ret_from_exception:
 	;; is a little bit different
 	;;
 ret_from_interrupt:
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	;;
 	;; Check if we are comming from user mode.
 	;; C6x doesn't have a user/supervisor mode
@@ -580,7 +580,7 @@ resume_userspace:
 	;; A4,B4,A6,B6,A8,B8 = arguments of the syscall function
 	;; A4 is the return value register
 	;;
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 	.global _system_call
 _system_call:
 	SAVE_ALL_EXCEPT			; save A0-A9/B0-B9 registers in stack
@@ -590,7 +590,7 @@ _system_call:
 system_call_saved:
 	MVK	.L2	1,B2
 	STW	.D2T2	B2,*+SP(REGS__END+8)	; set syscall flag
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	MVC	.S2	B2,ECR			; acknowledge the software exception
 #endif
 
@@ -673,7 +673,7 @@ _int5_handler:
 	MASK_SYSCALL
 	CALL_INT 5
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	.global	_int6_handler
 _int6_handler:
 	SAVE_ALL_INT
@@ -739,7 +739,7 @@ _bad_interrupt:
 	;;
 	.global _nmi_handler
 _nmi_handler:
-#ifndef CONFIG_TMS320C64XPLUS
+#if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
 
 	B	.S2	NRP
 	NOP	5
@@ -816,7 +816,7 @@ preempt_schedule:
 	ADDKPC	.S2	preempt_schedule,B3,4
 #endif
 
-#ifdef CONFIG_TMS320C64XPLUS
+#if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 	.global enable_exception
 enable_exception:
 	DINT

@@ -3,8 +3,8 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2007, 2009 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
+ *  Copyright (C) 2007, 2009, 2011 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -19,7 +19,7 @@
 #include <asm/sgmii.h>
 #include <asm/gemac.h>
 
-int sgmii_reset(void)
+int sgmii_reset(int port)
 {
 	sgmii_setbit_reg(SGMII_SRESET_REG, SGMII_SRESET_RESET); /* soft reset */
 	while(sgmii_get_reg(SGMII_SRESET_REG) != 0x0);
@@ -28,7 +28,7 @@ int sgmii_reset(void)
 	return 0;
 }
 
-int sgmii_config(struct sgmii_config_s *config)
+int sgmii_config(int port, struct sgmii_config_s *config)
 {
 	unsigned int val1 = 0, val2 = 0;
 

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/c6x/drivers/timer-tci648x.c
+ *  linux/arch/c6x/drivers/timer.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *

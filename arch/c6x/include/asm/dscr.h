@@ -13,13 +13,11 @@
 #ifndef __ASM_C6X_DSCR_H
 #define __ASM_C6X_DSCR_H
 
+#include <asm/io.h>
 #include <mach/dscr.h>
 
-#define dscr_set_reg(reg, val) \
-        *((volatile u32 *) (reg)) = (u32) (val)
-        
-#define dscr_get_reg(reg) \
-        *((volatile u32 *) (reg))
+#define dscr_set_reg(reg, val) __raw_writel((u32) val, reg)
+#define dscr_get_reg(reg)      __raw_readl(reg)
 
 #if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6472)
 static inline void dscr_set_device(unsigned int w, unsigned int reg)
@@ -30,5 +28,4 @@ static inline void dscr_set_device(unsigned int w, unsigned int reg)
 	}
 }
 #endif
-
 #endif /*__ASM_C6X_DSCR_H */

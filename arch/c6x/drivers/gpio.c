@@ -25,6 +25,7 @@
 #include <linux/irq.h>
 
 static struct tci648x_gpio chips[DIV_ROUND_UP(NR_SOC_GPIO, 32)];
+static unsigned __gpio_irq_list[] = MACH_GPIO_IRQ_LIST_DEF();
 
 /* create a non-inlined version */
 static struct gpio_controller __iomem * __init gpio2controller(unsigned gpio)
@@ -120,23 +121,11 @@ static int __init c6x_gpio_setup(void)
 }
 pure_initcall(c6x_gpio_setup);
 
-static unsigned __irq_to_mask(unsigned irq)
-{
-#ifdef CONFIG_SOC_TMS320C6472
-	if (irq == IRQ_GPIO_START)
-		return 1 << get_coreid();
-
-	return 1 << (CORE_NUM + irq - IRQ_GPIO_START - 1);
-#else
-	return 1 << (irq - IRQ_GPIO_START);
-#endif
-}
-
 static int c6x_gpio_irq_type(unsigned irq, unsigned trigger)
 {
 	struct gpio_controller *__iomem g = get_irq_chip_data(irq);
 	struct irq_desc *desc = irq_to_desc(irq);
-	u32 mask = __irq_to_mask(irq);
+	u32 mask = __mach_gpio_irq_to_mask(irq);
 
 	if (trigger & ~(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING))
 		return -EINVAL;
@@ -157,19 +146,13 @@ static int c6x_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 	if (offset >= NR_SOC_GPIO)
 		return -ENODEV;
 
-#ifdef CONFIG_SOC_TMS320C6472
-	if (offset == get_coreid())
-		return IRQ_GPIOINT;
-	else if (offset < CORE_NUM)
-		return -ENODEV;
-	offset -= (CORE_NUM - 1);
-#endif
-	return IRQ_GPIO_START + offset;
+	return __mach_gpio_to_irq(offset);
 }
 
 static int __init c6x_gpio_irq_setup(void)
 {
-	unsigned	irq;
+	unsigned irq;
+	unsigned index; 
 	struct gpio_controller	*__iomem g;
 	struct irq_desc *desc;
 	struct irq_chip *chip;
@@ -183,7 +166,8 @@ static int __init c6x_gpio_irq_setup(void)
 	chips[0].irq_base = IRQ_GPIO_START;
 
 	/* set the direct IRQs up to use that irqchip */
-	for (irq = IRQ_GPIO_START; irq <= IRQ_GPIO15; irq++) {
+	for (index = 0; index < ARRAY_SIZE(__gpio_irq_list); index++) {
+		irq  = __gpio_irq_list[index];
 		desc = irq_to_desc(irq);
 		chip = get_irq_desc_chip(desc);
 
@@ -195,7 +179,7 @@ static int __init c6x_gpio_irq_setup(void)
 	/* allow GPIO line interrupts */
 	__raw_writel(BIT(0), SOC_GPIO_BASE + 0x08);
 
-	printk(KERN_INFO "C64x: %d gpio irqs\n", irq - IRQ_GPIO_START);
+	printk(KERN_INFO "C64x: %d gpio irqs\n", index);
 
 	return 0;
 }

@@ -1,8 +1,9 @@
 /*
- * Clock and PLL control for TCI648x devices
+ * Clock and PLL control for C6x devices
  *
- * Copyright (C) 2010 Texas Instruments.
+ * Copyright (C) 2010, 2011 Texas Instruments.
  * Contributed by: Mark Salter <msalter@redhat.com>
+ *                 Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * Copied heavily from arm/mach-davinci/clock.c, so:
  *
@@ -273,14 +274,14 @@ static unsigned long clk_pllclk_recalc(struct clk *clk)
 	if (clk->flags & FIXED_RATE_PLL)
 		return rate;
 
-	pll->base = IO_ADDRESS(pll->phys_base);
+	pll->base = (void *) ioremap(pll->phys_base, PAGE_SIZE);
 	ctrl = __raw_readl(pll->base + PLLCTL);
 	rate = pll->input_rate = clk->parent->rate;
 
 	if (ctrl & PLLCTL_PLLEN) {
 		bypass = 0;
-		mult = __raw_readl(pll->base + PLLM);
-		mult = (mult & PLLM_PLLM_MASK) + 1;
+
+		mult = get_main_pll_mult(pll->base);
 	} else
 		bypass = 1;
 

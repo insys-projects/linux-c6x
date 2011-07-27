@@ -464,10 +464,10 @@ config MTD_NAND_SH_FLCTL
 
 config MTD_NAND_DAVINCI
         tristate "Support NAND on DaVinci SoC"
-        depends on ARCH_DAVINCI
+        depends on (ARCH_DAVINCI || SOC_TMS320C6678)
         help
 	  Enable the driver for NAND flash chips on Texas Instruments
-	  DaVinci processors.
+	  DaVinci and C66x processors.
 
 config MTD_NAND_TXX9NDFMC
 	tristate "NAND Flash support for TXx9 SoC"

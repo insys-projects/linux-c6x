@@ -1,0 +1,301 @@
+/*
+ *  linux/arch/c6x/platforms/platform-c66xx.c
+ *
+ *  Port on Texas Instruments TMS320C6x architecture
+ *
+ *  Copyright (C) 2011 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ */
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/fs.h>
+#include <linux/genhd.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/delay.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/kernel_stat.h>
+#include <linux/types.h>
+#include <linux/i2c.h>
+#include <linux/ioport.h>
+#include <linux/platform_device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mtd/plat-ram.h>
+#include <linux/mtd/physmap.h>
+
+#include <asm/pll.h>
+#include <asm/setup.h>
+#include <asm/irq.h>
+#include <asm/dscr.h>
+
+#include <mach/board.h>
+
+/*
+ * Resources present on the SoC
+ */
+static struct resource c6x_soc_res = {
+	.name = "C66X SOC peripherals",
+	.start = 0x01000000, .end = 0x02ffffff
+};
+
+#if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
+extern unsigned int c6x_platram_start;
+extern unsigned int c6x_platram_size;
+
+#ifdef CONFIG_MTD_PARTITIONS
+static const char *part_probe_types[] = { "cmdlinepart", NULL };
+#endif
+
+static struct platdata_mtd_ram c6x_plat_data = {
+	.mapname   = "DRAM",
+#ifdef CONFIG_MTD_PARTITIONS
+	.probes    = (const char **) part_probe_types,
+#endif
+	.bankwidth = 4,
+};
+
+static struct resource c6x_platram_resource = {
+	.start = 0,
+	.end   = 0,
+	.flags = IORESOURCE_MEM,
+};
+
+static struct platform_device c6x_platram_device = {
+	.name          = "mtd-ram",
+	.id            = 8,
+	.dev = {
+		.platform_data = &c6x_plat_data,
+	},
+	.num_resources = 1,
+	.resource      = &c6x_platram_resource,
+};
+#endif
+
+static void init_pll(void)
+{
+	unsigned int val;
+
+	/* Unlock DSCR boot config */
+	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+
+	/* Set ENSAT */
+	val = dscr_get_reg(DSCR_MAINPLLCTL1) | 0x40;
+	dscr_set_reg(DSCR_MAINPLLCTL1, val);
+
+	/* Set OUTPUT_DIVIDE and Main PLL Bypass enabled */
+	pll1_set_reg(SECCTL, 0x810000 | ((PLL_OUTDIV - 1) << 19));
+
+	udelay(10);
+	
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLENSRC);
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLEN);
+
+	udelay(10);
+
+	/* Reset PLL */
+	pll1_setbit_reg(PLLCTL, PLLCTL_PLLRST);
+	if (pll1_get_reg(PLLCTL & 0x2) != 0) {
+		val = pll1_get_reg(PLLCTL) & 0xfffffffd;
+		pll1_setbit_reg(PLLCTL, val);
+
+		/* Wait PLL stabilization time */
+		udelay(150);
+	}
+	
+	/* Set PLL multiplier * 2 in PLLM */
+	pll1_set_reg(PLLM, PLLM_VAL(PLL_MUL*2));
+
+	/* Program main PLL BWADJ field */
+	val = dscr_get_reg(DSCR_MAINPLLCTL0);
+	val = (((PLL_MUL + 1)/2  - 1) << 24) & 0xff000000;
+	dscr_set_reg(DSCR_MAINPLLCTL0, val);
+
+	/*
+	 * This can't be right. There is no predivider here...
+	 * pll1_set_reg(PLLPREDIV, PLLPREDIV_VAL(10) | PLLPREDIV_EN);
+	 */
+	pll1_wait_gostat();
+
+	/*  Set divider */
+	pll1_set_reg(PLLDIV2, PLLDIV_RATIO(PLL_DIV2) | PLLDIV_EN);
+	pll1_set_reg(PLLDIV5, PLLDIV_RATIO(PLL_DIV5) | PLLDIV_EN);
+	pll1_set_reg(PLLDIV8, PLLDIV_RATIO(PLL_DIV8) | PLLDIV_EN);
+	
+	/* Adjust modified related sysclk align */
+	pll1_set_reg(PLLALNCTL, pll1_get_reg(PLLDCHANGE));
+
+	pll1_setbit_reg(PLLCMD, PLLCMD_GOSTAT);
+
+	pll1_wait_gostat();
+
+	/* Wait for PLL to lock */
+	udelay(5);
+
+	pll1_clearbit_reg(PLLCTL, PLLCTL_PLLRST);
+
+	udelay(40);
+
+	/* Main PLL Bypass disabled, set OUTPUT_DIVIDE */
+	pll1_set_reg(SECCTL, 0x10000 | ((PLL_OUTDIV - 1) << 19)); 
+	pll1_setbit_reg(PLLCTL, PLLCTL_PLLEN);
+
+	/* Do not lock DSCR for multicore issue reason */
+}
+
+static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
+{
+	volatile unsigned int *mdctl;
+	volatile unsigned int *mdstat;
+	volatile unsigned int *pdctl;
+	int timeout;
+
+	/* Only core 0 can set PSC */
+	if (get_coreid() == 0) {
+		mdctl  = (volatile unsigned int *) (PSC_MDCTL0 + (id << 2));
+		mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
+		pdctl  = (volatile unsigned int *) (PSC_PDCTL0 + (pd << 2));
+		
+		if (state == PSC_SYNCRESET)
+			return 0; /* not yet supported */
+
+		/* If state is already set, do nothing */
+		if ((*mdstat & 0x1f) == state)
+			return 1;
+
+		/* Wait transition and check if we got timeout error while waiting */
+		timeout = 0;
+		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
+			udelay(1);
+			if (timeout++ > 150) {
+				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
+				return -1;
+			}
+		}
+
+		/* Set power domain control */
+		*pdctl = (*pdctl) | 0x00000001;
+            
+		/* Set MDCTL NEXT to new state */
+		*mdctl = ((*mdctl) & ~(0x1f)) | state;
+			
+		/* Start power transition by setting PTCMD GO to 1 */
+		*(volatile unsigned int *) (PSC_PTCMD) =
+			*(volatile unsigned int *) (PSC_PTCMD) | (0x1 << pd);
+
+		/* Wait for PTSTAT GOSTAT to clear */
+		timeout = 0;
+		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
+			udelay(1);
+			if (timeout++ > 150) {
+				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
+				return -1;
+			}
+		}
+
+		/* Verify that state changed */
+		udelay(1);
+		if((*mdstat & 0x1f ) != state) {
+			printk(KERN_DEBUG "PSC: pd %d, id %d state did not change (%d != %d)\n",
+			       pd, id, state, *mdstat);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Enable needed SoC devices
+ */
+static void init_power(void)
+{
+#if defined(CONFIG_SOC_TMS320C6678) && (defined(CONFIG_SPI) || defined(CONFIG_MTD))
+	/* EMIF16 and SPI (C6678 only) */
+	set_psc_state(0, PSC_EMIF25_SPI, PSC_ENABLE);
+#endif
+#ifdef CONFIG_TI_KEYSTONE_NETCP
+	/* NetCP, PA and SA */
+        set_psc_state(2, PSC_PA,     PSC_ENABLE);
+        set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
+/*      set_psc_state(2, PSC_SA,     PSC_ENABLE); */
+#endif
+#ifdef CONFIG_PCI
+	/* PCIe */
+        set_psc_state(3, PSC_PCIE, PSC_ENABLE);
+#endif
+#ifdef CONFIG_RAPIDIO_TCI648X
+	/* sRIO */
+        set_psc_state(4, PSC_SRIO, PSC_ENABLE);
+#endif
+#if 0
+	/* HyperLink and MSMC RAM */
+        set_psc_state(5, PSC_HYPERLINK, PSC_ENABLE);
+        set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
+#endif
+}
+
+#ifdef CONFIG_TI_KEYSTONE_NETCP
+#include <mach/keystone_netcp.h>
+#include <mach/keystone_qmss.h>
+
+struct netcp_platform_data netcp_data = {
+	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
+	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,
+};
+
+static struct platform_device netcp_dev0 = {
+	.name           = "keystone_netcp",
+        .id             = 0,
+	.dev = {
+		.platform_data = &netcp_data,
+	},
+};
+
+static int __init setup_netcp(void)
+{
+        return platform_device_register(&netcp_dev0);
+}
+
+core_initcall(setup_netcp);
+#endif
+
+void c6x_soc_setup_arch(void)
+{
+ 	/* Initialize C66x IRQs */          	
+	clear_all_irq(); /* acknowledge all pending irqs */
+
+	init_pll();
+
+	init_power();
+
+	/* Initialize SoC resources */
+	iomem_resource.name = "Memory";
+	request_resource(&iomem_resource, &c6x_soc_res);
+}
+
+static int __init platform_arch_init(void)
+{
+	int status = 0;
+
+#if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
+	if (c6x_platram_size) {
+
+		c6x_platram_resource.start = c6x_platram_start;
+		c6x_platram_resource.end   = c6x_platram_start + c6x_platram_size - 1;
+
+		status  = platform_device_register(&c6x_platram_device);
+			printk(KERN_ERR "Could not register platram device: %d\n", status);
+	}
+#endif
+	return status;
+}
+
+arch_initcall(platform_arch_init);

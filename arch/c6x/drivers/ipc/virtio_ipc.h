@@ -140,7 +140,7 @@ struct virtio_ipc_device {
 extern int master_core;
 
 /*
- *
+ * Caches synchronization primitives (if needed)
  */
 #define VIRTIO_USE_CACHED_RING
 

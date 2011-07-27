@@ -1,5 +1,5 @@
 /*
- * TI tci648x GPIO Support
+ * TI C6x GPIO Support
  *
  * Copyright (c) 2010 Texas Instruments Incorporated
  * Based on arm/mach-tci648x gpio.h by Mark Salter <msalter@redhat.com>
@@ -13,12 +13,23 @@
  * (at your option) any later version.
  */
 
-#ifndef	__TCI648X_GPIO_H
-#define	__TCI648X_GPIO_H
+#ifndef	__MACH_GPIO_H
+#define	__MACH_GPIO_H
 
 #include <linux/io.h>
 
-#define SOC_GPIO_BASE 0x02B00000
+#if defined(CONFIG_SOC_TMS320C6455) || defined(CONFIG_SOC_TMS320C6457)
+#include <mach/gpio-c645x.h>
+#elif defined(CONFIG_SOC_TMS320C6472)
+#include <mach/gpio-c6472.h>
+#elif defined(CONFIG_SOC_TMS320C6474)
+#include <mach/gpio-c6474.h>
+#elif defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#include <mach/gpio-c667x.h>
+#else
+#error "No machine GPIO definitions"
+#endif
+
 #define NR_SOC_GPIO   16
 
 /*
@@ -153,4 +164,4 @@ static inline int irq_to_gpio(unsigned irq)
 	return -ENOSYS;
 }
 
-#endif				/* __TCI648X_GPIO_H */
+#endif	/* __MACH_GPIO_H */

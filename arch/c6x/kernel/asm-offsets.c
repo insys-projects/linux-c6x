@@ -15,7 +15,7 @@
 
 void foo(void)
 {
-#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(_TMS320C6400)
+#if defined(CONFIG_TMS320C64X) || defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X) || defined(_TMS320C6400)
 	OFFSET(REGS_A16,	pt_regs, a16);
 	OFFSET(REGS_A17,	pt_regs, a17);
 	OFFSET(REGS_A18,	pt_regs, a18);

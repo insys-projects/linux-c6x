@@ -245,86 +245,10 @@ static void __init evm_setup_edma(void)
 #define evm_setup_edma()
 #endif /* CONFIG_EDMA3 */
 
-static struct pll_data pll1_data = {
-	.num       = 1,
-	.phys_base = ARCH_PLL1_BASE,
-};
-
-static struct clk clkin1 = {
-	.name = "clkin1",
-	.rate = 60000000,
-	.node = LIST_HEAD_INIT(clkin1.node),
-	.children = LIST_HEAD_INIT(clkin1.children),
-	.childnode = LIST_HEAD_INIT(clkin1.childnode),
-};
-
-static struct clk pll1_clk = {
-	.name = "pll1",
-	.parent = &clkin1,
-	.pll_data = &pll1_data,
-	.flags = CLK_PLL,
-};
-
-static struct clk pll1_sysclk1 = {
-	.name = "pll1_sysclk1",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 1,
-};
-
-static struct clk pll1_sysclk2 = {
-	.name = "pll1_sysclk2",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 3,
-};
-
-static struct clk pll1_sysclk3 = {
-	.name = "pll1_sysclk3",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL | FIXED_DIV_PLL,
-	.div = 6,
-};
-
-static struct clk pll1_sysclk4 = {
-	.name = "pll1_sysclk4",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL,
-	.div = PLLDIV4,
-};
-
-static struct clk pll1_sysclk5 = {
-	.name = "pll1_sysclk5",
-	.parent = &pll1_clk,
-	.flags = CLK_PLL,
-	.div = PLLDIV5,
-};
-
-static struct clk i2c_clk = {
-	.name = "i2c",
-	.parent = &pll1_sysclk3,
-};
-
-static struct clk core_clk = {
-	.name = "core",
-	.parent = &pll1_sysclk1,
-};
-
-static struct clk watchdog_clk = {
-	.name = "watchdog",
-	.parent = &pll1_sysclk5,
-};
+SOC_CLK_DEF(60000000);  /* clkin is a 60 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
-	CLK(NULL, "pll1", &pll1_clk),
-	CLK(NULL, "pll1_sysclk1", &pll1_sysclk1),
-	CLK(NULL, "pll1_sysclk2", &pll1_sysclk2),
-	CLK(NULL, "pll1_sysclk3", &pll1_sysclk3),
-	CLK(NULL, "pll1_sysclk4", &pll1_sysclk4),
-	CLK(NULL, "pll1_sysclk5", &pll1_sysclk5),
-	CLK(NULL, "core", &core_clk),
-	CLK("i2c_davinci.1", NULL, &i2c_clk),
-	CLK("watchdog", NULL, &watchdog_clk),
+        SOC_CLK(),
 	CLK("", NULL, NULL)
 };
 

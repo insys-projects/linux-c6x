@@ -1,0 +1,38 @@
+#
+# KeyStone Plaftorm Specific Drivers
+#
+
+menuconfig TI_KEYSTONE_PLATFORM_DEVICES
+	bool "KeyStone Platform Specific Device Drivers"
+	default y
+	depends on TI_KEYSTONE
+	---help---
+	  Say Y here to select options for device drivers for KeyStone
+	  platforms. This option alone does not add any kernel code.
+
+          If you sau N, all options in this submenu will be skipped and
+          disabled.
+
+if TI_KEYSTONE_PLATFORM_DEVICES
+
+config TI_KEYSTONE_PA
+	tristate "TI Keystone Packet Accelerator"
+	help
+	  This driver supports TI's Keystone Packet Accelerator.
+
+config TI_KEYSTONE_QM
+	tristate "TI Keystone Packet Queue Manager"
+	help
+	  This driver supports TI's Keystone Queue Manager.
+
+config TI_KEYSTONE_PKTDMA
+	tristate "TI Keystone Packet DMA"
+	help
+	  This driver supports TI's Keystone Packet DMA.
+
+config TI_KEYSTONE_CPSW
+	tristate "TI Keystone CPSW"
+	help
+	  This driver supports TI's Keystone CPSW.
+
+endif
