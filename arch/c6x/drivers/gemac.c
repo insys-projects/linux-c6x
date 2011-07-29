@@ -28,7 +28,7 @@
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/gmdio.h>
+#include <asm/mdio.h>
 #include <asm/gemac.h>
 
 #undef EMAC_DEBUG

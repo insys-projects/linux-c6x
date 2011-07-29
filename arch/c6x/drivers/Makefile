@@ -12,8 +12,7 @@ obj-$(CONFIG_TIMER_C6X)        += timer.o
 obj-$(CONFIG_INTC_C64XPLUS)    += intc-c64xplus.o
 obj-$(CONFIG_CP_INTC)          += cp-intc.o
 
-obj-$(CONFIG_TMS320C64X_GEMAC) += gemac.o gmdio.o
-obj-$(CONFIG_TMS320C6X_EMAC)   += emac.o mdio.o
+obj-$(CONFIG_TMS320C64X_GEMAC) += gemac.o mdio.o
 obj-$(CONFIG_SGMII)            += sgmii.o
 obj-$(CONFIG_SGMII_C66X)       += sgmii-c66x.o
 

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/c6x/kernel/gmdio.c
+ *  linux/arch/c6x/kernel/mdio.c
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
@@ -20,7 +20,7 @@
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/gmdio.h>
+#include <asm/mdio.h>
 #include <asm/pll.h>
 
 static struct mdio_status mdios;
@@ -99,7 +99,7 @@ int mdio_init(unsigned int txid_version)
 
 	mdios.mode = MDIO_MODE_AUTONEG; /* autonegotiate */
 	mdio_init_state_machine();
-	mdio_set_reg(MDIO_CONTROL, EMAC_B_ENABLE | (VBUSCLK & EMAC_M_CLKDIV));
+	mdio_set_reg(MDIO_CONTROL, MDIO_B_ENABLE | (VBUSCLK & MDIO_M_CLKDIV));
 	return 0;
 }
 

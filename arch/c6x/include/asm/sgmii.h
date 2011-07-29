@@ -34,6 +34,21 @@ extern int sgmii_config(int port, struct sgmii_config_s *config);
 #define SGMII_CTL_LOOPBACK    0x10
 #define SGMII_CTL_MASTER      0x20
 
+/*
+ * SGMII registers
+ */
+#define SGMII_IDVER_REG(x)    (SGMII_REG_BASE + (x * 0x100) + 0x000)
+#define SGMII_SRESET_REG(x)   (SGMII_REG_BASE + (x * 0x100) + 0x004)
+#define SGMII_CTL_REG(x)      (SGMII_REG_BASE + (x * 0x100) + 0x010)
+#define SGMII_STATUS_REG(x)   (SGMII_REG_BASE + (x * 0x100) + 0x014)
+#define SGMII_MRADV_REG(x)    (SGMII_REG_BASE + (x * 0x100) + 0x018)
+#define SGMII_LPADV_REG(x)    (SGMII_REG_BASE + (x * 0x100) + 0x020)
+#define SGMII_TXCFG_REG(x)    (SGMII_REG_BASE + (x * 0x100) + 0x030)
+#define SGMII_RXCFG_REG(x)    (SGMII_REG_BASE + (x * 0x100) + 0x034)
+#define SGMII_AUXCFG_REG(x)   (SGMII_REG_BASE + (x * 0x100) + 0x038)
+
+#define SGMII_REG_STATUS_FIELD_LOCK	        (1<<4)
+
 #define sgmii_setbit_reg(reg, val) \
         *((volatile u32 *) (reg)) |= (u32) (val)
 	    

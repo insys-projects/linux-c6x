@@ -168,7 +168,7 @@
 
 #endif  /* CONFIG_SOC_TMS320C6472 */
 
-#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#ifdef CONFIG_TI_KEYSTONE
 #define PSC_BASE                     0x02350000
 #define PSC_PTCMD                    0x02350120
 #define PSC_PTSTAT                   0x02350128
@@ -213,7 +213,19 @@
 #define PSC_SYNCRESET                0x1000
 #define PSC_DISABLE                  0x0000
 #define PSC_ENABLE                   0x0003
-#endif /* CONFIG_SOC_TMS329C6670 || CONFIG_SOC_TMS320C6678 */
+#endif /* CONFIG_TI_KEYSTONE */
+
+/* 
+ * MDIO and SGMII registers
+ */
+#ifdef CONFIG_TI_KEYSTONE
+#define SGMII_REG_BASE               0x02090100
+#define MDIO_REG_BASE                0x02090300
+#else
+/* C64x architecture case */ 
+#define SGMII_REG_BASE               0x02c40000
+#define MDIO_REG_BASE                0x02c81800
+#endif
 
 #ifdef CONFIG_SOC_TMS320C6670
 /* On C6670 the mapping of MDCTL to core is not linear */
@@ -252,7 +264,7 @@
 #define IPCGR_BASE                   0x02a80540
 #define IPCAR_BASE                   0x02a80580
 #endif
-#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#ifdef CONFIG_TI_KEYSTONE
 #define NMIGR_BASE                   0x02620200
 #define IPCGR_BASE                   0x02620240
 #define IPCGRH                       0x0262027c
@@ -270,17 +282,17 @@
 #define MCBSP1_EDMA_BASE_ADDR        0x34000000
 #endif
 
-#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#ifdef CONFIG_TI_KEYSTONE
 #define UART_BASE_ADDR               0x02540000
 #endif
 
-#if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
+#ifdef CONFIG_TI_KEYSTONE
 /*
  * KeyStone specific features
  */
 #define ARCH_HAS_XMC_PREFETCHW       /* Use prefetch buffers */
 #define ARCH_HAS_XMC_MPAX            /* Use XMC address extension  */
 #define ARCH_HAS_MSM                 /* Architecture has MSM */
-#endif /* (CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678) */
+#endif /* CONFIG_TI_KEYSTONE */
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

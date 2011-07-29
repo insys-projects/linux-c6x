@@ -20,13 +20,13 @@
 #include <asm/setup.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
-#include <asm/gmdio.h>
 #include <asm/sgmii.h>
 #include <asm/dscr.h>
 
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
+#include <mach/keystone_cpsw.h>
 
 static int serdes_init(void)
 {
@@ -117,7 +117,7 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 							     + CPSW_REG_ALE_CONTROL));
     
 	/* All ports put into forward mode */
-	for (i = 0; i < DEVICE_CPSW_NUM_PORTS; i++)
+	for (i = 0; i < CPSW_NUM_PORTS; i++)
 		__raw_writel(CPSW_REG_VAL_PORTCTL_FORWARD_MODE,
 			     (DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
 	

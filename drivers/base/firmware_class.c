@@ -177,9 +177,24 @@ static ssize_t firmware_loading_store(struct device *dev,
 	case 0:
 		if (test_bit(FW_STATUS_LOADING, &fw_priv->status)) {
 			vfree(fw_priv->fw->data);
+#ifdef CONFIG_MMU
 			fw_priv->fw->data = vmap(fw_priv->pages,
 						 fw_priv->nr_pages,
 						 0, PAGE_KERNEL_RO);
+#else
+			if (fw_priv->nr_pages == 1) {
+				/* 
+				 * Without MMU we can only map the first page, so
+				 * the restriction is that the firmware image must be
+				 * smaller than 4096KB.
+				 */
+				fw_priv->fw->data = page_to_virt(fw_priv->pages[0]);
+			} else {
+				dev_err(dev, "%s: vmap() failed, size limited to %d\n",
+					__func__, PAGE_SIZE);
+				goto err;
+			}
+#endif
 			if (!fw_priv->fw->data) {
 				dev_err(dev, "%s: vmap() failed\n", __func__);
 				goto err;

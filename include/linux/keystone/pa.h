@@ -16,6 +16,8 @@
 #ifndef KEYSTONE_PA_H
 #define KEYSTONE_PA_H
 
+#ifdef __KERNEL__
+
 struct pa_config {
 	/* 32 most significant bits of the mac address */
 	u32  mac0_ms;
@@ -34,16 +36,19 @@ struct pa_config {
 	/* Receive packet queue number */
 	u32  rx_qnum;
 	/* Buffer used to create PA command */
-	u8   *cmd_buf;
+	u8  *cmd_buf;
 };
 
 /* 
  * Prototypes
  */
 int keystone_pa_enable(int pdsp);
-int keystone_pa_disable(void);
+int keystone_pa_disable(int pdsp);
 int keystone_pa_reset(void);
-int keystone_pa_config(u8 *mac_addr);
+int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len);
+int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len);
+int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac_addr);
+#endif /* __KERNEL__ */
 
 #endif /* KEYSTONE_PA_H */
 

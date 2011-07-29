@@ -301,24 +301,6 @@
 #define EMAC_CONFIG_PASSCONTROL   0x20 /* pass control frames */
 #define EMAC_CONFIG_PACING        0x40 /* use interrupt pacing */
 
-#if defined(CONFIG_SGMII)
-
-/*
- * SGMII registers
- */
-#define SGMII_REG_BASE            0x02c40000
-#define SGMII_IDVER_REG           (SGMII_REG_BASE + 0x000)
-#define SGMII_SRESET_REG          (SGMII_REG_BASE + 0x004)
-#define SGMII_CTL_REG             (SGMII_REG_BASE + 0x010)
-#define SGMII_STATUS_REG          (SGMII_REG_BASE + 0x014)
-#define SGMII_MRADV_REG           (SGMII_REG_BASE + 0x018)
-#define SGMII_LPADV_REG           (SGMII_REG_BASE + 0x020)
-#define SGMII_TXCFG_REG           (SGMII_REG_BASE + 0x030)
-#define SGMII_RXCFG_REG           (SGMII_REG_BASE + 0x034)
-#define SGMII_AUXCFG_REG          (SGMII_REG_BASE + 0x038)
-
-#endif /* CONFIG_SGMII*/
-
 #if defined(CONFIG_SOC_TMS320C6474) || defined(CONFIG_SOC_TMS320C6457)
 
 /*

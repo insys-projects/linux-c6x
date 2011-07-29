@@ -18,45 +18,6 @@
 
 #include <linux/netdevice.h>
 
-/*
- * SGMII registers
- */
-#define SGMII_BASE_ADDRESS	                { 0x02090100, 0x02090200 }
-#define SGMII_IDVER_REG(x)	                (0x02090100 + (x * 0x100) + 0x000)
-#define SGMII_SRESET_REG(x)	                (0x02090100 + (x * 0x100) + 0x004)
-#define SGMII_CTL_REG(x)	                (0x02090100 + (x * 0x100) + 0x010)
-#define SGMII_STATUS_REG(x)	                (0x02090100 + (x * 0x100) + 0x014)
-#define SGMII_MRADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x018)
-#define SGMII_LPADV_REG(x)	                (0x02090100 + (x * 0x100) + 0x020)
-#define SGMII_TXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x030)
-#define SGMII_RXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x034)
-#define SGMII_AUXCFG_REG(x)	                (0x02090100 + (x * 0x100) + 0x038)
-
-#define SGMII_REG_STATUS_FIELD_LOCK	        (1<<4)
-
-#define CPSW_CTL_P2_PASS_PRI_TAGGED	        (1 << 5)
-#define CPSW_CTL_P1_PASS_PRI_TAGGED	        (1 << 4)
-#define CPSW_CTL_P0_PASS_PRI_TAGGED	        (1 << 3)
-#define CPSW_CTL_P0_ENABLE		        (1 << 2)
-#define CPSW_CTL_VLAN_AWARE		        (1 << 1)
-#define CPSW_CTL_FIFO_LOOPBACK		        (1 << 0)
-
-#define DEVICE_CPSW_BASE		        (0x02090800)
-
-/* Register offsets */
-#define CPSW_REG_CTL			        0x004
-#define CPSW_REG_STAT_PORT_EN		        0x00c
-#define CPSW_REG_MAXLEN			        0x040
-#define CPSW_REG_ALE_CONTROL		        0x608
-#define CPSW_REG_ALE_PORTCTL(x)		        (0x640 + (x)*4)
-
-/* Register values */
-#define CPSW_REG_VAL_STAT_ENABLE_ALL		0xf
-#define CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE	((u32)0xc0000000)
-#define CPSW_REG_VAL_PORTCTL_FORWARD_MODE	0x3
-
-/* Platform specific defines */
-#define DEVICE_CPSW_NUM_PORTS		        3
 #define MAX_SIZE_STREAM_BUFFER		        1520
 
 #define DEVICE_PA_CDMA_GLOBAL_CFG_BASE		0x02004000
@@ -80,28 +41,28 @@
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
-struct netcp_platform_data {
-	unsigned int rx_irq;
-	unsigned int tx_irq;
+struct pdsp_platform_data {
+	unsigned int pdsp;
+	char        *firmware;
+	int          firmware_version;
 };
 
-/* Accumulator channel definition */
-#define DEVICE_QM_ETH_ACC_RX_IDX        0   /* Rx Ethernet accumulator channel index */
-#define DEVICE_QM_ETH_ACC_TX_IDX        1   /* Tx Ethernet accumulator channel index */
+struct netcp_platform_data {
 
-/* Accumulator channels */
-#define DEVICE_QM_ETH_ACC_RX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX)
-#define DEVICE_QM_ETH_ACC_TX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX)
+	/* Rx/tx interrupts */
+	unsigned int rx_irq;
+	unsigned int tx_irq;
 
-/* Queue definitions */
-#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
+	/* PA PDSP */
+	struct pdsp_platform_data pa_pdsp;
 
-/* Ethernet (NetCP) queues */
-#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
-#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		648 /* Ethernet Tx queue (for PA) */
-#define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL)  /* Ethernet Tx completion queue (filled by PA) */
+	/* QM PDSP */
+	struct pdsp_platform_data qm_pdsp;
+
+	/* PHY and SGMII indexes */
+	unsigned int sgmii_port;
+	unsigned int phy_id;
+};
 
 #if defined(CONFIG_SOC_TMS320C6670) || defined(CONFIG_SOC_TMS320C6678)
 #define EMAC_ARCH_HAS_INTERRUPT
@@ -126,6 +87,17 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 
 	return 0;
 }
+#endif
+
+/*
+ * Firmware 
+ */
+#include <asm/byteorder.h>
+#define DEVICE_PA_PDSP_FIRMWARE "keystone-pdsp/pa_pdsp_default.fw"
+#ifdef CONFIG_CPU_BIG_ENDIAN
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_be.fw"
+#else
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_le.fw"
 #endif
 
 /*

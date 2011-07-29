@@ -76,7 +76,7 @@ struct qm_config  {
 	/* Where the initialized descriptors are placed */
 	u32                dest_q;
 	/* PDSP firmware to load */
-	struct pdsp_config pdsp_firmware[QMSS_MAX_PDSP];
+	struct pdsp_config pdsp_firmware[QM_MAX_PDSP];
 };
 
 struct qm_host_desc {
@@ -170,6 +170,8 @@ static inline int hw_qm_init_threshold(u32 qnum)
 /* 
  * Prototypes
  */
+int                  hw_qm_alloc_queue(u32 num);
+void                 hw_qm_free_queue(u32 queue);
 int                  hw_qm_setup(struct qm_config *cfg);
 void                 hw_qm_teardown(void);
 int                  hw_qm_download_firmware(u32 pdsp_id, void *image, u32 size);

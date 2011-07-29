@@ -26,19 +26,24 @@
 #include <linux/phy.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/firmware.h>
+#include <linux/mii.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/msmc.h>
+#include <asm/mdio.h>
 
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
-#include <mach/keystone_qmss_firmware.h>
+#include <mach/keystone_cpsw.h>
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>
 #include <linux/keystone/pktdma.h>
 #include <linux/keystone/cpsw.h>
 
+#define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
+#define NETCP_DRIVER_VERSION "v1.1"
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
@@ -46,14 +51,14 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-#define NETCP_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		| \
-			 NETIF_MSG_DRV		| NETIF_MSG_LINK	| \
-			 NETIF_MSG_IFUP		| NETIF_MSG_INTR	| \
-			 NETIF_MSG_PROBE	| NETIF_MSG_TIMER	| \
-			 NETIF_MSG_IFDOWN	| NETIF_MSG_RX_ERR	| \
-			 NETIF_MSG_TX_ERR	| NETIF_MSG_TX_DONE	| \
-			 NETIF_MSG_PKTDATA	| NETIF_MSG_TX_QUEUED	| \
-			 NETIF_MSG_RX_STATUS)
+#define NETCP_DEBUG (NETIF_MSG_HW	| NETIF_MSG_WOL		|	\
+		     NETIF_MSG_DRV	| NETIF_MSG_LINK	|	\
+		     NETIF_MSG_IFUP	| NETIF_MSG_INTR	|	\
+		     NETIF_MSG_PROBE	| NETIF_MSG_TIMER	|	\
+		     NETIF_MSG_IFDOWN	| NETIF_MSG_RX_ERR	|	\
+		     NETIF_MSG_TX_ERR	| NETIF_MSG_TX_DONE	|	\
+		     NETIF_MSG_PKTDATA	| NETIF_MSG_TX_QUEUED	|	\
+		     NETIF_MSG_RX_STATUS)
 
 #define DEVICE_NAPI_WEIGHT              16
 #define DEVICE_POLLING_PERIOD_MSEC      10
@@ -64,8 +69,8 @@
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
 #define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
-#define NETCP_MIN_PACKET_SIZE	ETH_ZLEN
-#define NETCP_MAX_PACKET_SIZE	(VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
+#define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
+#define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
@@ -79,17 +84,18 @@ static struct timer_list poll_timer;
 
 struct netcp_priv {
 	spinlock_t			lock;
-	struct platform_device		*pdev;
-	struct net_device		*ndev;
-	struct resource			*res;
+	struct platform_device	       *pdev;
+	struct net_device	       *ndev;
+	struct resource		       *res;
 	struct napi_struct		napi;
-	struct device			*dev;
+	struct device		       *dev;
 	struct netcp_platform_data	data;
 	u32				msg_enable;
 	struct net_device_stats		stats;
+	struct mii_if_info              mii;
 	int				rx_packet_max;
 	int				host_port;
-	struct clk			*clk;
+	struct clk		       *clk;
 };
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
@@ -655,11 +661,94 @@ static void netcp_ndo_tx_timeout(struct net_device *ndev)
 		netif_wake_queue(ndev);
 }
 
-static void netcp_get_drvinfo(struct net_device *ndev,
-			     struct ethtool_drvinfo *info)
+/*
+ * Standard MII ioctl()
+ */
+static int netcp_ndo_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 {
-	strcpy(info->driver, "TI KeyStone NetCP Driver");
-	strcpy(info->version, "v1.0");
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	if (!netif_running(ndev))
+		return -EINVAL;
+	
+	return generic_mii_ioctl(&priv->mii, if_mii(req), cmd, NULL);
+}
+
+/*
+ * MDIO management
+ */
+static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
+{	
+	int val;
+	int ack = 0;
+
+	mdio_phy_wait();
+	mdio_phy_read(reg, phy_id);
+	mdio_phy_wait_res_ack(val, ack);
+
+	if (!ack)
+		val = -1;
+
+	return val;
+}
+
+static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int value)
+{
+
+	mdio_phy_wait();
+	mdio_phy_write(reg, phy_id, value);
+	mdio_phy_wait();
+	
+	return;
+}
+
+static void netcp_mdio_init(void)
+{
+	mdio_set_reg(MDIO_CONTROL, MDIO_B_ENABLE | (VBUSCLK & MDIO_M_CLKDIV));
+}
+
+/*
+ * Ethtool management
+ */
+static int netcp_get_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+	
+	mii_ethtool_gset(&priv->mii, ecmd);
+	
+	return 0;
+}
+
+static int netcp_set_settings(struct net_device *ndev, struct ethtool_cmd *ecmd)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+	
+	mii_ethtool_sset(&priv->mii, ecmd);
+	
+	return 0;
+}
+
+static int netcp_nway_reset(struct net_device *ndev)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	return mii_nway_restart(&priv->mii);
+}
+
+static u32 netcp_get_link(struct net_device *ndev)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+
+	return mii_link_ok(&priv->mii);
+}
+
+static void netcp_get_drvinfo(struct net_device *ndev,
+			      struct ethtool_drvinfo *info)
+{
+	struct netcp_priv *priv = netdev_priv(ndev);
+	strcpy(info->driver, NETCP_DRIVER_NAME);
+	strcpy(info->version, NETCP_DRIVER_VERSION);
+	sprintf(info->fw_version, "%d", priv->data.pa_pdsp.firmware_version);
 }
 
 static u32 netcp_get_msglevel(struct net_device *ndev)
@@ -674,10 +763,199 @@ static void netcp_set_msglevel(struct net_device *ndev, u32 value)
 	priv->msg_enable = value;
 }
 
+static int netcp_flash_device(struct net_device *netdev, struct ethtool_flash *efl)
+{
+	char                  file_name[ETHTOOL_FLASH_MAX_FILENAME];
+	int                   pdsp;
+	int                   res = 0;
+	const struct firmware *fw;
+
+	file_name[ETHTOOL_FLASH_MAX_FILENAME - 1] = 0;
+	strcpy(file_name, efl->data);
+	pdsp = efl->region;
+
+	/* Request the firmware */
+	res = request_firmware(&fw, file_name, &netdev->dev);
+	if (res)
+		return res;
+
+	/* Stop the wanted PDSP, load the firmware then enable it */
+	res = keystone_pa_disable(pdsp);
+	if (res)
+		goto error;
+	
+	res = keystone_pa_set_firmware(pdsp, (const unsigned int*) fw->data,
+				       fw->size);
+	if (res)
+		goto error;
+	
+	return keystone_pa_enable(pdsp);
+error:
+	release_firmware(fw);
+	return res;
+}
+
+/*
+ * Statistic management
+ */
+struct netcp_ethtool_stat {
+	char desc[ETH_GSTRING_LEN];
+	int type;
+	int size;
+	int offset;
+};
+
+#define FIELDINFO(_struct, field)       FIELD_SIZEOF(_struct, field),	\
+		                                offsetof(_struct, field)
+#define CPSW_STATSA_INFO(field) 	"CPSW_A:"#field, CPSW_STATSA_MODULE,\
+					FIELDINFO(struct keystone_cpsw_stats,\
+						field)
+#define CPSW_STATSB_INFO(field) 	"CPSW_B:"#field, CPSW_STATSB_MODULE,\
+					FIELDINFO(struct keystone_cpsw_stats,\
+						field)
+
+static const struct netcp_ethtool_stat et_stats[] = {
+	/* CPSW module A */
+	{CPSW_STATSA_INFO(rx_good_frames)},
+	{CPSW_STATSA_INFO(rx_broadcast_frames)},
+	{CPSW_STATSA_INFO(rx_multicast_frames)},
+	{CPSW_STATSA_INFO(rx_pause_frames)},
+	{CPSW_STATSA_INFO(rx_crc_errors)},
+	{CPSW_STATSA_INFO(rx_align_code_errors)},
+	{CPSW_STATSA_INFO(rx_oversized_frames)},
+	{CPSW_STATSA_INFO(rx_jabber_frames)},
+	{CPSW_STATSA_INFO(rx_undersized_frames)},
+	{CPSW_STATSA_INFO(rx_fragments)},
+	{CPSW_STATSA_INFO(rx_bytes)},
+	{CPSW_STATSA_INFO(tx_good_frames)},
+	{CPSW_STATSA_INFO(tx_broadcast_frames)},
+	{CPSW_STATSA_INFO(tx_multicast_frames)},
+	{CPSW_STATSA_INFO(tx_pause_frames)},
+	{CPSW_STATSA_INFO(tx_deferred_frames)},
+	{CPSW_STATSA_INFO(tx_collision_frames)},
+	{CPSW_STATSA_INFO(tx_single_coll_frames)},
+	{CPSW_STATSA_INFO(tx_mult_coll_frames)},
+	{CPSW_STATSA_INFO(tx_excessive_collisions)},
+	{CPSW_STATSA_INFO(tx_late_collisions)},
+	{CPSW_STATSA_INFO(tx_underrun)},
+	{CPSW_STATSA_INFO(tx_carrier_senser_errors)},
+	{CPSW_STATSA_INFO(tx_bytes)},
+	{CPSW_STATSA_INFO(tx_64byte_frames)},
+	{CPSW_STATSA_INFO(tx_65_to_127byte_frames)},
+	{CPSW_STATSA_INFO(tx_128_to_255byte_frames)},
+	{CPSW_STATSA_INFO(tx_256_to_511byte_frames)},
+	{CPSW_STATSA_INFO(tx_512_to_1023byte_frames)},
+	{CPSW_STATSA_INFO(tx_1024byte_frames)},
+	{CPSW_STATSA_INFO(net_bytes)},
+	{CPSW_STATSA_INFO(rx_sof_overruns)},
+	{CPSW_STATSA_INFO(rx_mof_overruns)},
+	{CPSW_STATSA_INFO(rx_dma_overruns)},
+	/* CPSW module B */
+	{CPSW_STATSB_INFO(rx_good_frames)},
+	{CPSW_STATSB_INFO(rx_broadcast_frames)},
+	{CPSW_STATSB_INFO(rx_multicast_frames)},
+	{CPSW_STATSB_INFO(rx_pause_frames)},
+	{CPSW_STATSB_INFO(rx_crc_errors)},
+	{CPSW_STATSB_INFO(rx_align_code_errors)},
+	{CPSW_STATSB_INFO(rx_oversized_frames)},
+	{CPSW_STATSB_INFO(rx_jabber_frames)},
+	{CPSW_STATSB_INFO(rx_undersized_frames)},
+	{CPSW_STATSB_INFO(rx_fragments)},
+	{CPSW_STATSB_INFO(rx_bytes)},
+	{CPSW_STATSB_INFO(tx_good_frames)},
+	{CPSW_STATSB_INFO(tx_broadcast_frames)},
+	{CPSW_STATSB_INFO(tx_multicast_frames)},
+	{CPSW_STATSB_INFO(tx_pause_frames)},
+	{CPSW_STATSB_INFO(tx_deferred_frames)},
+	{CPSW_STATSB_INFO(tx_collision_frames)},
+	{CPSW_STATSB_INFO(tx_single_coll_frames)},
+	{CPSW_STATSB_INFO(tx_mult_coll_frames)},
+	{CPSW_STATSB_INFO(tx_excessive_collisions)},
+	{CPSW_STATSB_INFO(tx_late_collisions)},
+	{CPSW_STATSB_INFO(tx_underrun)},
+	{CPSW_STATSB_INFO(tx_carrier_senser_errors)},
+	{CPSW_STATSB_INFO(tx_bytes)},
+	{CPSW_STATSB_INFO(tx_64byte_frames)},
+	{CPSW_STATSB_INFO(tx_65_to_127byte_frames)},
+	{CPSW_STATSB_INFO(tx_128_to_255byte_frames)},
+	{CPSW_STATSB_INFO(tx_256_to_511byte_frames)},
+	{CPSW_STATSB_INFO(tx_512_to_1023byte_frames)},
+	{CPSW_STATSB_INFO(tx_1024byte_frames)},
+	{CPSW_STATSB_INFO(net_bytes)},
+	{CPSW_STATSB_INFO(rx_sof_overruns)},
+	{CPSW_STATSB_INFO(rx_mof_overruns)},
+	{CPSW_STATSB_INFO(rx_dma_overruns)},
+};
+
+#define ETHTOOL_STATS_NUM ARRAY_SIZE(et_stats)
+
+static void netcp_get_stat_strings(struct net_device *netdev, uint32_t stringset,
+				   uint8_t *data)
+{
+	int i;
+	switch (stringset) {
+	case ETH_SS_STATS:
+		for (i = 0; i < ETHTOOL_STATS_NUM; i++) {
+			memcpy(data, et_stats[i].desc, ETH_GSTRING_LEN);
+			data += ETH_GSTRING_LEN;
+		}
+		break;
+	case ETH_SS_TEST:
+		break;
+	}
+}
+
+static int netcp_get_sset_count(struct net_device *netdev, int stringset)
+{
+	switch (stringset) {
+	case ETH_SS_TEST:
+		return 0;
+	case ETH_SS_STATS:
+		return ETHTOOL_STATS_NUM;
+	default:
+		return -EINVAL;
+	}
+}
+
+static void netcp_get_ethtool_stats(struct net_device *netdev,
+				    struct ethtool_stats *stats, uint64_t *data)
+{
+	struct keystone_cpsw_stats *cpsw_statsa = cpsw_get_stats(CPSW_STATSA_MODULE);
+	struct keystone_cpsw_stats *cpsw_statsb = cpsw_get_stats(CPSW_STATSB_MODULE);
+
+	void *p = NULL;
+	int i;
+
+	for (i = 0; i < ETHTOOL_STATS_NUM; i++) {
+		switch (et_stats[i].type) {
+		case CPSW_STATSA_MODULE:
+			p = cpsw_statsa;
+			break;
+		case CPSW_STATSB_MODULE:
+			p  = cpsw_statsb;
+			break;
+		}
+
+		p = (u8 *)p + et_stats[i].offset;
+		data[i] = (et_stats[i].size == sizeof(u64)) ?
+			*(u64 *)p: *(u32 *)p;
+	}
+
+	return;
+}
+
 static const struct ethtool_ops netcp_ethtool_ops = {
-	.get_drvinfo	= netcp_get_drvinfo,
-	.get_msglevel	= netcp_get_msglevel,
-	.set_msglevel	= netcp_set_msglevel
+	.get_settings      = netcp_get_settings,
+	.set_settings      = netcp_set_settings,
+	.get_drvinfo	   = netcp_get_drvinfo,
+	.get_msglevel	   = netcp_get_msglevel,
+	.set_msglevel	   = netcp_set_msglevel,
+	.nway_reset	   = netcp_nway_reset,
+	.get_link	   = netcp_get_link,
+	.flash_device	   = netcp_flash_device,
+	.get_strings       = netcp_get_stat_strings,
+	.get_sset_count    = netcp_get_sset_count,
+	.get_ethtool_stats = netcp_get_ethtool_stats,
 };
 
 static const struct net_device_ops keystone_netdev_ops = {
@@ -685,6 +963,7 @@ static const struct net_device_ops keystone_netdev_ops = {
 	.ndo_stop		= netcp_ndo_stop,
 	.ndo_start_xmit		= netcp_ndo_start_xmit,
 	.ndo_change_rx_flags	= netcp_ndo_change_rx_flags,
+	.ndo_do_ioctl           = netcp_ndo_ioctl,
 	.ndo_change_mtu		= eth_change_mtu,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -698,7 +977,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 {
 	struct netcp_platform_data *data = pdev->dev.platform_data;
 	struct net_device	   *ndev;
-	struct netcp_priv  *priv;
+	struct netcp_priv          *priv;
 	int                         i, ret = 0;
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
@@ -710,6 +989,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
 	struct qm_config	   *q_cfg  = &c_q_cfg; 
+	const struct firmware      *fw;
 
 	if (!data) {
 		pr_err("KeyStone NetCP: platform data missing\n");
@@ -731,6 +1011,20 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->dev  = &ndev->dev;
 	priv->msg_enable = netif_msg_init(debug_level, NETCP_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
+
+	/* MII/MDIO init */
+	priv->msg_enable        = NETIF_MSG_LINK;
+	priv->mii.phy_id        = data->phy_id;
+	priv->mii.phy_id_mask   = 0x1f;
+	priv->mii.reg_num_mask  = 0x1f;
+	priv->mii.force_media   = 0;
+	priv->mii.full_duplex   = 0;
+	priv->mii.supports_gmii = 1;
+	priv->mii.dev	        = ndev;
+	priv->mii.mdio_read     = netcp_mdio_read;
+	priv->mii.mdio_write    = netcp_mdio_write;
+
+	netcp_mdio_init();
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
@@ -766,14 +1060,17 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	memset((void *) acc_ram, 0, DEVICE_QM_ACC_RAM_SIZE);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
+	/* Request QM accumulator firmware */
+	ret = request_firmware(&fw, data->qm_pdsp.firmware, &pdev->dev);
+	if (ret != 0) {
+		printk(KERN_ERR "QM: Cannot find  %s firmware\n", data->qm_pdsp.firmware);
+		return ret;
+	}
+
 	/* load QM PDSP firmwares for accumulators */
-	q_cfg->pdsp_firmware[0].id       = 0;
-#ifdef CONFIG_CPU_BIG_ENDIAN
-	q_cfg->pdsp_firmware[0].firmware = &acc48_be;
-#else
-	q_cfg->pdsp_firmware[0].firmware = &acc48_le;
-#endif
-	q_cfg->pdsp_firmware[0].size     = sizeof(acc48_le);
+	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
+	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
+	q_cfg->pdsp_firmware[0].size     = fw->size;;
 #else
 	q_cfg->pdsp_firmware[0].firmware = NULL;
 #endif
@@ -781,6 +1078,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	/* Initialize QM */
 	hw_qm_setup(q_cfg);
+	release_firmware(fw);
 
 	/* Configure Rx and Tx PKTDMA */
 	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
@@ -852,12 +1150,29 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	/* Streaming switch configuration */
 	streaming_switch_setup();
 
+	/* Reset the PA */
+	ret = keystone_pa_reset();
+	if (ret != 0) {
+		printk(KERN_ERR "%s: PA reset failed d\n", __FUNCTION__);
+		return ret;
+	}
+
+	/* Request PA firmware */
+	ret = request_firmware(&fw, data->pa_pdsp.firmware, &pdev->dev);
+	if (ret != 0) {
+		printk(KERN_ERR "PA: Cannot find  %s firmware\n", data->pa_pdsp.firmware);
+		return ret;
+	}
+
 	/* Configure the PA */
-	ret = keystone_pa_config(ndev->dev_addr);
+	ret = keystone_pa_config(data->pa_pdsp.pdsp, (const unsigned int*) fw->data,
+				 fw->size, ndev->dev_addr);
 	if (ret != 0) {
 		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;
 	}
+
+	release_firmware(fw);
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);
