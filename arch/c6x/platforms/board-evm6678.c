@@ -432,7 +432,7 @@ static void evm_fpga_work(struct work_struct *work)
 	evm_fpga_set(1, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_NAND_WP);
 
 	/* Disable EEPROM write protect */
-	evm_fpga_set(1, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_EEPROM_WP);
+	evm_fpga_set(0, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_EEPROM_WP);
 
 	/* Initialize LEDs support */
 	(void) evm_init_leds();
@@ -656,7 +656,7 @@ core_initcall(board_setup_spi);
 #ifdef CONFIG_EEPROM_AT24
 static struct at24_platform_data at24_eeprom_data = {
 	.byte_len	= 1024 * 1024 / 8,
-	.page_size	= 128,
+	.page_size	= 256,
 	.flags		= AT24_FLAG_ADDR16,
 };
 #endif
