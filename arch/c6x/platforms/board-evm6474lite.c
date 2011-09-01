@@ -316,7 +316,12 @@ static void __init board_setup_edma(void)
 #define board_setup_edma()
 #endif /* CONFIG_EDMA3 */
 
-SOC_CLK_DEF(61440000); /* clkin is a 61.4MHz clock */
+SOC_CLK_DEF(50000000);    /* clkin is a 50MHz clock 
+			     (default configuration with SW3-5 set to ON) */
+#if 0
+SOC_CLK_DEF(61440000);    /* This is when using SYSCLK shared with the AIF
+			    (SW3-5 CORECLOKSEL to OFF) */
+#endif
 
 static struct clk_lookup evm_clks[] = {
         SOC_CLK(),
