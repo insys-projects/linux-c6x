@@ -19,6 +19,7 @@ u32 msm_phys_to_virt(u32 paddr);
 u32 msm_get_heap(void);
 u32 msm_get_top(void);
 void *msm_alloc_coherent(size_t size, dma_addr_t *handle);
+void msm_free_coherent(size_t size, void *vaddr, dma_addr_t *handle);
 void msm_mem_init(void);
 
 #endif /* __KERNEL__ */
