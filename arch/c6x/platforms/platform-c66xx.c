@@ -242,11 +242,54 @@ static void init_power(void)
 #endif
 }
 
-#ifdef CONFIG_TI_KEYSTONE_NETCP
-#include <linux/firmware.h>
-
-#include <mach/keystone_netcp.h>
+#ifdef CONFIG_TI_KEYSTONE_QM
+/*
+ * Enable and configure QMSS
+ */
 #include <mach/keystone_qmss.h>
+#include <linux/keystone/qmss.h>
+
+struct qmss_platform_data qmss_data  = {
+
+	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
+	.link_ram_base = 0x00080000,
+	.link_ram_size = 0x3FFF,
+
+	/* Number and size of descritors */
+	.desc_ram_size = DEVICE_QM_DESC_RAM_SIZE,
+	.desc_num      = DEVICE_QM_NUM_DESCS,
+
+	/* free queue */
+	.free_queue    = DEVICE_QM_FREE_Q,
+
+	/* PDSP firmware for accumulators */
+	.qm_pdsp = {
+		.pdsp              = 0, /* QM PDSP 0 */
+		.firmware          = DEVICE_QM_PDSP_FIRMWARE,
+		.firmware_version  = 1,
+	},
+};
+
+static struct platform_device qmss_dev = {
+	.name           = "keystone_qmss",
+        .id             = 0,
+	.dev = {
+		.platform_data = &qmss_data,
+	},
+};
+
+static int __init setup_qmss(void)
+{
+	return platform_device_register(&qmss_dev);
+}
+core_initcall(setup_qmss);
+#endif /* CONFIG_TI_KEYSTONE_QM */
+
+#ifdef CONFIG_TI_KEYSTONE_NETCP
+/*
+ * Setup NetCP
+ */
+#include <mach/keystone_netcp.h>
 
 struct netcp_platform_data netcp_data = {
 	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
@@ -255,11 +298,6 @@ struct netcp_platform_data netcp_data = {
 		.pdsp              = 0, /* PA PDSP 0 */
 		.firmware          = DEVICE_PA_PDSP_FIRMWARE,
 		.firmware_version  = 1,
-	},
-	.qm_pdsp = {
-		 .pdsp              = 0, /* QM PDSP 0 */
-		 .firmware          = DEVICE_QM_PDSP_FIRMWARE,
-		 .firmware_version  = 1,
 	},
 	.sgmii_port        = 1,
 	.phy_id            = 1,
@@ -279,7 +317,7 @@ static int __init setup_netcp(void)
 }
 
 core_initcall(setup_netcp);
-#endif
+#endif /* CONFIG_TI_KEYSTONE_NETCP */
 
 void c6x_soc_setup_arch(void)
 {

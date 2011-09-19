@@ -223,7 +223,7 @@ int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
 	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_FREE_Q);
 
-	hw_qm_queue_push(hd, DEVICE_QM_PA_CFG_Q, QM_DESC_SIZE_BYTES);
+	hw_qm_queue_push(hd, DEVICE_QM_PA_CFG_Q, DEVICE_QM_DESC_SIZE_BYTES);
 
 	kfree(pa_cfg.cmd_buf);
 		

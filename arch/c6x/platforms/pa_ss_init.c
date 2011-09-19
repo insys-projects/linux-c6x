@@ -23,9 +23,10 @@
 #include <asm/sgmii.h>
 #include <asm/dscr.h>
 
+#include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_pa.h>
-#include <mach/keystone_qmss.h>
+
 #include <mach/keystone_cpsw.h>
 
 static int serdes_init(void)
