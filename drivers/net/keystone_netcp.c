@@ -67,7 +67,7 @@
 #define DEVICE_NUM_RX_DESCS	        64
 #define DEVICE_NUM_TX_DESCS	        64
 #define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
-#define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
+#define DEVICE_QM_DESC_RAM_SIZE         (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
 
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
@@ -982,7 +982,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
 #endif
-	u32                         acc_ram;
+	u32                         desc_ram;
 	struct pktdma_rx_cfg	    c_rx_cfg;
 	struct pktdma_tx_cfg	    c_tx_cfg;
 	struct qm_config	    c_q_cfg;
@@ -990,6 +990,9 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
 	struct qm_config	   *q_cfg  = &c_q_cfg; 
 	const struct firmware      *fw;
+	u32                         acc_list_num_rx;
+	u32                         acc_list_num_tx;
+	u32                         acc_list_size; 
 
 	if (!data) {
 		pr_err("KeyStone NetCP: platform data missing\n");
@@ -1043,21 +1046,21 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		random_ether_addr(ndev->dev_addr);
 
 	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
-	q_cfg->link_ram_base		= 0x00080000;
-	q_cfg->link_ram_size		= 0x3FFF;
+	q_cfg->link_ram_base = 0x00080000;
+	q_cfg->link_ram_size = 0x3FFF;
 
 	/* Allocate memory for descriptors */
-	acc_ram = qm_mem_alloc(DEVICE_QM_ACC_RAM_SIZE, (u32*)&q_cfg->mem_region_base);
-	if (!acc_ram) {
+	desc_ram = qm_mem_alloc(DEVICE_QM_DESC_RAM_SIZE, (u32*)&q_cfg->mem_region_base);
+	if (!desc_ram) {
 		printk(KERN_ERR "%s: descriptor memory allocation failed\n", 
 		       __FUNCTION__);
 		return -ENOMEM;
 	}
 	    
-	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-	q_cfg->dest_q			= DEVICE_QM_ETH_FREE_Q;
+	q_cfg->mem_regnum_descriptors = DEVICE_NUM_DESCS;
+	q_cfg->dest_q		      = DEVICE_QM_ETH_FREE_Q;
 
-	memset((void *) acc_ram, 0, DEVICE_QM_ACC_RAM_SIZE);
+	memset((void *) desc_ram, 0, DEVICE_QM_DESC_RAM_SIZE);
 
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* Request QM accumulator firmware */
@@ -1098,14 +1101,21 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
 	
 	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_rx = (u32*) qm_mem_alloc(((rx_cfg->acc_threshold + 1) * 2) << 2,
+	acc_list_num_rx = ((rx_cfg->acc_threshold + 1) * 2);
+	acc_list_num_tx = ((tx_cfg->acc_threshold + 1) * 2);
+	acc_list_size   =  (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
+
+	acc_list_addr_rx = (u32*) qm_mem_alloc(acc_list_size,
 					       (u32*)&acc_list_phys_addr_rx);
 	if (acc_list_addr_rx == NULL) {
 		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
 		       __FUNCTION__);
 		return -ENOMEM;
 	}
-	memset((void *) acc_list_addr_rx, 0, ((rx_cfg->acc_threshold + 1) * 2) << 2);
+	memset((void *) acc_list_addr_rx, 0, acc_list_size);
+
+	acc_list_addr_tx      = acc_list_addr_rx + acc_list_num_rx;
+	acc_list_phys_addr_tx = acc_list_phys_addr_rx + acc_list_num_rx;
 	
 	rx_cfg->acc_list_addr      = (u32) acc_list_addr_rx;
 	rx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_rx;
@@ -1123,16 +1133,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	tx_cfg->use_acc          = 1;
 	tx_cfg->acc_threshold    = DEVICE_TX_INT_THRESHOLD;
 	tx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_TX_CHANNEL;
-	
-	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_tx = (u32*) qm_mem_alloc(((tx_cfg->acc_threshold + 1) * 2) << 2,
-					       (u32*)&acc_list_phys_addr_tx);
-	if (acc_list_addr_tx == NULL) {
-		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-	memset((void *) acc_list_addr_tx, 0, ((tx_cfg->acc_threshold + 1) * 2) << 2);
 	
 	tx_cfg->acc_list_addr      = (u32) acc_list_addr_tx;
 	tx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_tx;
