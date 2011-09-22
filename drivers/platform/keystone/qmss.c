@@ -318,15 +318,20 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	u32 desc_ram;
 	int res;
 
+	/* Only master core can initialize QMSS in a multi-Linux environment */
+ 	if (!is_master_core()) {
+		goto slave_core;
+	}
+
 	q_cfg->link_ram_base = data->link_ram_base;
 	q_cfg->link_ram_size = data->link_ram_size;
-
+	
 	/* Allocate memory for descriptors */
 	desc_ram = qm_mem_alloc(data->desc_ram_size,
 				(u32*) &q_cfg->mem_region_base);
 	if (!desc_ram) {
 		printk(KERN_ERR "%s: descriptor memory allocation failed\n", 
-		   __FUNCTION__);
+		       __FUNCTION__);
 		return -ENOMEM;
 	}
 	    
@@ -334,7 +339,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	q_cfg->dest_q		      = data->free_queue;
 
 	memset((void *) desc_ram, 0, data->desc_ram_size);
-
+	
 	/* Request QM accumulator firmware */
 	res = request_firmware(&fw, data->qm_pdsp.firmware, &pdev->dev);
 	if (res != 0) {
@@ -343,7 +348,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 		return res;
 	}
 
-	/* load QM PDSP firmwares for accumulators */
+	/* load QM PDSP firmware for accumulators */
 	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
 	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
 	q_cfg->pdsp_firmware[0].size     = fw->size;;
@@ -353,6 +358,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	hw_qm_setup(q_cfg);
 	release_firmware(fw);
 
+slave_core:
 	printk("%s %s\n", NETCP_DRIVER_NAME, NETCP_DRIVER_VERSION);
 
 	return 0;

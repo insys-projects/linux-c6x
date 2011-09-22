@@ -57,9 +57,9 @@
 #define DEVICE_QM_NUM_MEMREGIONS	20
 
 /* The driver supports only a single descriptor size */
-#define DEVICE_QM_DESC_SIZE_BYTES	        64 
-#define DEVICE_QM_NUM_DESCS	                512 /* total number of queues */
-#define DEVICE_QM_DESC_RAM_SIZE                 (DEVICE_QM_DESC_SIZE_BYTES * DEVICE_QM_NUM_DESCS)
+#define DEVICE_QM_DESC_SIZE_BYTES       64 
+#define DEVICE_QM_NUM_DESCS             512 /* total number of queue descriptors */
+#define DEVICE_QM_DESC_RAM_SIZE         (DEVICE_QM_DESC_SIZE_BYTES * DEVICE_QM_NUM_DESCS)
 
 /*
  * Descriptor Info: Descriptor type is host
@@ -204,6 +204,14 @@ static inline u32 device_local_addr_to_global(u32 addr)
 		addr = (1 << 28) | (get_coreid() << 24) | addr;
 	
 	return addr;
+}
+
+static inline int is_master_core(void)
+{
+	if (get_coreid() == 0)
+		return 1;
+	
+	return 0;
 }
 
 /*
