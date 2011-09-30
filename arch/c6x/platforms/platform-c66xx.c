@@ -286,7 +286,7 @@ void c6x_soc_setup_arch(void)
  	/* Initialize C66x IRQs */          	
 	clear_all_irq(); /* acknowledge all pending irqs */
 
-	init_pll();
+	/*init_pll();*/
 
 	init_power();
 
