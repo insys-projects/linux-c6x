@@ -34,15 +34,15 @@
 #include <asm/msmc.h>
 #include <asm/mdio.h>
 
-#include <mach/keystone_netcp.h>
 #include <mach/keystone_qmss.h>
+ #include <mach/keystone_netcp.h>
 #include <mach/keystone_cpsw.h>
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>
 #include <linux/keystone/pktdma.h>
 #include <linux/keystone/cpsw.h>
 
-#define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
+#define NETCP_DRIVER_NAME    "TI KeyStone NetCP driver"
 #define NETCP_DRIVER_VERSION "v1.1"
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG
@@ -64,10 +64,7 @@
 #define DEVICE_POLLING_PERIOD_MSEC      10
 #define DEVICE_TX_LOOP_FREE_QUEUE       20  /* number of loop to spin on free queue */
 #define DEVICE_TX_TIMEOUT               40  /* transmit timeout */
-#define DEVICE_NUM_RX_DESCS	        64
-#define DEVICE_NUM_TX_DESCS	        64
-#define DEVICE_NUM_DESCS	        (DEVICE_NUM_RX_DESCS + DEVICE_NUM_TX_DESCS)
-#define DEVICE_QM_ACC_RAM_SIZE          (QM_DESC_SIZE_BYTES * DEVICE_NUM_DESCS)
+#define DEVICE_NUM_RX_DESCS             64
 
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
@@ -157,7 +154,7 @@ static void netcp_cleanup_qs(struct net_device *ndev)
 	struct qm_host_desc *hd = NULL;
 
 	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL))
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 }
 
 /*
@@ -181,7 +178,7 @@ static void netcp_init_qs(struct net_device *ndev)
 		hd->orig_buff_ptr  = (u32)skb->data;
 		hd->private        = (u32)skb;
 
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);		
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);		
 
 		L2_cache_block_writeback_invalidate((u32) skb->data,
 						    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
@@ -362,7 +359,7 @@ static int netcp_tx(struct net_device *ndev)
 		}
 
 		/* Give back packets to free queue */
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 
 		released++;
 	}
@@ -441,7 +438,7 @@ static int netcp_rx(struct net_device *ndev,
 			hd->next_bdptr    = 0;
 			hd->orig_buff_ptr = (u32)skb->data;
 			hd->private       = (u32)skb;
-			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, QM_DESC_SIZE_BYTES);
+			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 
 			L2_cache_block_writeback_invalidate((u32) skb->data,
 							    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
@@ -586,7 +583,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
 	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_TX_CP_Q);
 	
-	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, QM_DESC_SIZE_BYTES);
+	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, DEVICE_QM_DESC_SIZE_BYTES);
 
 	return NETDEV_TX_OK;
 }
@@ -982,14 +979,15 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
 #endif
-	u32                         acc_ram;
+
 	struct pktdma_rx_cfg	    c_rx_cfg;
 	struct pktdma_tx_cfg	    c_tx_cfg;
-	struct qm_config	    c_q_cfg;
 	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
-	struct qm_config	   *q_cfg  = &c_q_cfg; 
 	const struct firmware      *fw;
+	u32                         acc_list_num_rx;
+	u32                         acc_list_num_tx;
+	u32                         acc_list_size; 
 
 	if (!data) {
 		pr_err("KeyStone NetCP: platform data missing\n");
@@ -1042,44 +1040,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	else
 		random_ether_addr(ndev->dev_addr);
 
-	/* Use internal link RAM according to SPRUGR9B section 4.1.1.3 */
-	q_cfg->link_ram_base		= 0x00080000;
-	q_cfg->link_ram_size		= 0x3FFF;
-
-	/* Allocate memory for descriptors */
-	acc_ram = qm_mem_alloc(DEVICE_QM_ACC_RAM_SIZE, (u32*)&q_cfg->mem_region_base);
-	if (!acc_ram) {
-		printk(KERN_ERR "%s: descriptor memory allocation failed\n", 
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-	    
-	q_cfg->mem_regnum_descriptors	= DEVICE_NUM_DESCS;
-	q_cfg->dest_q			= DEVICE_QM_ETH_FREE_Q;
-
-	memset((void *) acc_ram, 0, DEVICE_QM_ACC_RAM_SIZE);
-
-#ifdef EMAC_ARCH_HAS_INTERRUPT
-	/* Request QM accumulator firmware */
-	ret = request_firmware(&fw, data->qm_pdsp.firmware, &pdev->dev);
-	if (ret != 0) {
-		printk(KERN_ERR "QM: Cannot find  %s firmware\n", data->qm_pdsp.firmware);
-		return ret;
-	}
-
-	/* load QM PDSP firmwares for accumulators */
-	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
-	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
-	q_cfg->pdsp_firmware[0].size     = fw->size;;
-#else
-	q_cfg->pdsp_firmware[0].firmware = NULL;
-#endif
-	q_cfg->pdsp_firmware[1].firmware = NULL;
-
-	/* Initialize QM */
-	hw_qm_setup(q_cfg);
-	release_firmware(fw);
-
 	/* Configure Rx and Tx PKTDMA */
 	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
 	rx_cfg->n_rx_chans       = DEVICE_PA_CDMA_RX_NUM_CHANNELS;
@@ -1098,14 +1058,21 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
 	
 	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_rx = (u32*) qm_mem_alloc(((rx_cfg->acc_threshold + 1) * 2) << 2,
+	acc_list_num_rx = ((rx_cfg->acc_threshold + 1) * 2);
+	acc_list_num_tx = ((tx_cfg->acc_threshold + 1) * 2);
+	acc_list_size   =  (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
+
+	acc_list_addr_rx = (u32*) qm_mem_alloc(acc_list_size,
 					       (u32*)&acc_list_phys_addr_rx);
 	if (acc_list_addr_rx == NULL) {
 		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
 		       __FUNCTION__);
 		return -ENOMEM;
 	}
-	memset((void *) acc_list_addr_rx, 0, ((rx_cfg->acc_threshold + 1) * 2) << 2);
+	memset((void *) acc_list_addr_rx, 0, acc_list_size);
+
+	acc_list_addr_tx      = acc_list_addr_rx + acc_list_num_rx;
+	acc_list_phys_addr_tx = acc_list_phys_addr_rx + acc_list_num_rx;
 	
 	rx_cfg->acc_list_addr      = (u32) acc_list_addr_rx;
 	rx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_rx;
@@ -1123,16 +1090,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	tx_cfg->use_acc          = 1;
 	tx_cfg->acc_threshold    = DEVICE_TX_INT_THRESHOLD;
 	tx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_TX_CHANNEL;
-	
-	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_addr_tx = (u32*) qm_mem_alloc(((tx_cfg->acc_threshold + 1) * 2) << 2,
-					       (u32*)&acc_list_phys_addr_tx);
-	if (acc_list_addr_tx == NULL) {
-		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-	memset((void *) acc_list_addr_tx, 0, ((tx_cfg->acc_threshold + 1) * 2) << 2);
 	
 	tx_cfg->acc_list_addr      = (u32) acc_list_addr_tx;
 	tx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_tx;
@@ -1216,6 +1173,9 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		goto clean_ndev_ret;
 	}
 
+	printk("%s: %s %s\n",
+	       ndev->name, NETCP_DRIVER_NAME, NETCP_DRIVER_VERSION);
+
 	return 0;
 
 clean_ndev_ret:
@@ -1229,7 +1189,6 @@ static int __devexit netcp_remove(struct platform_device *pdev)
 	
 	platform_set_drvdata(pdev, NULL);
 
-	hw_qm_teardown();
 	free_netdev(ndev);
 
 	return 0;

@@ -19,9 +19,6 @@
 #define QM_LINKRAM_ALIGN	        4 
 #define QM_MEMR_ALIGN		        16      /* Not specified in the doc */
 
-/* The driver supports only a single descriptor size */
-#define QM_DESC_SIZE_BYTES	        64
-
 /* Accumulator commands */
 #define QM_ACC_CMD_ENABLE               0x81
 #define QM_ACC_CMD_DISABLE              0x80
@@ -58,6 +55,11 @@
 
 #define DEVICE_QM_NUM_LINKRAMS		2
 #define DEVICE_QM_NUM_MEMREGIONS	20
+
+/* The driver supports only a single descriptor size */
+#define DEVICE_QM_DESC_SIZE_BYTES       64 
+#define DEVICE_QM_NUM_DESCS             512 /* total number of queue descriptors */
+#define DEVICE_QM_DESC_RAM_SIZE         (DEVICE_QM_DESC_SIZE_BYTES * DEVICE_QM_NUM_DESCS)
 
 /*
  * Descriptor Info: Descriptor type is host
@@ -160,8 +162,11 @@
 #define DEVICE_QM_VUSR_ALLOC_Q          4096 /* First allocable queue */
 #define DEVICE_QM_VUSR_ALLOC_END_Q      8191 /* Last allocable queue */
 
+/* Generic free queue */
+#define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
+
 /* Ethernet (NetCP) queues */
-#define DEVICE_QM_ETH_FREE_Q		910 /* Free buffer desc queue */
+#define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
 #define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
 #define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
 #define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_Q                                   /* Ethernet Tx queue (for PA) */
@@ -200,6 +205,42 @@ static inline u32 device_local_addr_to_global(u32 addr)
 	
 	return addr;
 }
+
+static inline int is_master_core(void)
+{
+	if (get_coreid() == 0)
+		return 1;
+	
+	return 0;
+}
+
+/*
+ * Platform data structures
+ */
+struct pdsp_platform_data {
+	unsigned int pdsp;
+	char        *firmware;
+	int          firmware_version;
+};
+
+struct qmss_platform_data {
+	u32 link_ram_base;
+	u32 link_ram_size;
+	u32 desc_ram_size;
+	u32 desc_num;
+	u32 free_queue;
+	struct pdsp_platform_data qm_pdsp;
+};
+
+/*
+ * Firmware 
+ */
+#include <asm/byteorder.h>
+#ifdef CONFIG_CPU_BIG_ENDIAN
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_be.fw"
+#else
+#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_le.fw"
+#endif
 
 /*
  * Copy a PDSP firmware image from/to PDSP memory. 

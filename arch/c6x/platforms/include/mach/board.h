@@ -37,4 +37,7 @@
 #ifdef CONFIG_ARCH_BOARD_EVM6670
 #include <mach/board-evm6670.h>
 #endif
+#ifdef CONFIG_ARCH_BOARD_SCBP_TCI6618
+#include <mach/board-scbp-tci6618.h>
+#endif
 #endif

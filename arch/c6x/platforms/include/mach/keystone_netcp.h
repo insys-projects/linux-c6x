@@ -41,12 +41,6 @@
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
-struct pdsp_platform_data {
-	unsigned int pdsp;
-	char        *firmware;
-	int          firmware_version;
-};
-
 struct netcp_platform_data {
 
 	/* Rx/tx interrupts */
@@ -55,9 +49,6 @@ struct netcp_platform_data {
 
 	/* PA PDSP */
 	struct pdsp_platform_data pa_pdsp;
-
-	/* QM PDSP */
-	struct pdsp_platform_data qm_pdsp;
 
 	/* PHY and SGMII indexes */
 	unsigned int sgmii_port;
@@ -92,13 +83,7 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 /*
  * Firmware 
  */
-#include <asm/byteorder.h>
 #define DEVICE_PA_PDSP_FIRMWARE "keystone-pdsp/pa_pdsp_default.fw"
-#ifdef CONFIG_CPU_BIG_ENDIAN
-#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_be.fw"
-#else
-#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_le.fw"
-#endif
 
 /*
  * Configure the streaming switch

@@ -19,12 +19,18 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/bitmap.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
+#include <linux/firmware.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
 
 #include <mach/keystone_qmss.h>
 #include <linux/keystone/qmss.h>
+
+#define NETCP_DRIVER_NAME    "TI KeyStone QMSS driver"
+#define NETCP_DRIVER_VERSION "v1.1"
 
 static DEFINE_MUTEX(qmss_mutex);
 
@@ -168,7 +174,7 @@ int hw_qm_download_firmware (u32 pdsp_id, void *image, u32 size)
 	return 0;
 }
 
-int hw_qm_setup (struct qm_config *cfg)
+static int hw_qm_setup (struct qm_config *cfg)
 {
 	u32 v, w, x, i;
 	    
@@ -228,14 +234,14 @@ int hw_qm_setup (struct qm_config *cfg)
 		v = 0;
 
 	/* Add the descriptor size field */
-	QM_REG_VAL_DESC_SETUP_SET_DESC_SIZE(v, QM_DESC_SIZE_BYTES);
+	QM_REG_VAL_DESC_SETUP_SET_DESC_SIZE(v, DEVICE_QM_DESC_SIZE_BYTES);
 	__raw_writel(v, (DEVICE_QM_DESC_SETUP_BASE +
 			 QM_REG_MEMR_DESC_SETUP(0))); 
 
 	/* Now format the descriptors and put them in a queue */
 	for (i = 0, v = cfg->mem_region_base;
 	     i < cfg->mem_regnum_descriptors;
-	     i++, v += QM_DESC_SIZE_BYTES) {
+	     i++, v += DEVICE_QM_DESC_SIZE_BYTES) {
 		
 		hd = (struct qm_host_desc *) qm_desc_ptov(v);
 		memset (hd, 0, sizeof(struct qm_host_desc));
@@ -247,9 +253,9 @@ int hw_qm_setup (struct qm_config *cfg)
 			    QM_DESC_PSINFO_IN_DESCR) {
 				if (QM_PKT_INFO_GET_EPIB(hd->packet_info) ==
 				    QM_DESC_PINFO_EPIB)
-					w = QM_DESC_SIZE_BYTES - 32 - 16;
+					w = DEVICE_QM_DESC_SIZE_BYTES - 32 - 16;
 				else
-					w = QM_DESC_SIZE_BYTES - 32;
+					w = DEVICE_QM_DESC_SIZE_BYTES - 32;
 			} else
 				w = 0;
 			
@@ -279,7 +285,7 @@ int hw_qm_setup (struct qm_config *cfg)
 	return 0;
 } 
 
-void hw_qm_teardown (void)
+static void hw_qm_teardown (void)
 {
 	u32 i;
 	
@@ -302,3 +308,89 @@ void hw_qm_teardown (void)
 				 QM_REG_MEMR_DESC_SETUP(i)));
 	}
 }
+
+static int __devinit qmss_probe(struct platform_device *pdev)
+{
+	struct qmss_platform_data *data = pdev->dev.platform_data;
+	struct qm_config c_q_cfg;
+	struct qm_config *q_cfg  = &c_q_cfg;
+	const struct firmware *fw;
+	u32 desc_ram;
+	int res;
+
+	/* Only master core can initialize QMSS in a multi-Linux environment */
+ 	if (!is_master_core()) {
+		goto slave_core;
+	}
+
+	q_cfg->link_ram_base = data->link_ram_base;
+	q_cfg->link_ram_size = data->link_ram_size;
+	
+	/* Allocate memory for descriptors */
+	desc_ram = qm_mem_alloc(data->desc_ram_size,
+				(u32*) &q_cfg->mem_region_base);
+	if (!desc_ram) {
+		printk(KERN_ERR "%s: descriptor memory allocation failed\n", 
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
+	    
+	q_cfg->mem_regnum_descriptors = data->desc_num;
+	q_cfg->dest_q		      = data->free_queue;
+
+	memset((void *) desc_ram, 0, data->desc_ram_size);
+	
+	/* Request QM accumulator firmware */
+	res = request_firmware(&fw, data->qm_pdsp.firmware, &pdev->dev);
+	if (res != 0) {
+		printk(KERN_ERR "QM: Cannot find %s firmware\n",
+		       data->qm_pdsp.firmware);
+		return res;
+	}
+
+	/* load QM PDSP firmware for accumulators */
+	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
+	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
+	q_cfg->pdsp_firmware[0].size     = fw->size;;
+	q_cfg->pdsp_firmware[1].firmware = NULL;
+
+	/* Initialize QM */
+	hw_qm_setup(q_cfg);
+	release_firmware(fw);
+
+slave_core:
+	printk("%s %s\n", NETCP_DRIVER_NAME, NETCP_DRIVER_VERSION);
+
+	return 0;
+}
+
+static int __devexit qmss_remove(struct platform_device *pdev)
+{
+	hw_qm_teardown();
+
+	return 0;
+}
+
+static struct platform_driver qmss_driver = {
+	.driver = {
+		.name	 = "keystone_qmss",
+		.owner	 = THIS_MODULE,
+	},
+	.probe = qmss_probe,
+	.remove = __devexit_p(qmss_remove),
+};
+
+static int __init qmss_init(void)
+{
+	return platform_driver_register(&qmss_driver);
+}
+subsys_initcall(qmss_init); /* should be initialized early */
+
+static void __exit qmss_exit(void)
+{
+	platform_driver_unregister(&qmss_driver);
+}
+module_exit(qmss_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("TI Keystone QMSS driver");

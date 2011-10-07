@@ -22,6 +22,7 @@
 #include <asm/machdep.h>
 #include <asm/sgmii.h>
 
+#include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_cpsw.h>
 

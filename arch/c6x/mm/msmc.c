@@ -19,6 +19,7 @@
 #include <linux/device.h>
 #include <linux/wait.h>
 #include <linux/dma-mapping.h>
+#include <linux/bitmap.h>
 
 #include <asm/cache.h>
 #include <asm/io.h>
@@ -31,22 +32,47 @@ static u32 __msm_memory_size  = RAM_MSM_SIZE;
 static u32 __msm_page_heap    = 0;
 static u32 __msm_page_top     = 0;
 
+#define MSM_BBMAP_BITS (RAM_MSM_SIZE >> PAGE_SHIFT)
+
+static DECLARE_BITMAP(__msm_bitmap, MSM_BBMAP_BITS);
+
 DEFINE_SPINLOCK(__msmc_mem_lock);
 
 /*
  * Return a MSM memory chunk
  */
-static inline u32 __msm_alloc(size_t size)
+static inline u32 __msm_alloc(int order)
 {
+	unsigned long flags;
+	u32 offset;
 	u32 paddr;
 
-	if ((__msm_page_heap + size) > __msm_page_top)
-		return -1;
+	spin_lock_irqsave(&__msmc_mem_lock, flags);
+	offset = bitmap_find_free_region(__msm_bitmap, MSM_BBMAP_BITS, order);
+
+	paddr = __msm_memory_start + (offset << PAGE_SHIFT);
+
+	if (__msm_page_heap < (paddr + ((1 << order) << PAGE_SHIFT)))
+		__msm_page_heap = paddr + ((1 << order) << PAGE_SHIFT);
 	
-	paddr            = __msm_page_heap;
-	__msm_page_heap += size;
+	spin_unlock_irqrestore(&__msmc_mem_lock, flags);
 
 	return paddr;
+}
+
+static inline void __msm_free(u32 paddr, int order)
+{
+	unsigned long flags;
+	u32 offset = (paddr - __msm_memory_start) >> PAGE_SHIFT;
+
+	if ((paddr < __msm_memory_start) || (offset + (1 << order) >= MSM_BBMAP_BITS)) {
+		printk(KERN_ERR "%s: freeing outside MSM range\n", __func__);
+		BUG();
+	}
+		
+	spin_lock_irqsave(&__msmc_mem_lock, flags);
+	bitmap_release_region(__msm_bitmap, offset, order);
+	spin_unlock_irqrestore(&__msmc_mem_lock, flags);
 }
 
 /*
@@ -57,21 +83,25 @@ u32 msm_virt_to_phys(u32 vaddr)
 {
 	return (vaddr - (RAM_MSM_CO_BASE - RAM_MSM_BASE));
 }
+EXPORT_SYMBOL(msm_virt_to_phys);
 
 u32 msm_phys_to_virt(u32 paddr)
 {
 	return (paddr + (RAM_MSM_CO_BASE - RAM_MSM_BASE));
 }
+EXPORT_SYMBOL(msm_phys_to_virt);
 
-u32 msm_get_heap(void)
+u32 msm_get_heap(void) 
 {
 	return msm_phys_to_virt(__msm_page_heap);
 }
+EXPORT_SYMBOL(msm_get_heap);
 
 u32 msm_get_top(void)
 {
 	return msm_phys_to_virt(__msm_page_top);
 }
+EXPORT_SYMBOL(msm_get_top);
 
 /*
  * Allocate an MSM memory chunk and returns its virtual address and the physical
@@ -83,20 +113,18 @@ msm_alloc_coherent(size_t size, dma_addr_t *handle)
 {
 	u32 paddr;
 	u32 virt;
+	int order;
 
 	if (in_interrupt())
 		BUG();
 
-	/* Round up to a page */
-	size = PAGE_ALIGN(size);
+	if (!__msm_memory_size || !size)
+		return NULL;
 
-	spin_lock_irq(&__msmc_mem_lock);
-
-	paddr = __msm_alloc(size);
+	order = get_order(size);
+	paddr = __msm_alloc(order);
 	
-	spin_unlock_irq(&__msmc_mem_lock);
-
-	if (paddr == -1)
+	if (!paddr)
 		return NULL;
 
 	if (handle)
@@ -113,11 +141,33 @@ msm_alloc_coherent(size_t size, dma_addr_t *handle)
 	L2_cache_block_invalidate(paddr, paddr + size);
 
 #ifdef DEBUG
-	printk("%s: paddr = 0x%x, virt = 0x%x, size = 0x%x\n",
-	       __FUNCTION__, paddr, virt, size);
+	printk(KERN_CRIT "%s: paddr = 0x%x, virt = 0x%x, size = 0x%x\n",
+	       __func__, paddr, virt, size);
 #endif	
 	return (void *) virt;
 }
+EXPORT_SYMBOL(msm_alloc_coherent);
+
+void
+msm_free_coherent(size_t size, void *vaddr, dma_addr_t *handle)
+{
+	int order;
+
+	if (in_interrupt())
+		BUG();
+
+	if (!__msm_memory_size || !size)
+		return;
+
+	order = get_order(size);
+	__msm_free(msm_virt_to_phys((u32) vaddr), order);
+
+#ifdef DEBUG
+	printk(KERN_CRIT "%s: vaddr = 0x%x, size = 0x%x\n",
+	       __func__, vaddr, size);
+#endif	
+}
+EXPORT_SYMBOL(msm_free_coherent);
 
 void 
 msm_mem_init(void)
@@ -145,5 +195,7 @@ msm_mem_init(void)
 
 	__msm_page_heap = __msm_memory_start;
 	__msm_page_top  = __msm_memory_start + __msm_memory_size;
+
+	bitmap_zero(__msm_bitmap, MSM_BBMAP_BITS);
 }
 #endif /* ARCH_HAS_MSM */

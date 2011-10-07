@@ -16,7 +16,6 @@ config SOC_TMS320C6457
 	select GPIO_C6X
 	select TIMER_C6X
 	select INTC_C64XPLUS
-	select SGMII
 
 config SOC_TMS320C6472
 	bool "TMS320C6472"
@@ -35,7 +34,6 @@ config SOC_TMS320C6474
 	select GPIO_C6X
 	select TIMER_C6X
 	select INTC_C64XPLUS
-	select SGMII
 
 config SOC_TMS320C6670
 	bool "TMS320C6670"
@@ -47,7 +45,6 @@ config SOC_TMS320C6670
 	select TIMER_C6X
 	select INTC_C64XPLUS
 	select CP_INTC
-	select SGMII_C66X
 	
 config SOC_TMS320C6678
 	bool "TMS320C6678"
@@ -59,7 +56,6 @@ config SOC_TMS320C6678
 	select TIMER_C6X
 	select INTC_C64XPLUS
 	select CP_INTC
-	select SGMII_C66X
 
 comment "Board Selection"
 choice
@@ -98,6 +94,10 @@ config ARCH_BOARD_EVM6678
 
 config ARCH_BOARD_EVM6670
 	bool "EVM6670"
+	select SOC_TMS320C6670
+
+config ARCH_BOARD_SCBP_TCI6618
+	bool "SCBP TCI6618"
 	select SOC_TMS320C6670
 
 endchoice
