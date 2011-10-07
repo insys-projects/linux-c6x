@@ -122,7 +122,6 @@ config TMS320C64XPLUS
 config TMS320C66X
 	bool "TMS320C66X"
 	select SERIAL_CORE
-	select SGMII_C66X
 
 config TI_KEYSTONE
 	bool
@@ -159,7 +158,6 @@ config USE_RT_TIMER
 config TMS320C64X_GEMAC
 	bool "Ethernet (GEMAC/MDIO interface)"
 	depends on !TMS320C66X
-	select SGMII
 	default n
 
 config TMS320C64X_GEMAC_0
@@ -174,13 +172,13 @@ config TMS320C64X_GEMAC_1
 
 config SGMII
 	bool "Ethernet SGMII support for C64x"
-	depends on TMS320C64X_GEMAC
-	default n
+	depends on TMS320C64X_GEMAC && (SOC_TMS320C6474 || SOC_TMS320C6457)
+	default y
 
 config SGMII_C66X
 	bool "Ethernet SGMII support for C66x"
-	depends on TMS320C66X
-	default n
+	depends on TI_KEYSTONE_NETCP
+	default y
 
 config EDMA3
 	bool "EDMA3 support"

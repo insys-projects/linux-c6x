@@ -125,7 +125,7 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 	return 0;
 }
 
-int evm_pa_ss_init(void)
+int evm_phy_init(void)
 {	
 	/* Reset SGMII */
 	sgmii_reset(0);
@@ -142,5 +142,4 @@ int evm_pa_ss_init(void)
 
 	return 0;
 }
-
-arch_initcall(evm_pa_ss_init);
+arch_initcall(evm_phy_init);
