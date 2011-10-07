@@ -96,4 +96,8 @@ config ARCH_BOARD_EVM6670
 	bool "EVM6670"
 	select SOC_TMS320C6670
 
+config ARCH_BOARD_SCBP_TCI6618
+	bool "SCBP TCI6618"
+	select SOC_TMS320C6670
+
 endchoice
