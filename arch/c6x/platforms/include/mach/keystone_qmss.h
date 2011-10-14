@@ -52,6 +52,12 @@
 #define DEVICE_QM_PDSP_IRAM_BASE(x)     (DEVICE_QM_PDSP1_IRAM_BASE \
 					 + ((DEVICE_QM_PDSP2_IRAM_BASE - DEVICE_QM_PDSP1_IRAM_BASE) \
 					    * (x)))
+/* QMSS PKTDMA register memory map */
+#define DEVICE_QM_CDMA_GLOBAL_CFG_BASE	 0x02a6c000
+#define DEVICE_QM_CDMA_TX_CHAN_CFG_BASE	 0x02a6c400
+#define DEVICE_QM_CDMA_RX_CHAN_CFG_BASE	 0x02a6c800
+#define DEVICE_QM_CDMA_TX_SCHED_CFG_BASE 0x02a6cc00
+#define DEVICE_QM_CDMA_RX_FLOW_CFG_BASE	 0x02a6d000
 
 #define DEVICE_QM_NUM_LINKRAMS		2
 #define DEVICE_QM_NUM_MEMREGIONS	20
@@ -65,23 +71,32 @@
  * Descriptor Info: Descriptor type is host
  * with any protocol specific info in the descriptor
  */
-#define QM_DESC_TYPE_HOST		0
-#define QM_DESC_PSINFO_IN_DESCR		0
-#define QM_DESC_DEFAULT_DESCINFO	(QM_DESC_TYPE_HOST << 30)    |  \
-					(QM_DESC_PSINFO_IN_DESCR << 22)
-#define QM_DESC_INFO_GET_PSINFO_LOC(x)	READ_BITFIELD((x), 22, 22)
-#define QM_DESC_DESCINFO_SET_PKT_LEN(x,v)	(x) = SET_BITFIELD((x), (v), 21, 0)
-#define QM_DESC_DESCINFO_GET_PKT_LEN(x)	READ_BITFIELD((x), 21, 0)
 
-/* Packet Info */
+/* Desc info */
+#define QM_DESC_DINFO_TYPE_HOST		0
+#define QM_DESC_DINFO_PSINFO_IN_DESCR   0
+#define QM_DESC_DINFO_DEFAULT	        (QM_DESC_DINFO_TYPE_HOST << 30)    | \
+					(QM_DESC_DINFO_PSINFO_IN_DESCR << 22)
+#define QM_DESC_DINFO_GET_PSINFO_LOC(x)	READ_BITFIELD((x), 22, 22)
+#define QM_DESC_DINFO_SET_PKT_LEN(x,v)	(x) = SET_BITFIELD((x), (v), 21, 0)
+#define QM_DESC_DINFO_GET_PKT_LEN(x)	READ_BITFIELD((x), 21, 0)
+
+/* Tag info */
+#define QM_DESC_TINFO_SET_S_TAG_HI(x,v) (x) = SET_BITFIELD((x), (v), 31, 24)
+#define QM_DESC_TINFO_SET_S_TAG_LO(x,v) (x) = SET_BITFIELD((x), (v), 23, 16)
+#define QM_DESC_TINFO_SET_D_TAG_HI(x,v) (x) = SET_BITFIELD((x), (v), 15, 8)
+#define QM_DESC_TINFO_SET_D_TAG_LO(x,v) (x) = SET_BITFIELD((x), (v), 15, 0)
+
+/* Packet info */
 #define QM_DESC_PINFO_EPIB		1
 #define QM_DESC_PINFO_RETURN_OWN	1
-#define QM_DESC_DEFAULT_PINFO		(QM_DESC_PINFO_EPIB << 31) | \
+#define QM_DESC_PINFO_DEFAULT		(QM_DESC_PINFO_EPIB << 31) | \
 					(QM_DESC_PINFO_RETURN_OWN << 15)
-#define QM_PKT_INFO_GET_EPIB(x)		READ_BITFIELD((x), 31, 31)
-#define QM_PKT_INFO_SET_PSINFO_SIZE(x,v)    (x) = SET_BITFIELD((x), (v), 29, 24)
 #define QM_DESC_PINFO_SET_QM(x,v)	(x) = SET_BITFIELD((x), (v), 13, 12)
 #define QM_DESC_PINFO_SET_QUEUE(x,v)    (x) = SET_BITFIELD((x), (v), 11,  0)
+#define QM_DESC_PINFO_GET_EPIB(x)	READ_BITFIELD((x), 31, 31)
+#define QM_DESC_PINFO_SET_SIZE(x,v)     (x) = SET_BITFIELD((x), (v), 29, 24)
+
 #define QM_REG_REVISION			0x00
 #define QM_REG_DIVERSION		0x08
 #define QM_REG_LINKRAM_BASE(x)		(0x0c + 8*(x))
