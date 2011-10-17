@@ -159,7 +159,7 @@ static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
 	int timeout;
 
 	/* Only core 0 can set PSC */
-	if (get_coreid() == 0) {
+	if (get_coreid() == get_master_coreid()) {
 		mdctl  = (volatile unsigned int *) (PSC_MDCTL0 + (id << 2));
 		mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
 		pdctl  = (volatile unsigned int *) (PSC_PDCTL0 + (pd << 2));
@@ -262,6 +262,9 @@ struct qmss_platform_data qmss_data  = {
 	/* free queue */
 	.free_queue    = DEVICE_QM_FREE_Q,
 
+	/* we are master core by default */
+	.slave         = 0,
+
 	/* PDSP firmware for accumulators */
 	.qm_pdsp = {
 		.pdsp              = 0, /* QM PDSP 0 */
@@ -280,6 +283,10 @@ static struct platform_device qmss_dev = {
 
 static int __init setup_qmss(void)
 {
+	if (get_coreid() != get_master_coreid()) {
+		qmss_data.slave = 1;
+	}
+
 	return platform_device_register(&qmss_dev);
 }
 core_initcall(setup_qmss);

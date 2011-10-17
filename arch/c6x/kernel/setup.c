@@ -599,3 +599,48 @@ void arch_gettod(int *year, int *mon, int *day, int *hour, int *min, int *sec)
 	else
 		*year = *mon = *day = *hour = *min = *sec = 0;
 }
+
+static inline long _hex_chartol (char c)
+{
+	if ((c >= '0') && (c <= '9')) return (c - '0');
+	if ((c >= 'A') && (c <= 'F')) return (c - 'A') + 10;
+	if ((c >= 'a') && (c <= 'f')) return (c - 'a') + 10;
+	
+	return -1;
+}
+
+static u8 _hex_strtoul (const char* str, const char** end)
+{
+	unsigned long ul = 0;
+	long          ud;
+	while ((ud = _hex_chartol(*str)) >= 0) {
+		ul = (ul << 4) | ud;
+		str++;
+	}
+	*end = str;
+	return (u8) ul;
+}
+
+static int __master_coreid = 0;
+
+static int master_coreid_setup(char *str)
+{
+	char *end;
+
+	__master_coreid = _hex_strtoul(str, &end);
+	if (str == end)
+		return 0;
+
+	if (__master_coreid >= CORE_NUM) {
+		__master_coreid = 0; /* default value */
+		return 0;
+	}
+
+	return 1;
+}
+__setup("master_core=", master_coreid_setup);
+
+int get_master_coreid(void)
+{
+	return __master_coreid;
+}

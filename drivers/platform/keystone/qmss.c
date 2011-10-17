@@ -319,7 +319,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	int res;
 
 	/* Only master core can initialize QMSS in a multi-Linux environment */
- 	if (!is_master_core()) {
+ 	if (data->slave) {
 		goto slave_core;
 	}
 

@@ -127,18 +127,21 @@ static int hw_cpsw_config(u32 ctl, u32 max_pkt_size)
 
 int evm_phy_init(void)
 {	
-	/* Reset SGMII */
-	sgmii_reset(0);
-	sgmii_reset(1);
+	if (get_coreid() == get_master_coreid()) {
 
-	/* SERDES init */
-	serdes_init();
-	
-	/* Configure the SGMII */
-	sgmii_init();
+		/* Reset SGMII */
+		sgmii_reset(0);
+		sgmii_reset(1);
 
-	/* Enable port 0 with max pkt size to 9000 */
-	hw_cpsw_config(CPSW_CTL_P0_ENABLE, 9000);
+		/* SERDES init */
+		serdes_init();
+		
+		/* Configure the SGMII */
+		sgmii_init();
+		
+		/* Enable port 0 with max pkt size to 9000 */
+		hw_cpsw_config(CPSW_CTL_P0_ENABLE, 9000);
+	}
 
 	return 0;
 }

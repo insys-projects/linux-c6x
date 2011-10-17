@@ -112,29 +112,31 @@ int phy_init(void)
 
 int evm_phy_init(void)
 {
+	if (get_coreid() == get_master_coreid()) {
 #if !defined(CONFIG_ARCH_BOARD_EVM6472)
-	struct sgmii_config_s sgmiic;
-
-	/* SGMII setup */
-	sgmii_reset(0);
-
-	sgmiic.master    = 1;
-	sgmiic.loopback  = 0;
-	sgmiic.autoneg   = 0;
-	sgmiic.txconfig  = 0x00000e23;
-	sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode */
-	sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
-
+		struct sgmii_config_s sgmiic;
+		
+		/* SGMII setup */
+		sgmii_reset(0);
+		
+		sgmiic.master    = 1;
+		sgmiic.loopback  = 0;
+		sgmiic.autoneg   = 0;
+		sgmiic.txconfig  = 0x00000e23;
+		sgmiic.rxconfig  = 0x00081023; /* programming serdes to be in master mode */
+		sgmiic.auxconfig = 0x0000000b; /* PLL multiplier */
+		
 #ifdef CONFIG_ARCH_BOARD_EVM6474
-	/* EVMC6474 board is wired up with TX differential +/- swapped. */
-	sgmiic.txconfig  |= 0x80;
+		/* EVMC6474 board is wired up with TX differential +/- swapped. */
+		sgmiic.txconfig  |= 0x80;
 #endif /* CONFIG_ARCH_BOARD_EVM6474 */
-
-	sgmii_config(0, &sgmiic);
+		
+		sgmii_config(0, &sgmiic);
 
 #endif /* !defined(CONFIG_ARCH_BOARD_EVM6472) */
 
-	phy_init();
+		phy_init();
+	}
 
 	return 0;
 }

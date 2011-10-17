@@ -221,14 +221,6 @@ static inline u32 device_local_addr_to_global(u32 addr)
 	return addr;
 }
 
-static inline int is_master_core(void)
-{
-	if (get_coreid() == 0)
-		return 1;
-	
-	return 0;
-}
-
 /*
  * Platform data structures
  */
@@ -244,6 +236,7 @@ struct qmss_platform_data {
 	u32 desc_ram_size;
 	u32 desc_num;
 	u32 free_queue;
+	u32 slave;
 	struct pdsp_platform_data qm_pdsp;
 };
 
