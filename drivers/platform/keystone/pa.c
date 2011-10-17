@@ -217,7 +217,7 @@ int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac
 	hd->orig_buff_ptr  = (u32) pa_cfg.cmd_buf;
 	hd->buff_ptr       = (u32) pa_cfg.cmd_buf;
 	hd->private        = 0;
-	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, PA_CMD_SIZE);
+	QM_DESC_DINFO_SET_PKT_LEN(hd->desc_info, PA_CMD_SIZE);
 
 	/* Set the return Queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);

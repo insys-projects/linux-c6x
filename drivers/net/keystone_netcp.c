@@ -413,7 +413,7 @@ static int netcp_rx(struct net_device *ndev,
 		if (unlikely(work_done && *work_done >= work_to_do))
 			return 0;
 
-		pkt_size = QM_DESC_DESCINFO_GET_PKT_LEN(hd->desc_info);
+		pkt_size = QM_DESC_DINFO_GET_PKT_LEN(hd->desc_info);
 		if (unlikely(pkt_size == 0))
 			return 0;
 
@@ -564,7 +564,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	L2_cache_block_writeback((u32) skb->data,
 				 (u32) skb->data + pkt_len);
 
-	QM_DESC_DESCINFO_SET_PKT_LEN(hd->desc_info, pkt_len);
+	QM_DESC_DINFO_SET_PKT_LEN(hd->desc_info, pkt_len);
 	
 	hd->buff_len		= pkt_len;
 	hd->orig_buff_len	= pkt_len;
@@ -988,6 +988,8 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	u32                         acc_list_num_rx;
 	u32                         acc_list_num_tx;
 	u32                         acc_list_size; 
+	u32                         queue_free_buf[DEVICE_PA_CDMA_RX_NUM_FLOWS];
+	u32                         queue_rx[DEVICE_PA_CDMA_RX_NUM_FLOWS];
 
 	if (!data) {
 		pr_err("KeyStone NetCP: platform data missing\n");
@@ -1042,13 +1044,15 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	/* Configure Rx and Tx PKTDMA */
 	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
+	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
 	rx_cfg->n_rx_chans       = DEVICE_PA_CDMA_RX_NUM_CHANNELS;
 	rx_cfg->flow_base        = DEVICE_PA_CDMA_RX_FLOW_CFG_BASE;
-	rx_cfg->nrx_flows        = DEVICE_PA_CDMA_RX_NUM_FLOWS;
+	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRST_FLOW;
+	rx_cfg->n_rx_flows       = DEVICE_PA_CDMA_RX_NUM_FLOWS;
 	rx_cfg->qmnum_free_buf   = 0;
-	rx_cfg->queue_free_buf   = DEVICE_QM_ETH_RX_FREE_Q;
+	rx_cfg->queue_free_buf   = &queue_free_buf[0];
 	rx_cfg->qmnum_rx         = 0;
-	rx_cfg->queue_rx         = DEVICE_QM_ETH_RX_Q;
+	rx_cfg->queue_rx         = &queue_rx[0];
 	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
 #ifndef EMAC_ARCH_HAS_INTERRUPT
 	rx_cfg->use_acc          = 0;
@@ -1056,7 +1060,10 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->use_acc          = 1;
 	rx_cfg->acc_threshold    = DEVICE_RX_INT_THRESHOLD;
 	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
-	
+
+	queue_free_buf[0]        = DEVICE_QM_ETH_RX_FREE_Q;
+	queue_rx[0]              = DEVICE_QM_ETH_RX_Q;
+
 	/* Set the accumulator list memory in the descriptor memory */
 	acc_list_num_rx = ((rx_cfg->acc_threshold + 1) * 2);
 	acc_list_num_tx = ((tx_cfg->acc_threshold + 1) * 2);
@@ -1082,6 +1089,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	tx_cfg->gbl_ctl_base     = DEVICE_PA_CDMA_GLOBAL_CFG_BASE;
 	tx_cfg->tx_base          = DEVICE_PA_CDMA_TX_CHAN_CFG_BASE;
+	tx_cfg->tx_chan          = DEVICE_PA_CDMA_TX_FIRST_CHANNEL;
 	tx_cfg->n_tx_chans       = DEVICE_PA_CDMA_TX_NUM_CHANNELS;
 	tx_cfg->queue_tx         = DEVICE_QM_ETH_TX_CP_Q;
 #ifndef EMAC_ARCH_HAS_INTERRUPT

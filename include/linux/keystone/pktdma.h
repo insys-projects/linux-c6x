@@ -76,12 +76,12 @@ struct pktdma_global_control {
 struct pktdma_tx_channel_config {
 	u32 tx_channel_global_config_reg_a;
 	u32 tx_channel_global_config_reg_b;
-	u32  rsvd0[6];
+	u32 rsvd0[6];
 };
 
 struct pktdma_rx_channel_config {
 	u32 rx_channel_global_config_reg_a;
-	u32  rsvd0[7];
+	u32 rsvd0[7];
 };
 
 struct pktdma_rx_flow_config {
@@ -94,7 +94,6 @@ struct pktdma_rx_flow_config {
 	u32 rx_flow_config_reg_g;
 	u32 rx_flow_config_reg_h;
 };
-
 
 struct pktdma_tx_scheduler_config {
 	u32 tx_channel_scheduler_config_reg;
@@ -222,13 +221,15 @@ struct pktdma_rx_flow_cfg
  */
 struct pktdma_rx_cfg {
 	u32 rx_base;		/* Base address of rx registers */
+	u32 rx_chan;            /* Index of first rx channel */
 	u32 n_rx_chans;		/* The number of rx channels */
 	u32 flow_base;		/* Add address of flow registers */
-	u32 nrx_flows;		/* Number of rx flows */
+	u32 rx_flow;            /* Index of first flow */
+	u32 n_rx_flows;		/* Number of rx flows */
 	u32 qmnum_free_buf;	/* Queue manager for descriptors/buffers for received packets */
-	u32 queue_free_buf;	/* Queue that holds descriptors/buffers for received packets */
+	u32 *queue_free_buf;	/* Queue that holds descriptors/buffers for received packets */
 	u32 qmnum_rx;		/* Queue manager for received packets */
-	u32 queue_rx;		/* Default Rx queue for received packets */
+	u32 *queue_rx;		/* Default Rx queue for received packets */
 	u32 tdown_poll_count;	/* Number of loop iterations to wait for teardown */
 	u8  use_acc;            /* Use accumulators if non zero */
 	u8  acc_threshold;      /* Accumulator threshold */
@@ -240,6 +241,7 @@ struct pktdma_rx_cfg {
 struct pktdma_tx_cfg {
 	u32 gbl_ctl_base;	/* Base address of global control registers */
 	u32 tx_base;		/* Base address of the tx registers */
+	u32 tx_chan;            /* Index of first tx channel */
 	u32 n_tx_chans;		/* The number of tx channels */
 	u32 queue_tx;		/* Default Tx queue for Tx completion packets */
 	u8  use_acc;            /* Use accumulators if non zero */
@@ -256,5 +258,9 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg);
 int pktdma_tx_disable(struct pktdma_tx_cfg *cfg);
 int pktdma_rx_config(struct pktdma_rx_cfg *cfg);
 int pktdma_tx_config(struct pktdma_tx_cfg *cfg);
+void pktdma_flow_config(struct pktdma_rx_cfg *cfg,
+			int flow,
+			u32 queue_rx,
+			u32 queue_free_buf);
 
 #endif /* KEYSTONE_PKTDMA_H */

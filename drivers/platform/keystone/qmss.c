@@ -246,28 +246,28 @@ static int hw_qm_setup (struct qm_config *cfg)
 		hd = (struct qm_host_desc *) qm_desc_ptov(v);
 		memset (hd, 0, sizeof(struct qm_host_desc));
 		
-		hd->desc_info = QM_DESC_DEFAULT_DESCINFO;
-			hd->packet_info = QM_DESC_DEFAULT_PINFO;
-			
-			if (QM_DESC_INFO_GET_PSINFO_LOC(hd->desc_info) ==
-			    QM_DESC_PSINFO_IN_DESCR) {
-				if (QM_PKT_INFO_GET_EPIB(hd->packet_info) ==
-				    QM_DESC_PINFO_EPIB)
-					w = DEVICE_QM_DESC_SIZE_BYTES - 32 - 16;
-				else
-					w = DEVICE_QM_DESC_SIZE_BYTES - 32;
-			} else
-				w = 0;
-			
-			QM_PKT_INFO_SET_PSINFO_SIZE(hd->packet_info, (w >> 2));
-			
-			/* Push the descriptor onto the queue */
-			x = device_local_addr_to_global(v);
-			
-			__raw_writel(x, (DEVICE_QM_MANAGER_QUEUES_BASE +
-					 QM_REG_QUEUE_REGD(cfg->dest_q)));
+		hd->desc_info   = QM_DESC_DINFO_DEFAULT;
+		hd->packet_info = QM_DESC_PINFO_DEFAULT;
+		
+		if (QM_DESC_DINFO_GET_PSINFO_LOC(hd->desc_info) ==
+		    QM_DESC_DINFO_PSINFO_IN_DESCR) {
+			if (QM_DESC_PINFO_GET_EPIB(hd->packet_info) ==
+			    QM_DESC_PINFO_EPIB)
+				w = DEVICE_QM_DESC_SIZE_BYTES - 32 - 16;
+			else
+				w = DEVICE_QM_DESC_SIZE_BYTES - 32;
+		} else
+			w = 0;
+		
+		QM_DESC_PINFO_SET_SIZE(hd->packet_info, (w >> 2));
+		
+		/* Push the descriptor onto the queue */
+		x = device_local_addr_to_global(v);
+		
+		__raw_writel(x, (DEVICE_QM_MANAGER_QUEUES_BASE +
+				 QM_REG_QUEUE_REGD(cfg->dest_q)));
         }
-
+	
 	mutex_unlock(&qmss_mutex);
     
 	/* Download optional firmware to QM PDSP */
@@ -319,7 +319,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	int res;
 
 	/* Only master core can initialize QMSS in a multi-Linux environment */
- 	if (!is_master_core()) {
+ 	if (data->slave) {
 		goto slave_core;
 	}
 

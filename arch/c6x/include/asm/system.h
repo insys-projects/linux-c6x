@@ -159,6 +159,8 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 
 #define get_coreid() (get_creg(DNUM) & 0xff)
 
+extern int get_master_coreid(void);
+
 /*
  * Interrupt management
  */
