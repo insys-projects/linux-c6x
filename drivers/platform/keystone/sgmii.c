@@ -23,7 +23,7 @@
 
 #include <linux/keystone/sgmii.h>
 
-#define SGMII_REG_BASE 0x02090100
+#include <mach/keystone_netcp.h>
 
 static void __iomem	*base;
 
