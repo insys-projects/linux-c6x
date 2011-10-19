@@ -10,7 +10,7 @@ menuconfig TI_KEYSTONE_PLATFORM_DEVICES
 	  Say Y here to select options for device drivers for KeyStone
 	  platforms. This option alone does not add any kernel code.
 
-          If you sau N, all options in this submenu will be skipped and
+          If you say N, all options in this submenu will be skipped and
           disabled.
 
 if TI_KEYSTONE_PLATFORM_DEVICES
@@ -34,5 +34,10 @@ config TI_KEYSTONE_CPSW
 	tristate "TI Keystone CPSW"
 	help
 	  This driver supports TI's Keystone CPSW.
+
+config TI_KEYSTONE_SGMII
+	tristate "TI Keystone SGMII"
+	help
+	  This driver supports TI's Keystone SGMII.
 
 endif
