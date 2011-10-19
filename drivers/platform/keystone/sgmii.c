@@ -25,7 +25,7 @@
 
 #define SGMII_REG_BASE 0x02090100
 
-void __iomem	*base;
+static void __iomem	*base;
 
 static inline void sgmii_write_reg(int reg, u32 val)
 {
@@ -90,7 +90,6 @@ int keystone_sgmii_config(int port, struct sgmii_config *config)
 	 */
 	for (i = 0; i < 1000; i++)  {
         	udelay(20000);
-		udelay(20000);
         	status = sgmii_read_reg(SGMII_STATUS_REG(port));
         	if ( (status & SGMII_REG_STATUS_FIELD_LOCK) != 0 )
 			break;
