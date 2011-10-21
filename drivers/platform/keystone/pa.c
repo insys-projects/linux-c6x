@@ -24,31 +24,43 @@
 #include <linux/keystone/pa.h>
 #include <linux/keystone/qmss.h>
 
+static void __iomem	*pa_base;
+
+static inline void pa_write_reg(u32 val, int reg)
+{
+	__raw_writel(val, pa_base + reg);
+}
+
+static inline u32 pa_read_reg(int reg)
+{
+	return __raw_readl(pa_base + reg);
+}
+
 int keystone_pa_reset(void)
 {
 	u32 i;
 
 	/* Reset and disable all PDSPs */
 	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++) {
-		__raw_writel(PA_REG_VAL_PDSP_CTL_RESET_PDSP,
-			     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(i)));
+		pa_write_reg(PA_REG_VAL_PDSP_CTL_RESET_PDSP,
+			     PA_REG_PDSP_CTL(i));
 
-		while((__raw_readl(DEVICE_PA_BASE + PA_REG_PDSP_CTL(i))
+		while((pa_read_reg(PA_REG_PDSP_CTL(i))
 		       & PA_REG_VAL_PDSP_CTL_STATE));
 	}
 
 	/* Reset packet Id */
-	__raw_writel(1, DEVICE_PA_BASE + PA_REG_PKTID_SOFT_RESET);
+	pa_write_reg(1, PA_REG_PKTID_SOFT_RESET);
 
 	/* Reset LUT2 */
-	__raw_writel(1, DEVICE_PA_BASE + PA_REG_LUT2_SOFT_RESET);
+	pa_write_reg(1, PA_REG_LUT2_SOFT_RESET);
 
 	/* Reset statistic */
-	__raw_writel(1, DEVICE_PA_BASE + PA_REG_STATS_SOFT_RESET);
+	pa_write_reg(1, PA_REG_STATS_SOFT_RESET);
 
 	/* Reset timers */
 	for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++) {
-		__raw_writel(0, (DEVICE_PA_BASE + PA_REG_TIMER_CTL(i)));
+		pa_write_reg(0, PA_REG_TIMER_CTL(i));
 	}
 
 	return 0;
@@ -63,7 +75,7 @@ int keystone_pa_enable(int pdsp)
 		return -EINVAL;
 
 	/* Check the PDSP state */
-	v = __raw_readl(DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp));
+	v = pa_read_reg(PA_REG_PDSP_CTL(pdsp));
 	if (v & PA_REG_VAL_PDSP_CTL_STATE) {
 		/* Already enabled */
 		return 1;
@@ -71,12 +83,12 @@ int keystone_pa_enable(int pdsp)
 
 	/* Clear the mailboxes */
 	for (i = 0; i < PA_NUM_MAILBOX_SLOTS; i++) {
-		__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(pdsp, i)));
+		pa_write_reg(0, PA_REG_MAILBOX_SLOT(pdsp, i));
 	}
 
 	/* Enable PDSP */
-	__raw_writel(PA_REG_VAL_PDSP_CTL_ENABLE_PDSP(0),
-		     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp)));
+	pa_write_reg(PA_REG_VAL_PDSP_CTL_ENABLE_PDSP(0),
+		     PA_REG_PDSP_CTL(pdsp));
 
 	return 0;
 }
@@ -91,18 +103,18 @@ int keystone_pa_disable(int pdsp)
 	if (pdsp < 0) {
 		/* Disable all pdsps, clear all mailboxes */
 		for (i = 0; i < DEVICE_PA_NUM_PDSPS; i++)  {
-			__raw_writel(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
-				     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(i)));
+			pa_write_reg(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
+				     PA_REG_PDSP_CTL(i));
 
 			for (j = 0; j < PA_NUM_MAILBOX_SLOTS; j++)
-				__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(i, j)));
+				pa_write_reg(0, PA_REG_MAILBOX_SLOT(i, j));
 		}
 	} else {
-		__raw_writel(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
-			     (DEVICE_PA_BASE + PA_REG_PDSP_CTL(pdsp)));
+		pa_write_reg(PA_REG_VAL_PDSP_CTL_DISABLE_PDSP,
+			     PA_REG_PDSP_CTL(pdsp));
 
 		for (j = 0; j < PA_NUM_MAILBOX_SLOTS; j++)
-			__raw_writel(0, (DEVICE_PA_BASE + PA_REG_MAILBOX_SLOT(pdsp, j)));
+			pa_write_reg(0, PA_REG_MAILBOX_SLOT(pdsp, j));
 
 	}
 	return 0;
@@ -116,7 +128,7 @@ int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len)
 	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
-	pdsp_fw_get(buffer, (u32 *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)),
+	pdsp_fw_get(buffer, (u32 *)(pa_base + PA_MEM_PDSP_IRAM(pdsp)),
 		    len >> 2);
 
 	return 0;
@@ -127,7 +139,7 @@ int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len)
 	if ((pdsp < 0) || (pdsp >= DEVICE_PA_NUM_PDSPS))
 		return -EINVAL;
 
-	pdsp_fw_put((u32 *)(DEVICE_PA_BASE + PA_MEM_PDSP_IRAM(pdsp)), buffer,
+	pdsp_fw_put((u32 *)(pa_base + PA_MEM_PDSP_IRAM(pdsp)), buffer,
 		    len >> 2);
 
 	return 0;
@@ -229,3 +241,12 @@ int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac
 		
 	return 0;
 }
+
+int keystone_pa_init(void)
+{
+
+	pa_base = ioremap(DEVICE_PA_BASE, DEVICE_PA_REGION_SIZE);
+
+	return 0;
+}
+

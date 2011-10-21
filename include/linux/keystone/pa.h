@@ -48,6 +48,7 @@ int keystone_pa_reset(void);
 int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len);
 int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len);
 int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac_addr);
+int keystone_pa_init(void);
 #endif /* __KERNEL__ */
 
 #endif /* KEYSTONE_PA_H */
