@@ -16,10 +16,11 @@
 #define __MACH_C6X_KEYSTONE_PA_H
 
 #define DEVICE_PA_BASE				0x02000000
+#define DEVICE_PA_REGION_SIZE			0x40000
 #define DEVICE_PA_RUN_CHECK_COUNT		100
 #define DEVICE_PA_NUM_PDSPS			6
 
-#define PA_CMD_SIZE 16
+#define PA_CMD_SIZE				16
 #define PA_MAGIC_ID				0x0CEC11E0
 #define PA_REG_MAILBOX_SLOT(pdsp, slot)		(0x00 + ((pdsp) * 0x10) + ((slot) * 0x04))
 #define PA_REG_PDSP_CTL(pdsp)			(0x1000 + ((pdsp) * 0x100))
