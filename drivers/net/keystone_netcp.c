@@ -32,7 +32,6 @@
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/msmc.h>
-#include <asm/mdio.h>
 
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
@@ -68,6 +67,63 @@
 
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
+
+#define MDIO_CONTROL		0x004 /* Module Control Register */
+#define MDIO_USERACCESS0	0x080 /* User Access Register 0 */
+
+#define MDIO_B_ACK               (1 << 29)
+#define MDIO_B_WRITE             (1 << 30)
+#define MDIO_B_GO                (1 << 31) /* for USERACESS */
+
+#define MDIO_M_CLKDIV            ((1 << 16) - 1)
+
+#define MDIO_B_FAULTENB          (1 << 18)
+#define MDIO_B_FAULT             (1 << 19)
+#define MDIO_B_PREAMBLE          (1 << 20)
+#define MDIO_B_ENABLE            (1 << 30)
+#define MDIO_B_IDLE              (1 << 31)
+
+static void __iomem	*mdio_base;
+
+static inline void mdio_set_reg(int reg, u32 val)
+{
+	__raw_writel(val, mdio_base + reg);
+}
+
+static inline u32 mdio_get_reg(int reg)
+{
+	return __raw_readl(mdio_base + reg);
+}
+
+static inline void mdio_phy_read(int regadr, int phyadr)
+{
+        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
+		     ((phyadr & 0x1f) << 16) |
+		     ((regadr & 0x1f) << 21));
+
+}
+
+static inline void mdio_phy_write(int regadr, int phyadr, int data)
+{
+        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
+                     MDIO_B_WRITE |
+		     ((phyadr & 0x1f) << 16) |
+		     ((regadr & 0x1f) << 21) |
+                     ((data & 0xffff)));
+}
+
+static inline int mdio_phy_wait_res_ack(int *results)
+{
+	int ack;
+
+	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+        
+	*results = mdio_get_reg(MDIO_USERACCESS0) & 0xffff;
+        
+	ack = (mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_ACK) >> 29;
+
+	return ack;
+}
 
 static void __iomem	*mac_sl;
 
@@ -693,9 +749,11 @@ static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
 	int val;
 	int ack = 0;
 
-	mdio_phy_wait();
+	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+
 	mdio_phy_read(reg, phy_id);
-	mdio_phy_wait_res_ack(val, ack);
+
+	ack = mdio_phy_wait_res_ack(&val);
 
 	if (!ack)
 		val = -1;
@@ -706,15 +764,20 @@ static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
 static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int value)
 {
 
-	mdio_phy_wait();
+	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+
 	mdio_phy_write(reg, phy_id, value);
-	mdio_phy_wait();
+
+	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
 	
 	return;
 }
 
 static void netcp_mdio_init(void)
 {
+
+	mdio_base = ioremap(MDIO_REG_BASE, 0x100);
+	
 	mdio_set_reg(MDIO_CONTROL, MDIO_B_ENABLE | (VBUSCLK & MDIO_M_CLKDIV));
 }
 
