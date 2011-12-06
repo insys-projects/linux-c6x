@@ -91,7 +91,7 @@ static u32 virtio_ipc_set_config_space(void)
 
 		desc->id         = dev;                             /* id */
 		desc->type       = VIRTIO_ID_NET;
-		desc->owner      = (get_coreid() + dev) % CORE_NUM; /* core owner*/
+		desc->owner      = dev;                             /* core owner*/
 		desc->num_vq     = 2;
 		desc->config_len = sizeof(struct virtio_net_config);
 		desc->status     = 0;
