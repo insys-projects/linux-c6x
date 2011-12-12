@@ -36,6 +36,7 @@
 #define CPSW_CTL_FIFO_LOOPBACK		        (1 << 0)
 
 #define DEVICE_CPSW_BASE		        (0x02090800)
+#define DEVICE_CPSW_REGION_SIZE			0x800
 
 /* Register offsets */
 #define CPSW_REG_CTL			        0x004
