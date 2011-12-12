@@ -55,17 +55,17 @@ static inline u32 qm_read_reg(int reg)
  */
 void hw_qm_ack_interrupt(u32 index, u32 channel)
 {
-	if (__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
+	if (qm_read_reg(DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS0) &
 		    (1 << channel)) {
-			__raw_writel(1, QM_REG_INTD_COUNT_IRQ(channel));
-			__raw_writel(index + channel,
-				     DEVICE_QM_INTD_BASE + QM_REG_INTD_EOI);
+			qm_write_reg(1, QM_REG_INTD_COUNT_IRQ(channel));
+			qm_write_reg(index + channel,
+				     DEVICE_QM_INTD_OFFSET + QM_REG_INTD_EOI);
 	}
 }
 
 int hw_qm_interrupt_status(u32 channel)
 {
-	if ((__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
+	if ((qm_read_reg(DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS0) &
 	     (1 << channel)) == 0)
 		return 0;
 	else
@@ -115,7 +115,7 @@ struct qm_host_desc *hw_qm_queue_pop(u32 qnum)
 	u32 uhd;
 
 	/* Strip the descriptor size info */
-	uhd = __raw_readl(DEVICE_QM_MANAGER_QUEUES_BASE + QM_REG_QUEUE_REGD(qnum));
+	uhd = qm_read_reg(DEVICE_QM_MANAGER_QUEUES_OFFSET + QM_REG_QUEUE_REGD(qnum));
 	uhd = uhd & ~0xf;
 
 	return (struct qm_host_desc *) qm_desc_ptov(uhd);
@@ -128,7 +128,7 @@ void hw_qm_queue_push (struct qm_host_desc *hd, u32 qnum, u32 desc_size)
 	regd = (qm_desc_vtop((u32) hd)) | ((desc_size >> 4) - 1);
 	
 	/* Push the descriptor onto the queue */
-	__raw_writel(regd, (DEVICE_QM_MANAGER_QUEUES_BASE +
+	qm_write_reg(regd, (DEVICE_QM_MANAGER_QUEUES_OFFSET +
 			    QM_REG_QUEUE_REGD(qnum)));
 }
 
@@ -136,7 +136,7 @@ u32 hw_qm_queue_count(u32 qnum)
 {
 	u32 rega;
 
-	rega = __raw_readl(DEVICE_QM_QUEUE_STATUS_BASE +
+	rega = qm_read_reg(DEVICE_QM_QUEUE_STATUS_OFFSET +
 			   QM_REG_QUEUE_REGA(qnum));
 	rega = READ_BITFIELD (rega, QM_QA_ENTRY_COUNT_MSB,
 			      QM_QA_ENTRY_COUNT_LSB);
@@ -146,7 +146,7 @@ u32 hw_qm_queue_count(u32 qnum)
 
 int hw_qm_init_threshold(u32 qnum)
 {
-	__raw_writel(0x81, (DEVICE_QM_QUEUE_STATUS_BASE +
+	qm_write_reg(0x81, (DEVICE_QM_QUEUE_STATUS_OFFSET +
 			    QM_REG_STAT_CFG_REGD(qnum)));
 	
 	return 0;
@@ -184,11 +184,12 @@ u32 hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg)
 	cmd[4] = SET_BITFIELD(cmd[4], cfg->multi_queue_mode, 21, 21);
 	
 	/* Point to the accumulator command register's last word */
-	reg = (uint32_t *) ((uint8_t *) DEVICE_QM_PDSP_CMD_BASE(pdsp_id) + 4 * 4);
+	reg = (uint32_t *) ((uint8_t *)(qm_base +
+					DEVICE_QM_PDSP_CMD_OFFSET(pdsp_id)) + 4 * 4);
 	
 	/* Write command word last */
 	p_cmd = cmd + 4;
-
+	
 	mutex_lock(&qmss_mutex);
 
 	for (index = 0; index < QM_ACC_CMD_SIZE; index += 4)
@@ -222,28 +223,28 @@ int hw_qm_download_firmware (u32 pdsp_id, void *image, u32 size)
 	mutex_lock(&qmss_mutex);
 
 	/* Reset the PDSP */
-	__raw_writel(QM_REG_VAL_PDSP_CTL_DISABLE, DEVICE_QM_PDSP_CTRL_BASE(pdsp_id));
+	qm_write_reg(QM_REG_VAL_PDSP_CTL_DISABLE, DEVICE_QM_PDSP_CTRL_OFFSET(pdsp_id));
 	
 	/* Confirm PDSP has halted */
-	while(__raw_readl(DEVICE_QM_PDSP_CTRL_BASE(pdsp_id))
+	while(qm_read_reg(DEVICE_QM_PDSP_CTRL_OFFSET(pdsp_id))
 	      & QM_REG_VAL_PDSP_CTL_STATE);
 	
 	/* upload the firmware */
-	pdsp_fw_put((u32 *) DEVICE_QM_PDSP_IRAM_BASE(pdsp_id), (u32 *) image, size >> 2);
+	pdsp_fw_put((u32 *)(qm_base + DEVICE_QM_PDSP_IRAM_OFFSET(pdsp_id)), (u32 *) image, size >> 2);
 	
 	/* Use the command register to sync the PDSP */
-	__raw_writel(0xFFFFFFFF, DEVICE_QM_PDSP_CMD_BASE(pdsp_id));
+	qm_write_reg(0xFFFFFFFF, DEVICE_QM_PDSP_CMD_OFFSET(pdsp_id));
 	
 	/* Wait to the memory write to land */
 	for (i = 0;
-	     (i < 20000) && (__raw_readl(DEVICE_QM_PDSP_CMD_BASE(pdsp_id)) != 0xFFFFFFFF);
+	     (i < 20000) && (qm_read_reg(DEVICE_QM_PDSP_CMD_OFFSET(pdsp_id)) != 0xFFFFFFFF);
 	     i++);
 	
 	/* Reset the PC and enable PDSP */
-	__raw_writel(QM_REG_VAL_PDSP_CTL_ENABLE(0), DEVICE_QM_PDSP_CTRL_BASE(pdsp_id));
+	qm_write_reg(QM_REG_VAL_PDSP_CTL_ENABLE(0), DEVICE_QM_PDSP_CTRL_OFFSET(pdsp_id));
 
 	/* Wait for the command register to clear */
-	while (__raw_readl(DEVICE_QM_PDSP_CMD_BASE(pdsp_id)));
+	while (qm_read_reg(DEVICE_QM_PDSP_CMD_OFFSET(pdsp_id)));
 	
 	mutex_unlock(&qmss_mutex);
     
@@ -258,8 +259,8 @@ static int hw_qm_setup (struct qm_config *cfg)
 
 	/* Reset the QM PDSP */
 	for (i = 0; i < QM_MAX_PDSP; i++)
-		__raw_writel(QM_REG_VAL_PDSP_CTL_DISABLE,
-			     DEVICE_QM_PDSP_CTRL_BASE(cfg->pdsp_firmware[i].id));
+		qm_write_reg(QM_REG_VAL_PDSP_CTL_DISABLE,
+			     DEVICE_QM_PDSP_CTRL_OFFSET(cfg->pdsp_firmware[i].id));
 
 	/* Verify that alignment requirements */
 	if ((cfg->link_ram_base & (QM_LINKRAM_ALIGN - 1)) != 0)
@@ -282,17 +283,17 @@ static int hw_qm_setup (struct qm_config *cfg)
 	mutex_lock(&qmss_mutex);
 
 	/* Linking RAM info */
-	__raw_writel(cfg->link_ram_base, (DEVICE_QM_MANAGER_BASE +
+	qm_write_reg(cfg->link_ram_base, (DEVICE_QM_MANAGER_OFFSET +
 					  QM_REG_LINKRAM_BASE(0)));
-	__raw_writel(cfg->link_ram_size, (DEVICE_QM_MANAGER_BASE +
+	qm_write_reg(cfg->link_ram_size, (DEVICE_QM_MANAGER_OFFSET +
 					  QM_REG_LINKRAM_SIZE(0)));
-	__raw_writel(0, (DEVICE_QM_MANAGER_BASE + QM_REG_LINKRAM_BASE(1)));
+	qm_write_reg(0, (DEVICE_QM_MANAGER_OFFSET + QM_REG_LINKRAM_BASE(1)));
 
 	
 	/* Memory region 0 info */
-	__raw_writel(cfg->mem_region_base, (DEVICE_QM_DESC_SETUP_BASE +
+	qm_write_reg(cfg->mem_region_base, (DEVICE_QM_DESC_SETUP_OFFSET +
 					    QM_REG_MEMR_BASE_ADDR(0)));
-	__raw_writel(0, (DEVICE_QM_DESC_SETUP_BASE +
+	qm_write_reg(0, (DEVICE_QM_DESC_SETUP_OFFSET +
 			 QM_REG_MEMR_START_IDX(0)));
 
 	/*
@@ -311,9 +312,9 @@ static int hw_qm_setup (struct qm_config *cfg)
 
 	/* Add the descriptor size field */
 	QM_REG_VAL_DESC_SETUP_SET_DESC_SIZE(v, DEVICE_QM_DESC_SIZE_BYTES);
-	__raw_writel(v, (DEVICE_QM_DESC_SETUP_BASE +
+	qm_write_reg(v, (DEVICE_QM_DESC_SETUP_OFFSET +
 			 QM_REG_MEMR_DESC_SETUP(0))); 
-
+	
 	/* Now format the descriptors and put them in a queue */
 	for (i = 0, v = cfg->mem_region_base;
 	     i < cfg->mem_regnum_descriptors;
@@ -321,7 +322,7 @@ static int hw_qm_setup (struct qm_config *cfg)
 		
 		hd = (struct qm_host_desc *) qm_desc_ptov(v);
 		memset (hd, 0, sizeof(struct qm_host_desc));
-		
+
 		hd->desc_info   = QM_DESC_DINFO_DEFAULT;
 		hd->packet_info = QM_DESC_PINFO_DEFAULT;
 		
@@ -340,7 +341,7 @@ static int hw_qm_setup (struct qm_config *cfg)
 		/* Push the descriptor onto the queue */
 		x = device_local_addr_to_global(v);
 		
-		__raw_writel(x, (DEVICE_QM_MANAGER_QUEUES_BASE +
+		qm_write_reg(x, (DEVICE_QM_MANAGER_QUEUES_OFFSET +
 				 QM_REG_QUEUE_REGD(cfg->dest_q)));
         }
 	
@@ -367,20 +368,20 @@ static void hw_qm_teardown (void)
 	
 	/* Linking RAM info */
 	for (i = 0; i < DEVICE_QM_NUM_LINKRAMS; i++)  {
-		__raw_writel(0, (DEVICE_QM_MANAGER_BASE +
+		qm_write_reg(0, (DEVICE_QM_MANAGER_OFFSET +
 				 QM_REG_LINKRAM_BASE(i)));
 		
-		__raw_writel(0, (DEVICE_QM_MANAGER_BASE +
+		qm_write_reg(0, (DEVICE_QM_MANAGER_OFFSET +
 				 QM_REG_LINKRAM_SIZE(i)));
 	}
 
 	/* Memory region info */
 	for (i = 0; i < DEVICE_QM_NUM_MEMREGIONS; i++)  {
-		__raw_writel(0, (DEVICE_QM_DESC_SETUP_BASE +
+		qm_write_reg(0, (DEVICE_QM_DESC_SETUP_OFFSET +
 				 QM_REG_MEMR_BASE_ADDR(i)));
-		__raw_writel(0, (DEVICE_QM_DESC_SETUP_BASE +
+		qm_write_reg(0, (DEVICE_QM_DESC_SETUP_OFFSET +
 				 QM_REG_MEMR_START_IDX(i)));
-		__raw_writel(0, (DEVICE_QM_DESC_SETUP_BASE +
+		qm_write_reg(0, (DEVICE_QM_DESC_SETUP_OFFSET +
 				 QM_REG_MEMR_DESC_SETUP(i)));
 	}
 }
