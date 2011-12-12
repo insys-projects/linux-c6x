@@ -42,8 +42,8 @@
 #include <linux/keystone/pktdma.h>
 #include <linux/keystone/cpsw.h>
 
-#define NETCP_DRIVER_NAME    "TI KeyStone NetCP driver"
-#define NETCP_DRIVER_VERSION "v1.1"
+#define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
+#define NETCP_DRIVER_VERSION "v1.2"
 #undef NETCP_DEBUG
 #ifdef NETCP_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
@@ -68,6 +68,19 @@
 
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
+
+static void __iomem	*mac_sl;
+
+static inline void mac_sl_write_reg(u32 val, int reg)
+{
+	__raw_writel(val, mac_sl + reg);
+}
+
+static inline u32 mac_sl_read_reg(int reg)
+{
+	return __raw_readl(mac_sl + reg);
+}
+
 
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
@@ -194,12 +207,12 @@ int mac_sl_reset(u16 port)
 	u32 i, v;
 
 	/* Set the soft reset bit */
-	__raw_writel(CPGMAC_REG_RESET_VAL_RESET,
-		     DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
+	mac_sl_write_reg(CPGMAC_REG_RESET_VAL_RESET,
+		     DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_RESET);
 
 	/* Wait for the bit to clear */
 	for (i = 0; i < DEVICE_EMACSL_RESET_POLL_COUNT; i++) {
-		v = __raw_readl(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
+		v = mac_sl_read_reg(DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_RESET);
 		if ((v & CPGMAC_REG_RESET_VAL_RESET_MASK) != CPGMAC_REG_RESET_VAL_RESET)
 			return 0;
 	}
@@ -223,7 +236,7 @@ int mac_sl_config(u16 port, struct mac_sliver *cfg)
 
 	/* Must wait if the device is undergoing reset */
 	for (i = 0; i < DEVICE_EMACSL_RESET_POLL_COUNT; i++) {
-		v = __raw_readl(DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_RESET);
+		v = mac_sl_read_reg(DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_RESET);
 		if ((v & CPGMAC_REG_RESET_VAL_RESET_MASK) != CPGMAC_REG_RESET_VAL_RESET)
 			break;
 	}
@@ -231,10 +244,17 @@ int mac_sl_config(u16 port, struct mac_sliver *cfg)
 	if (i == DEVICE_EMACSL_RESET_POLL_COUNT)
 		return GMACSL_RET_CONFIG_FAIL_RESET_ACTIVE;
 
-	__raw_writel(cfg->max_rx_len, DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_MAXLEN);
-	__raw_writel(cfg->ctl, DEVICE_EMACSL_BASE(port) + CPGMACSL_REG_CTL);
+	mac_sl_write_reg(cfg->max_rx_len, DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_MAXLEN);
+	mac_sl_write_reg(cfg->ctl, DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_CTL);
 
 	return ret;
+}
+
+static int cpmac_init(void)
+{
+	mac_sl = ioremap(DEVICE_EMACSL_BASE, 0x100);
+
+	return 0;
 }
 
 static int cpmac_drv_start(void)
@@ -1109,6 +1129,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	netcp_cleanup_qs(ndev);
 	netcp_init_qs(ndev);
 
+	cpmac_init();
 	/* Stop EMAC */
 	cpmac_drv_stop();
 

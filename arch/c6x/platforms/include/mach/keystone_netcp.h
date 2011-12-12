@@ -17,6 +17,7 @@
 #define __MACH_C6X_KEYSTONE_NETCP_H
 
 #include <linux/netdevice.h>
+#include <linux/io.h>
 
 #define MAX_SIZE_STREAM_BUFFER		        1520
 
@@ -33,7 +34,8 @@
 #define DEVICE_PA_CDMA_TX_FIRST_CHANNEL 	0
 #define DEVICE_PA_CDMA_TX_NUM_CHANNELS		9
 
-#define DEVICE_EMACSL_BASE(x)			(0x02090900 + (x)*0x040)
+#define DEVICE_EMACSL_BASE			0x02090900
+#define DEVICE_EMACSL_PORT(x)			((x) * 0x040)
 #define DEVICE_N_GMACSL_PORTS			2
 #define DEVICE_EMACSL_RESET_POLL_COUNT		100
 
@@ -68,10 +70,12 @@ struct netcp_platform_data {
 /* Read the e-fuse value as 32 bit values to be endian independent */
 static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 {
+	void __iomem *efuse_mac;
 	unsigned int addr0, addr1;
 
-	addr1 = __raw_readl(EFUSE_REG_MAC_ADDR + 4);
-	addr0 = __raw_readl(EFUSE_REG_MAC_ADDR);
+	efuse_mac = ioremap(EFUSE_REG_MAC_ADDR, 8);
+	addr1 = __raw_readl(efuse_mac + 4);
+	addr0 = __raw_readl(efuse_mac);
 
 	x[0] = (addr1 & 0x0000ff00) >> 8;
 	x[1] = addr1 & 0x000000ff;
@@ -79,6 +83,8 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 	x[3] = (addr0 & 0x00ff0000) >> 16;
 	x[4] = (addr0 & 0x0000ff00) >> 8;
 	x[5] = addr0 & 0x000000ff;
+
+	iounmap(efuse_mac);
 
 	return 0;
 }
@@ -94,8 +100,13 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
  */
 static inline void streaming_switch_setup(void)
 {
-	__raw_writel(DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0,
-		     DEVICE_PSTREAM_CFG_REG_ADDR);
+	void __iomem *stream;
+
+	stream = ioremap(DEVICE_PSTREAM_CFG_REG_ADDR, 4);
+
+	__raw_writel(DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0, stream);
+
+	iounmap(stream);
 }
 
 /* Register offsets */
