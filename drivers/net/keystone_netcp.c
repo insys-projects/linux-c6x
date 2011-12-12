@@ -68,75 +68,20 @@
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
-#define MDIO_CONTROL		0x004 /* Module Control Register */
-#define MDIO_USERACCESS0	0x080 /* User Access Register 0 */
+#define MDIO_CONTROL		        0x004 /* Module Control Register */
+#define MDIO_USERACCESS0	        0x080 /* User Access Register 0 */
 
-#define MDIO_B_ACK               (1 << 29)
-#define MDIO_B_WRITE             (1 << 30)
-#define MDIO_B_GO                (1 << 31) /* for USERACESS */
+#define MDIO_B_ACK                      (1 << 29)
+#define MDIO_B_WRITE                    (1 << 30)
+#define MDIO_B_GO                       (1 << 31) /* for USERACESS */
 
-#define MDIO_M_CLKDIV            ((1 << 16) - 1)
+#define MDIO_M_CLKDIV                   ((1 << 16) - 1)
 
-#define MDIO_B_FAULTENB          (1 << 18)
-#define MDIO_B_FAULT             (1 << 19)
-#define MDIO_B_PREAMBLE          (1 << 20)
-#define MDIO_B_ENABLE            (1 << 30)
-#define MDIO_B_IDLE              (1 << 31)
-
-static void __iomem	*mdio_base;
-
-static inline void mdio_set_reg(int reg, u32 val)
-{
-	__raw_writel(val, mdio_base + reg);
-}
-
-static inline u32 mdio_get_reg(int reg)
-{
-	return __raw_readl(mdio_base + reg);
-}
-
-static inline void mdio_phy_read(int regadr, int phyadr)
-{
-        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
-		     ((phyadr & 0x1f) << 16) |
-		     ((regadr & 0x1f) << 21));
-
-}
-
-static inline void mdio_phy_write(int regadr, int phyadr, int data)
-{
-        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
-                     MDIO_B_WRITE |
-		     ((phyadr & 0x1f) << 16) |
-		     ((regadr & 0x1f) << 21) |
-                     ((data & 0xffff)));
-}
-
-static inline int mdio_phy_wait_res_ack(int *results)
-{
-	int ack;
-
-	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
-        
-	*results = mdio_get_reg(MDIO_USERACCESS0) & 0xffff;
-        
-	ack = (mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_ACK) >> 29;
-
-	return ack;
-}
-
-static void __iomem	*mac_sl;
-
-static inline void mac_sl_write_reg(u32 val, int reg)
-{
-	__raw_writel(val, mac_sl + reg);
-}
-
-static inline u32 mac_sl_read_reg(int reg)
-{
-	return __raw_readl(mac_sl + reg);
-}
-
+#define MDIO_B_FAULTENB                 (1 << 18)
+#define MDIO_B_FAULT                    (1 << 19)
+#define MDIO_B_PREAMBLE                 (1 << 20)
+#define MDIO_B_ENABLE                   (1 << 30)
+#define MDIO_B_IDLE                     (1 << 31)
 
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
@@ -174,6 +119,58 @@ static u32 *acc_list_phys_addr_tx;
 static u32 netcp_irq_enabled = 0;
 
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
+
+static void __iomem *mdio_base;
+static void __iomem *mac_sl_base;
+
+static inline void mdio_set_reg(int reg, u32 val)
+{
+	__raw_writel(val, mdio_base + reg);
+}
+
+static inline u32 mdio_get_reg(int reg)
+{
+	return __raw_readl(mdio_base + reg);
+}
+
+static inline void mdio_phy_read(int regadr, int phyadr)
+{
+        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
+		     ((phyadr & 0x1f) << 16) |
+		     ((regadr & 0x1f) << 21));
+}
+
+static inline void mdio_phy_write(int regadr, int phyadr, int data)
+{
+        mdio_set_reg(MDIO_USERACCESS0, MDIO_B_GO |
+                     MDIO_B_WRITE |
+		     ((phyadr & 0x1f) << 16) |
+		     ((regadr & 0x1f) << 21) |
+                     ((data & 0xffff)));
+}
+
+static inline int mdio_phy_wait_res_ack(int *results)
+{
+	int ack;
+
+	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+        
+	*results = mdio_get_reg(MDIO_USERACCESS0) & 0xffff;
+        
+	ack = (mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_ACK) >> 29;
+
+	return ack;
+}
+
+static inline void mac_sl_write_reg(u32 val, int reg)
+{
+	__raw_writel(val, mac_sl_base + reg);
+}
+
+static inline u32 mac_sl_read_reg(int reg)
+{
+	return __raw_readl(mac_sl_base + reg);
+}
 
 static inline long _hex_chartol (char c)
 {
@@ -308,7 +305,7 @@ int mac_sl_config(u16 port, struct mac_sliver *cfg)
 
 static int cpmac_init(void)
 {
-	mac_sl = ioremap(DEVICE_EMACSL_BASE, 0x100);
+	mac_sl_base = ioremap(DEVICE_EMACSL_BASE, 0x100);
 
 	return 0;
 }
@@ -317,11 +314,11 @@ static int cpmac_drv_start(void)
 {
 	struct mac_sliver cfg;
 	int i;
-
+	
 	cfg.max_rx_len	= MAX_SIZE_STREAM_BUFFER;
 	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL |
-				GMACSL_ENABLE_FULL_DUPLEX | 
-				GMACSL_ENABLE_GIG_MODE;
+		GMACSL_ENABLE_FULL_DUPLEX | 
+		GMACSL_ENABLE_GIG_MODE;
        
 	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
 		mac_sl_reset(i);
@@ -763,7 +760,6 @@ static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
 
 static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int value)
 {
-
 	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
 
 	mdio_phy_write(reg, phy_id, value);
@@ -775,9 +771,7 @@ static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int va
 
 static void netcp_mdio_init(void)
 {
-
 	mdio_base = ioremap(MDIO_REG_BASE, 0x100);
-	
 	mdio_set_reg(MDIO_CONTROL, MDIO_B_ENABLE | (VBUSCLK & MDIO_M_CLKDIV));
 }
 
@@ -1193,6 +1187,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	netcp_init_qs(ndev);
 
 	cpmac_init();
+
 	/* Stop EMAC */
 	cpmac_drv_stop();
 
