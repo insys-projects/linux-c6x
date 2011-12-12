@@ -175,6 +175,11 @@ config SGMII
 	depends on TMS320C64X_GEMAC && (SOC_TMS320C6474 || SOC_TMS320C6457)
 	default y
 
+config PHY_C66X
+	bool "Ethernet PHY support for C66x"
+	depends on TMS320C66X
+	default y
+
 config EDMA3
 	bool "EDMA3 support"
 	default y

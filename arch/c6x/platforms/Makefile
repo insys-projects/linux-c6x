@@ -27,5 +27,5 @@ obj-$(CONFIG_ARCH_BOARD_EVM6670)      += board-evm6670.o
 obj-$(CONFIG_ARCH_BOARD_SCBP_TCI6618) += board-scbp-tci6618.o
 
 # Misc objects
-obj-$(CONFIG_SGMII_C66X)            += phy-c66x.o
+obj-$(CONFIG_PHY_C66X) += phy-c66x.o
 
