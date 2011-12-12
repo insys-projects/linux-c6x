@@ -242,11 +242,9 @@ int keystone_pa_config(int pdsp, const unsigned int *pdsp_code, int len, u8* mac
 	return 0;
 }
 
-int keystone_pa_init(void)
+static int __init keystone_pa_init(void)
 {
-
 	pa_base = ioremap(DEVICE_PA_BASE, DEVICE_PA_REGION_SIZE);
-
 	return 0;
 }
-
+subsys_initcall(keystone_pa_init); /* should be initialized early */
