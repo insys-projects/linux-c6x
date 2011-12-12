@@ -625,7 +625,7 @@ static int __master_coreid = 0;
 
 static int master_coreid_setup(char *str)
 {
-	char *end;
+	const char *end;
 
 	__master_coreid = _hex_strtoul(str, &end);
 	if (str == end)
