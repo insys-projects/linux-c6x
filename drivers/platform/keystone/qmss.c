@@ -51,6 +51,15 @@ void hw_qm_ack_interrupt(u32 index, u32 channel)
 	}
 }
 
+int hw_qm_interrupt_status(u32 channel)
+{
+	if ((__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
+	     (1 << channel)) == 0)
+		return 0;
+	else
+		return 1;
+}
+
 /*
  * Queue number allocator
  */

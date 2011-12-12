@@ -331,14 +331,15 @@ static inline void netcp_tx_irq_ack(struct net_device *ndev)
 static int netcp_tx(struct net_device *ndev)
 {
 	struct qm_host_desc *hd       = NULL;
+	int qm_tx_int_status = 0;
 	int                  released = 0;
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 
-	if ((__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
-	    (1 << DEVICE_QM_ETH_ACC_TX_CHANNEL)) == 0)
-		return 0;
+	qm_tx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_TX_CHANNEL);
+	if (qm_tx_int_status == 0)
+		return qm_tx_int_status;
 
 	/* Accumulator ping pong buffer management */
 	if (acc_list == acc_list_addr_tx)
@@ -393,6 +394,7 @@ static int netcp_rx(struct net_device *ndev,
 		     unsigned int work_to_do)
 {
 	int                  pkt_size = 0;
+	int qm_rx_int_status = 0;
 	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
@@ -400,9 +402,9 @@ static int netcp_rx(struct net_device *ndev,
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 
-	if ((__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
-	     (1 << DEVICE_QM_ETH_ACC_RX_CHANNEL)) == 0)
-		return 0;
+	qm_rx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_RX_CHANNEL);
+	if (qm_rx_int_status == 0)
+		return qm_rx_int_status;
 
 	/* Accumulator ping pong buffer management */
 	if (acc_list == acc_list_addr_rx)
