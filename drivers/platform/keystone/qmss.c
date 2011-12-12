@@ -38,6 +38,18 @@ static DEFINE_MUTEX(qmss_mutex);
 
 static unsigned long queue_bitmap[(QUEUE_BITMAP_SIZE) >> 5];
 
+static void __iomem *qm_base;
+
+static inline void qm_write_reg(u32 val, int reg)
+{
+	__raw_writel(val, qm_base + reg);
+}
+
+static inline u32 qm_read_reg(int reg)
+{
+	return __raw_readl(qm_base + reg);
+}
+
 /*
  * Acknowledge accumulator interrupts for a given prioriy index and a given channel 
  */
@@ -382,6 +394,8 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	u32 desc_ram;
 	int res;
 
+	qm_base = ioremap(DEVICE_QM_BASE, DEVICE_QM_SIZE);
+
 	/* Only master core can initialize QMSS in a multi-Linux environment */
  	if (data->slave) {
 		goto slave_core;
@@ -431,6 +445,8 @@ slave_core:
 static int __devexit qmss_remove(struct platform_device *pdev)
 {
 	hw_qm_teardown();
+
+	iounmap(qm_base);
 
 	return 0;
 }
