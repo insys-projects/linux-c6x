@@ -999,7 +999,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	u8			    hw_emac_addr[6];
 #endif
-
+	void __iomem               *pa_cdma_base_addr;
 	struct pktdma_rx_cfg	    c_rx_cfg;
 	struct pktdma_tx_cfg	    c_tx_cfg;
 	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
@@ -1046,6 +1046,10 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	netcp_mdio_init();
 
+	pktdma_region_init(DEVICE_PA_CDMA_BASE,
+			   DEVICE_PA_CDMA_SIZE,
+			   &pa_cdma_base_addr);
+
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
 	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
@@ -1063,10 +1067,11 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		random_ether_addr(ndev->dev_addr);
 
 	/* Configure Rx and Tx PKTDMA */
-	rx_cfg->rx_base          = DEVICE_PA_CDMA_RX_CHAN_CFG_BASE;
+	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
+	rx_cfg->rx_base_offset   = DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET;
 	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
 	rx_cfg->n_rx_chans       = DEVICE_PA_CDMA_RX_NUM_CHANNELS;
-	rx_cfg->flow_base        = DEVICE_PA_CDMA_RX_FLOW_CFG_BASE;
+	rx_cfg->flow_base_offset = DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET;
 	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRST_FLOW;
 	rx_cfg->n_rx_flows       = DEVICE_PA_CDMA_RX_NUM_FLOWS;
 	rx_cfg->qmnum_free_buf   = 0;
@@ -1107,17 +1112,18 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 	pktdma_rx_config(rx_cfg);
 
-	tx_cfg->gbl_ctl_base     = DEVICE_PA_CDMA_GLOBAL_CFG_BASE;
-	tx_cfg->tx_base          = DEVICE_PA_CDMA_TX_CHAN_CFG_BASE;
-	tx_cfg->tx_chan          = DEVICE_PA_CDMA_TX_FIRST_CHANNEL;
-	tx_cfg->n_tx_chans       = DEVICE_PA_CDMA_TX_NUM_CHANNELS;
-	tx_cfg->queue_tx         = DEVICE_QM_ETH_TX_CP_Q;
+	tx_cfg->base_addr               = (u32) pa_cdma_base_addr;
+	tx_cfg->gbl_ctl_base_offset     = DEVICE_PA_CDMA_GLOBAL_CFG_OFFSET;
+	tx_cfg->tx_base_offset          = DEVICE_PA_CDMA_TX_CHAN_CFG_OFFSET;
+	tx_cfg->tx_chan                 = DEVICE_PA_CDMA_TX_FIRST_CHANNEL;
+	tx_cfg->n_tx_chans		= DEVICE_PA_CDMA_TX_NUM_CHANNELS;
+	tx_cfg->queue_tx		= DEVICE_QM_ETH_TX_CP_Q;
 #ifndef EMAC_ARCH_HAS_INTERRUPT
-	tx_cfg->use_acc          = 0;
+	tx_cfg->use_acc			= 0;
 #else
-	tx_cfg->use_acc          = 1;
-	tx_cfg->acc_threshold    = DEVICE_TX_INT_THRESHOLD;
-	tx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_TX_CHANNEL;
+	tx_cfg->use_acc			= 1;
+	tx_cfg->acc_threshold		= DEVICE_TX_INT_THRESHOLD;
+	tx_cfg->acc_channel		= DEVICE_QM_ETH_ACC_TX_CHANNEL;
 	
 	tx_cfg->acc_list_addr      = (u32) acc_list_addr_tx;
 	tx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_tx;

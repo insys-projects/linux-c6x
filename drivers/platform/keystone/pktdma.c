@@ -22,6 +22,16 @@
 #include <linux/keystone/pktdma.h>
 #include <linux/keystone/qmss.h>
 
+static inline void pktdma_write_reg(u32 val, u32 base_addr, int reg)
+{
+	__raw_writel(val, base_addr + reg);
+}
+
+static inline u32 pktdma_read_reg(u32 base_addr, int reg)
+{
+	return __raw_readl(base_addr + reg);
+}
+
 /* 
  * Disable all rx channels and clear all the flow registers
  * The teardown is initiated and polled for completion. The function will
@@ -36,36 +46,39 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 
 	for (c = cfg->rx_chan; c < cfg->n_rx_chans; c++) {
 		/* If enabled, set the teardown bit */
-		v = __raw_readl(cfg->rx_base + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+		v = pktdma_read_reg(cfg->base_addr,
+				    cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
 		if ((v & PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE) == PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE ) {
 			v = v | PKTDMA_REG_VAL_RCHAN_A_RX_TDOWN;
-			__raw_writel(v, cfg->rx_base + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+			pktdma_write_reg(v, cfg->base_addr,
+					 cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
 		}
-
 
 		/* Poll for completion */
 		for (i = 0, done = 0; ( (i < cfg->tdown_poll_count) && (done == 0) ); i++) {
-		    udelay(1000);
-		    done = 1;
-		    v = __raw_readl(cfg->rx_base + PKTDMA_REG_RCHAN_CFG_REG_A(c));
-		    if ((v & PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE) == PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE)
-			done = 0;
+			udelay(1000);
+			done = 1;
+			v = pktdma_read_reg(cfg->base_addr,
+					    cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+			if ((v & PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE) == PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE)
+				done = 0;
 		}
-
+		
 		if (done == 0)
-		    ret = -1;
+			ret = -1;
 	}
 
 	/* Clear all of the flow registers */
+
 	for (f = cfg->rx_flow; f < cfg->n_rx_flows; f++)  {
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_C, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_D, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_E, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_F, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_G, f));
-		__raw_writel(0, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_H, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_C, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_D, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_E, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_F, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_G, f));
+		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_H, f));
 	}
 
 	return ret;
@@ -79,12 +92,14 @@ int pktdma_tx_disable(struct pktdma_tx_cfg *cfg)
 	u32 i, v;
 
 	for (i = cfg->tx_chan; i < cfg->n_tx_chans; i++) {
-		v = __raw_readl(cfg->tx_base + PKTDMA_REG_TCHAN_CFG_REG_A(i));
+		v = pktdma_read_reg(cfg->base_addr,
+				    cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(i));
 		
 		if ((v & PKTDMA_REG_VAL_TCHAN_A_TX_ENABLE) ==
 		    PKTDMA_REG_VAL_TCHAN_A_TX_ENABLE) {
 			v = v | PKTDMA_REG_VAL_TCHAN_A_TX_TDOWN;
-			__raw_writel(v, cfg->tx_base + PKTDMA_REG_TCHAN_CFG_REG_A(i));
+			pktdma_write_reg(v, cfg->base_addr,
+					 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(i));
 		}
 	}
 
@@ -115,33 +130,40 @@ void pktdma_flow_config(struct pktdma_rx_cfg *cfg,
 					  cfg->qmnum_rx,
 					  queue_rx);             /* Rx packet destination queue */
 	
-	__raw_writel(v, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, flow));
+	pktdma_write_reg(v, cfg->base_addr, 
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, flow));
 	
-	__raw_writel(PKTDMA_REG_VAL_RX_FLOW_B_DEFAULT,
-		     cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, flow));
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_B_DEFAULT,
+			 cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, flow));
 	
-	__raw_writel(PKTDMA_REG_VAL_RX_FLOW_C_DEFAULT,
-		     cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_C, flow));
-
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_C_DEFAULT,
+			 cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_C, flow));
+	
 	v = PKTDMA_REG_VAL_MAKE_RX_FLOW_D(cfg->qmnum_free_buf,
 					  queue_free_buf,
 					  cfg->qmnum_free_buf,
 					  queue_free_buf);
 
-	__raw_writel(v, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_D, flow));
+	pktdma_write_reg(v, cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_D, flow));
 	
 	/* Register E uses the same setup as D */
-	__raw_writel(v, cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_E, flow));
+	pktdma_write_reg(v, cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_E, flow));
 	
-	__raw_writel(PKTDMA_REG_VAL_RX_FLOW_F_DEFAULT,
-		     cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_F, flow));
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_F_DEFAULT,
+			 cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_F, flow));
 	
-	__raw_writel(PKTDMA_REG_VAL_RX_FLOW_G_DEFAULT,
-		     cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_G, flow));
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_G_DEFAULT,
+			 cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_G, flow));
 	
-	__raw_writel(PKTDMA_REG_VAL_RX_FLOW_H_DEFAULT,
-		     cfg->flow_base + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_H, flow));
-
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_H_DEFAULT,
+			 cfg->base_addr,
+			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_H, flow));
 }
 
 /*
@@ -191,9 +213,10 @@ int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
 
 	/* Enable the rx channels */
 	for (c = cfg->rx_chan; c < cfg->n_rx_chans; c++) 
-		__raw_writel(PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE,
-			     cfg->rx_base + PKTDMA_REG_RCHAN_CFG_REG_A(c));
-	
+		pktdma_write_reg(PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE,
+				 cfg->base_addr,
+				 cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+
 	return ret;
 }
 
@@ -233,15 +256,27 @@ int pktdma_tx_config(struct pktdma_tx_cfg *cfg)
 	}
 
 	/* Disable loopback in the tx direction */
-	__raw_writel(PKTDMA_REG_VAL_EMU_CTL_NO_LOOPBACK,
-		     cfg->gbl_ctl_base + PKTDMA_REG_EMU_CTL);
+	pktdma_write_reg(PKTDMA_REG_VAL_EMU_CTL_NO_LOOPBACK,
+			 cfg->base_addr,
+			 cfg->gbl_ctl_base_offset + PKTDMA_REG_EMU_CTL);
 
 	/* Enable all channels. The current state isn't important */
 	for (i = cfg->tx_chan; i < cfg->n_tx_chans; i++) {
-		__raw_writel(0, cfg->tx_base + PKTDMA_REG_TCHAN_CFG_REG_B(i));  /* Priority */
-		__raw_writel(PKTDMA_REG_VAL_TCHAN_A_TX_ENABLE,
-			     cfg->tx_base + PKTDMA_REG_TCHAN_CFG_REG_A(i));
+		pktdma_write_reg(0, cfg->base_addr,
+				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_B(i));  /* Priority */
+		pktdma_write_reg(PKTDMA_REG_VAL_TCHAN_A_TX_ENABLE,
+				 cfg->base_addr,
+				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(i));
 	}
+	
+	return 0;
+}
 
+int pktdma_region_init(u32 base_paddr,
+		       u32 size,
+		       void __iomem **vaddr)
+{
+	if (vaddr)
+		*vaddr = ioremap(base_paddr, size);
 	return 0;
 }

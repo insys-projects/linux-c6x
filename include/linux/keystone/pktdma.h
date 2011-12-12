@@ -220,10 +220,11 @@ struct pktdma_rx_flow_cfg
  * Configuration parameter structures
  */
 struct pktdma_rx_cfg {
-	u32 rx_base;		/* Base address of rx registers */
+	u32 base_addr;          /* Base address of registers */
+	u32 rx_base_offset;	/* Offset of rx registers */
 	u32 rx_chan;            /* Index of first rx channel */
 	u32 n_rx_chans;		/* The number of rx channels */
-	u32 flow_base;		/* Add address of flow registers */
+	u32 flow_base_offset;	/* Offset of flow registers */
 	u32 rx_flow;            /* Index of first flow */
 	u32 n_rx_flows;		/* Number of rx flows */
 	u32 qmnum_free_buf;	/* Queue manager for descriptors/buffers for received packets */
@@ -239,8 +240,9 @@ struct pktdma_rx_cfg {
 }; 
 
 struct pktdma_tx_cfg {
-	u32 gbl_ctl_base;	/* Base address of global control registers */
-	u32 tx_base;		/* Base address of the tx registers */
+	u32 base_addr;          /* Base address of registers */
+	u32 gbl_ctl_base_offset; /* Offset of global control registers */
+	u32 tx_base_offset;	/* Offset of the tx registers */
 	u32 tx_chan;            /* Index of first tx channel */
 	u32 n_tx_chans;		/* The number of tx channels */
 	u32 queue_tx;		/* Default Tx queue for Tx completion packets */
@@ -262,5 +264,8 @@ void pktdma_flow_config(struct pktdma_rx_cfg *cfg,
 			int flow,
 			u32 queue_rx,
 			u32 queue_free_buf);
+int pktdma_region_init(u32 base_paddr,
+		       u32 size,
+		       void __iomem **vaddr);
 
 #endif /* KEYSTONE_PKTDMA_H */
