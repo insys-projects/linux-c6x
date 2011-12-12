@@ -21,50 +21,50 @@
 
 #include <asm/setup.h>
 
-#include <linux/keystone/sgmii.h>
-
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
 
-static void __iomem	*base;
+#include <linux/keystone/sgmii.h>
 
-static inline void sgmii_write_reg(int reg, u32 val)
-{
-	__raw_writel(val, base + reg);
-}
+/*
+ * SGMII registers
+ */
+#define SGMII_IDVER_REG(x)              ((x * 0x100) + 0x000)
+#define SGMII_SRESET_REG(x)             ((x * 0x100) + 0x004)
+#define SGMII_CTL_REG(x)                ((x * 0x100) + 0x010)
+#define SGMII_STATUS_REG(x)             ((x * 0x100) + 0x014)
+#define SGMII_MRADV_REG(x)              ((x * 0x100) + 0x018)
+#define SGMII_LPADV_REG(x)              ((x * 0x100) + 0x020)
+#define SGMII_TXCFG_REG(x)              ((x * 0x100) + 0x030)
+#define SGMII_RXCFG_REG(x)              ((x * 0x100) + 0x034)
+#define SGMII_AUXCFG_REG(x)             ((x * 0x100) + 0x038)
 
-static inline u32 sgmii_read_reg(int reg)
-{
-	return __raw_readl(base + reg);
-}
-
-static inline void sgmii_write_reg_bit(int reg, u32 val)
-{
-	__raw_writel((__raw_readl(base + reg) | val),
-			base + reg);
-}
-
-#define SGMII_SRESET_RESET		0x1
-#define SGMII_SRESET_RTRESET		0x2
+#define SGMII_SRESET_RESET		0x01
+#define SGMII_SRESET_RTRESET		0x02
 #define SGMII_CTL_AUTONEG		0x01
 #define SGMII_CTL_LOOPBACK		0x10
 #define SGMII_CTL_MASTER		0x20
 #define SGMII_REG_STATUS_FIELD_LOCK	(1<<4)
 
-/*
- * SGMII registers
- */
-#define SGMII_IDVER_REG(x)    ((x * 0x100) + 0x000)
-#define SGMII_SRESET_REG(x)   ((x * 0x100) + 0x004)
-#define SGMII_CTL_REG(x)      ((x * 0x100) + 0x010)
-#define SGMII_STATUS_REG(x)   ((x * 0x100) + 0x014)
-#define SGMII_MRADV_REG(x)    ((x * 0x100) + 0x018)
-#define SGMII_LPADV_REG(x)    ((x * 0x100) + 0x020)
-#define SGMII_TXCFG_REG(x)    ((x * 0x100) + 0x030)
-#define SGMII_RXCFG_REG(x)    ((x * 0x100) + 0x034)
-#define SGMII_AUXCFG_REG(x)   ((x * 0x100) + 0x038)
+static void __iomem *sgmii_reg_base;
 
-extern int keystone_sgmii_reset(int port)
+static inline void sgmii_write_reg(int reg, u32 val)
+{
+	__raw_writel(val, sgmii_reg_base + reg);
+}
+
+static inline u32 sgmii_read_reg(int reg)
+{
+	return __raw_readl(sgmii_reg_base + reg);
+}
+
+static inline void sgmii_write_reg_bit(int reg, u32 val)
+{
+	__raw_writel((__raw_readl(sgmii_reg_base + reg) | val),
+		     sgmii_reg_base + reg);
+}
+
+int keystone_sgmii_reset(int port)
 {
 	sgmii_write_reg(SGMII_CTL_REG(port), 0);
 
@@ -104,10 +104,6 @@ int keystone_sgmii_config(int port, struct sgmii_config *config)
 
 int keystone_sgmii_init(void)
 {
-
-	base = ioremap(SGMII_REG_BASE, 0x150);
-
+	sgmii_reg_base = ioremap(SGMII_REG_BASE, 0x150);
 	return 0;
 }
-
-
