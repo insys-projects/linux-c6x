@@ -170,9 +170,10 @@ static inline int hw_qm_init_threshold(u32 qnum)
 /* 
  * Prototypes
  */
-int                  hw_qm_alloc_queue(u32 num);
-void                 hw_qm_free_queue(u32 queue);
-int                  hw_qm_download_firmware(u32 pdsp_id, void *image, u32 size);
-u32                  hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg);
+int  hw_qm_alloc_queue(u32 num);
+void hw_qm_free_queue(u32 queue);
+int  hw_qm_download_firmware(u32 pdsp_id, void *image, u32 size);
+u32  hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg);
+void hw_qm_ack_interrupt(u32 index, u32 channel);
 
 #endif /* KEYSTONE_QMSS_H */

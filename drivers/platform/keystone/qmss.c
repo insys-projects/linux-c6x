@@ -39,6 +39,19 @@ static DEFINE_MUTEX(qmss_mutex);
 static unsigned long queue_bitmap[(QUEUE_BITMAP_SIZE) >> 5];
 
 /*
+ * Acknowledge accumulator interrupts for a given prioriy index and a given channel 
+ */
+void hw_qm_ack_interrupt(u32 index, u32 channel)
+{
+	if (__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
+		    (1 << channel)) {
+			__raw_writel(1, QM_REG_INTD_COUNT_IRQ(channel));
+			__raw_writel(index + channel,
+				     DEVICE_QM_INTD_BASE + QM_REG_INTD_EOI);
+	}
+}
+
+/*
  * Queue number allocator
  */
 int hw_qm_alloc_queue(u32 num)

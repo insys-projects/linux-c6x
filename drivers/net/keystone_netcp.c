@@ -308,12 +308,8 @@ static inline void netcp_rx_irq_ack(struct net_device *ndev)
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	if (netcp_irq_enabled) {
 		/* Ack Rx interrupt */
-		if (__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
-		    (1 << DEVICE_QM_ETH_ACC_RX_CHANNEL)) {
-			__raw_writel(1, QM_REG_INTD_COUNT_IRQ(DEVICE_QM_ETH_ACC_RX_CHANNEL));
-			__raw_writel(QM_REG_INTD_EOI_HIGH_PRIO_INDEX + DEVICE_QM_ETH_ACC_RX_CHANNEL,
-				     DEVICE_QM_INTD_BASE + QM_REG_INTD_EOI);
-		}
+		hw_qm_ack_interrupt(QM_REG_INTD_EOI_HIGH_PRIO_INDEX,
+				 DEVICE_QM_ETH_ACC_RX_CHANNEL);
 	}
 #endif
 }
@@ -323,12 +319,8 @@ static inline void netcp_tx_irq_ack(struct net_device *ndev)
 #ifdef EMAC_ARCH_HAS_INTERRUPT
 	if (netcp_irq_enabled) {
 		/* Ack Tx interrupt */
-		if (__raw_readl(DEVICE_QM_INTD_BASE + QM_REG_INTD_STATUS0) &
-		    (1 << DEVICE_QM_ETH_ACC_TX_CHANNEL)) {
-			__raw_writel(1, QM_REG_INTD_COUNT_IRQ(DEVICE_QM_ETH_ACC_TX_CHANNEL));
-			__raw_writel(QM_REG_INTD_EOI_HIGH_PRIO_INDEX + DEVICE_QM_ETH_ACC_TX_CHANNEL,
-				     DEVICE_QM_INTD_BASE + QM_REG_INTD_EOI);
-		}
+		hw_qm_ack_interrupt(QM_REG_INTD_EOI_HIGH_PRIO_INDEX,
+				 DEVICE_QM_ETH_ACC_TX_CHANNEL);
 	}
 #endif
 }
