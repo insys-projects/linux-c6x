@@ -35,7 +35,7 @@
 #include <asm/mdio.h>
 
 #include <mach/keystone_qmss.h>
- #include <mach/keystone_netcp.h>
+#include <mach/keystone_netcp.h>
 #include <mach/keystone_cpsw.h>
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>

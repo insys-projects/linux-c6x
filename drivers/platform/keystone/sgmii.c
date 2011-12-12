@@ -23,6 +23,7 @@
 
 #include <linux/keystone/sgmii.h>
 
+#include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
 
 static void __iomem	*base;
