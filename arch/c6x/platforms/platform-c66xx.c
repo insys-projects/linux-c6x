@@ -83,10 +83,6 @@ static void init_pll(void)
 {
 	unsigned int val;
 
-	/* Unlock DSCR boot config */
-	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
-	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
-
 	/* Set ENSAT */
 	val = dscr_get_reg(DSCR_MAINPLLCTL1) | 0x40;
 	dscr_set_reg(DSCR_MAINPLLCTL1, val);
@@ -147,8 +143,6 @@ static void init_pll(void)
 	/* Main PLL Bypass disabled, set OUTPUT_DIVIDE */
 	pll1_set_reg(SECCTL, 0x10000 | ((PLL_OUTDIV - 1) << 19)); 
 	pll1_setbit_reg(PLLCTL, PLLCTL_PLLEN);
-
-	/* Do not lock DSCR for multicore issue reason */
 }
 
 static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
@@ -231,7 +225,7 @@ static void init_power(void)
 	/* PCIe */
         set_psc_state(3, PSC_PCIE, PSC_ENABLE);
 #endif
-#ifdef CONFIG_RAPIDIO_TCI648X
+#ifdef CONFIG_TI_KEYSTONE_RAPIDIO
 	/* sRIO */
         set_psc_state(4, PSC_SRIO, PSC_ENABLE);
 #endif
@@ -331,9 +325,18 @@ void c6x_soc_setup_arch(void)
  	/* Initialize C66x IRQs */          	
 	clear_all_irq(); /* acknowledge all pending irqs */
 
-	/*init_pll();*/
+	/* Unlock DSCR boot config */
+	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+
+	init_pll();
 
 	init_power();
+
+	/* 
+	 * Do not lock DSCR for multicore issue reason and for drivers that
+	 * needs to configure their serdes with DSCR 
+	 */
 
 	/* Initialize SoC resources */
 	iomem_resource.name = "Memory";
