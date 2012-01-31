@@ -221,14 +221,14 @@ config RAPIDIO_TCI648X
 config RAPIDIO_DEV
 	bool "sRIO user-level interface through /dev"
 	default y
-	depends on RAPIDIO_TCI648X
+	depends on RAPIDIO_TCI648X || TI_KEYSTONE_RAPIDIO
 
 config RAPIDIO
         bool
-	depends on RAPIDIO_TCI648X
+	depends on RAPIDIO_TCI648X || TI_KEYSTONE_RAPIDIO
 	default y
 
-if RAPIDIO_TCI648X
+if RAPIDIO
 source "drivers/rapidio/Kconfig"
 endif
 
