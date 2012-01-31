@@ -1,9 +1,9 @@
 /*
- *  linux/arch/c6x/platforms/include/mach/rio.h
+ *  linux/arch/c6x/platforms/include/mach/rio-tci648x.h
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -233,7 +233,7 @@
 /*
  * RIO message passing defines
  */
-#define TCI648X_MAX_MBOX                 4    /* 4 in multi-segment, 64 in single-segment */
+#define TCI648X_RIO_MAX_MBOX             4    /* 4 in multi-segment, 64 in single-segment */
 #define TCI648X_RIO_MSG_RX_QUEUE_FIRST   0    /* first hw queue used for Rx, from 0 to 15 */
 #define TCI648X_RIO_MSG_TX_QUEUE_FIRST   0    /* first hw queue used for Tx, from 0 to 15 */
 #define TCI648X_RIO_MSG_RX_QUEUE_END     3    /* last hw queue used for Rx, from 0 to 15 */

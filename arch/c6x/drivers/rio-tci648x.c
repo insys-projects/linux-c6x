@@ -119,7 +119,7 @@ static struct tci648x_serdes_config _tci648x_serdes_config[4] = {
 	  { 0x00000901, 0x00000901 } },
 
 	/* sRIO config 2, BOOTMODE 10:
-	   SERDES ef clock: 156.25 MHz, Link rate = 1.25 Gbps */
+	   SERDES ref clock: 156.25 MHz, Link rate = 1.25 Gbps */
 	{ 0x0009,
 	  { 0x00081121, 0x00081121 },
 	  { 0x00000921, 0x00000921 } },
@@ -947,9 +947,11 @@ retry_transfer:
 	case TCI648X_RIO_LSU_CC_INVALID:
 	case TCI648X_RIO_LSU_CC_DMA:
 		res = -EIO;
+		break;
 	case TCI648X_RIO_LSU_CC_RETRY:
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		res = -EAGAIN;
+		break;
 	default:
 		break;
 	}
@@ -1150,9 +1152,11 @@ retry_transfer:
 	case TCI648X_RIO_LSU_CC_INVALID:
 	case TCI648X_RIO_LSU_CC_DMA:
 		res = -EIO;
+		break;
 	case TCI648X_RIO_LSU_CC_RETRY:
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		res = -EAGAIN;
+		break;
 	default:
 		break;
 	}
@@ -1437,10 +1441,13 @@ static int tci648x_rio_dbell_send(struct rio_mport *mport,
 	case TCI648X_RIO_LSU_CC_INVALID:
 	case TCI648X_RIO_LSU_CC_DMA:
 		return -EIO;
+		break;
 	case TCI648X_RIO_LSU_CC_RETRY:
 		return -EBUSY;
+		break;
 	case TCI648X_RIO_LSU_CC_CREDIT:
 		return -EAGAIN;
+		break;
 	default:
 		break;
 	}
@@ -2209,7 +2216,7 @@ int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 
 	desc->pbuff = (void*) virt_to_phys((u32) buffer);      /* buffer */
 	desc->next  = NULL;
-	desc->opt1  = (mbox & (TCI648X_MAX_MBOX - 1))  /* mbox */
+	desc->opt1  = (mbox & (TCI648X_RIO_MAX_MBOX - 1))      /* mbox */
 		| (TCI648X_RIO_MSG_SSIZE << 6)         /* ssize (32 dword) */
 		| (mport->id << 10)                    /* port_id */
 		| ((u32) rdev->destid << 16);          /* dest_id*/
@@ -2767,7 +2774,7 @@ static int __init tci648x_rio_probe(struct platform_device *pdev)
 {
 	int res;
 
-	/* sRIO main driver hw initialization (global setup, PSC, interrupts) */
+	/* sRIO main driver hw initialization (global ressources, interrupts) */
 	res = tci648x_rio_init(pdev);
 	if (res < 0)
 		return res;
