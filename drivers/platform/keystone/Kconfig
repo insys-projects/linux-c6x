@@ -40,4 +40,9 @@ config TI_KEYSTONE_SGMII
 	help
 	  This driver supports TI's Keystone SGMII.
 
+config TI_KEYSTONE_RAPIDIO
+	tristate "TI Keystone RapidIO support"
+	help
+	  This driver supports TI's Keystone RapidIO.
+
 endif
