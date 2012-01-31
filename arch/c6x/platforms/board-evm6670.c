@@ -407,6 +407,73 @@ static int __init evm_init_uart(void)
 core_initcall(evm_init_uart);
 #endif
 
+#ifdef CONFIG_TI_KEYSTONE_RAPIDIO
+#include <linux/rio.h>
+#include <linux/keystone/rio.h>
+/* 
+ * SerDes and port mode configurations for different sRIO modes.
+ * All configurations are based on a 250MHz SerDes reference clock,
+ * mode 0 is the default sRIO boot mode of the board.
+ */
+static struct keystone_serdes_config evm6670_serdes_config[4]  = {
+	/* sRIO config 0: MPY = 5x, div rate = half, link rate = 2.5 Gbps, mode 1x */
+	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
+	  0x0229,
+	  0x001e,
+	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
+	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
+	  { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
+       /* sRIO config 1: MPY = 5x, div rate = half, link rate = 2.5 Gbps, mode 4x */
+	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
+	  0x0229,
+	  0x001e,
+	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
+	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
+	  { 0x00000004, 0x00000004, 0x00000004, 0x00000004 } },
+	/* sRIO config 2: MPY = 5x, div rate = full, link rate = 5 Gbps, mode 1x, inverted polarity */
+	{ 0x00053840, /* VBUS freq 223 - 447 */
+	  0x0229,
+	  0x0021,
+	  { 0x004404C5, 0x004404C5, 0x004404C5, 0x004404C5 },
+	  { 0x001807C5, 0x001807C5, 0x001807C5, 0x001807C5 },
+	  { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
+	/* sRIO config 3: MPY = 5x, div rate = full, link rate = 5 Gbps, mode 4x, inverted polarity */
+	{ 0x00053840, /* VBUS freq 223 - 447 */
+	  0x0229,
+	  0x0021,
+	  { 0x004404C5, 0x004404C5, 0x004404C5, 0x004404C5 },
+	  { 0x001807C5, 0x001807C5, 0x001807C5, 0x001807C5 },
+	  { 0x00000004, 0x00000004, 0x00000004, 0x00000004 } },
+};
+
+static struct keystone_rio_board_controller_info evm6670_rio_controller = {
+	0xf,                         /* bitfield of port(s) to probe on this controller */
+	0,                           /* default SerDes configuration */
+	0,                           /* host id */
+	RIO_DO_ENUMERATION,          /* initialisation method */
+	0,                           /* 8bit ID size */
+	evm6670_serdes_config,       /* SerDes configurations */
+	ARRAY_SIZE(evm6670_serdes_config), /* number of SerDes configurations */
+};
+
+static struct platform_device evm6670_rio_device = {
+	.name           = "keystone-rapidio",
+	.id             = 1,
+	.dev		= {
+		.platform_data = &evm6670_rio_controller,
+	},
+};
+
+static int __init evm_init_rio(void)
+{
+	return platform_device_register(&evm6670_rio_device);
+}
+
+core_initcall(evm_init_rio);
+#endif /* CONFIG_TI_KEYSTONE_RAPIDIO */
+
+void c6x_arch_idle_led(int state) {}
+
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}
 
