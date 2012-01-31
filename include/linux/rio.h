@@ -66,9 +66,12 @@
 
 #define RIO_MAX_MBOX		4
 #define RIO_MAX_MSG_SIZE	0x1000
-#define RIO_MAX_DIO_PKT_SIZE    0x1000
-#define RIO_MAX_DIO_CHUNK_SIZE  (RIO_MAX_DIO_PKT_SIZE * 10)
- 
+#define RIO_MAX_DIO_CHUNK_SIZE  0x100000 /* DirectIO maximal size of contiguous physical
+					    memory than can be transferred at once.
+					    It then up to the transport layer to split them 
+					    if needed. sRIO rev2 will support DIO transfer up
+					    to 1MB. */
+
 /*
  * Error values that may be returned by RIO functions.
  */
