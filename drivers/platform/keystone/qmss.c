@@ -29,8 +29,8 @@
 #include <mach/keystone_qmss.h>
 #include <linux/keystone/qmss.h>
 
-#define NETCP_DRIVER_NAME    "TI KeyStone QMSS driver"
-#define NETCP_DRIVER_VERSION "v1.1"
+#define QMSS_DRIVER_NAME    "TI KeyStone QMSS driver"
+#define QMSS_DRIVER_VERSION "v1.1"
 
 static DEFINE_MUTEX(qmss_mutex);
 
@@ -438,7 +438,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	release_firmware(fw);
 
 slave_core:
-	printk("%s %s\n", NETCP_DRIVER_NAME, NETCP_DRIVER_VERSION);
+	printk("%s %s\n", QMSS_DRIVER_NAME, QMSS_DRIVER_VERSION);
 
 	return 0;
 }
