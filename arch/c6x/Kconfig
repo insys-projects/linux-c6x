@@ -7,6 +7,9 @@ mainmenu "Linux Kernel Configuration"
 
 config TMS320C6X
 	def_bool y
+	select HAVE_KERNEL_GZIP
+	select HAVE_KERNEL_BZIP2
+	select HAVE_KERNEL_LZMA
 	select ARCH_REQUIRE_GPIOLIB
 
 config MMU

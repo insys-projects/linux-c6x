@@ -99,7 +99,11 @@ endif
 
 KBUILD_CFLAGS	+= $(arch-y)
 KBUILD_AFLAGS	+= $(arch-y)
+KBUILD_IMAGE    += vmlinux
 
+ifndef CONFIG_TI_C6X_LINKER
+boot            := arch/c6x/boot
+endif
 head-y		:= arch/c6x/kernel/head.o
 core-y		+= arch/c6x/kernel/ arch/c6x/mm/ arch/c6x/platforms/ arch/c6x/drivers/
 libs-y		+= arch/c6x/lib/
@@ -131,4 +135,38 @@ MRPROPER_FILES = arch/c6x/kernel/c6x_config.inc arch/c6x/kernel/c6x_defs.inc
 ifdef CONFIG_TI_C6X_LINKER
 MRPROPER_FILES += arch/c6x/vmlinux.cmd arch/c6x/vmlinux.map
 endif
-#archclean:
+
+ifndef CONFIG_TI_C6X_LINKER
+OBJCOPYFLAGS:= -O binary -R .note -R .comment -R .GCC-command-line -R .note.gnu.build-id -S
+
+CLEAN_FILES += $(boot)/zImage
+CLEAN_FILES += $(boot)/zImage.bin
+CLEAN_FILES += $(boot)/vmlinux.bin
+CLEAN_FILES += $(boot)/compressed/vmlinux
+CLEAN_FILES += $(boot)/compressed/vmlinux.bin
+CLEAN_FILES += $(boot)/compressed/vmlinux.bin.gz
+
+PHONY += vmlinux.bin zImage zImage.bin
+
+all: vmlinux
+
+# Convert bzImage to zImage
+bzImage: zImage
+
+BOOT_TARGETS = vmlinux.bin zImage zImage.bin
+
+$(BOOT_TARGETS): vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+compressed: zImage
+
+archclean:
+	$(Q)$(MAKE) $(clean)=$(boot)
+
+define archhelp
+	@echo '* vmlinux         - Create an uncompressed kernel image'
+	@echo '  vmlinux.bin     - Create an uncompressed binary image (arch/$(ARCH)/boot/vmlinux.bin)'
+	@echo '  zImage          - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+	@echo '  zImage.bin      - Compressed binary image (arch/$(ARCH)/boot/zImage.bin)'
+endef
+endif
