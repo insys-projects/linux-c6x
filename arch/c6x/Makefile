@@ -50,6 +50,7 @@ arch-$(CONFIG_TMS320C64XPLUS) := -march=c64x+ -msdata=none -mno-dsbt
 arch-$(CONFIG_TMS320C66X)     := -march=c64x+ -msdata=none -mno-dsbt
 
 CFLAGS_MODULE   += -mlong-calls
+CFLAGS_KERNEL   += -mlong-calls
 endif
 
 ifdef CONFIG_TI_C6X_LINKER
