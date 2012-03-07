@@ -48,7 +48,7 @@ MODULE_LICENSE("GPL");
 #define RIONET_TX_RING_SIZE	CONFIG_RIONET_TX_SIZE
 #define RIONET_RX_RING_SIZE	CONFIG_RIONET_RX_SIZE
 
-#ifdef CONFIG_RAPIDIO_TCI648X
+#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 #include <asm/rio.h>
 #define RIONET_MSG_SIZE         MACH_RIO_MAX_MSG_SIZE
 #else 
@@ -225,7 +225,7 @@ static int rionet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	return NETDEV_TX_OK;
 }
 
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 static void rionet_dbell_event(struct rio_mport *mport, void *dev_id, u16 sid, u16 tid,
 			       u16 info)
 {
@@ -308,7 +308,7 @@ static int rionet_open(struct net_device *ndev)
 	if (netif_msg_ifup(rnet))
 		printk(KERN_INFO "%s: open\n", DRV_NAME);
 
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 	if ((rc = rio_request_inb_dbell(rnet->mport,
 					(void *)ndev,
 					RIONET_DOORBELL_JOIN,
@@ -344,7 +344,7 @@ static int rionet_open(struct net_device *ndev)
 	netif_start_queue(ndev);
 
 	list_for_each_entry_safe(peer, tmp, &rionet_peers, node) {
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 		if (!(peer->res = rio_request_outb_dbell(peer->rdev,
 							 RIONET_DOORBELL_JOIN,
 							 RIONET_DOORBELL_LEAVE)))
@@ -367,6 +367,10 @@ static int rionet_open(struct net_device *ndev)
 		rio_read_config_32(peer->rdev, RIO_SRC_OPS_CAR, &peer->rdev->src_ops);
 		rio_read_config_32(peer->rdev, RIO_DST_OPS_CAR, &peer->rdev->dst_ops);
 
+#ifdef CONFIG_TI_KEYSTONE_RAPIDIO
+		/* Hack for adding INB_MBOX and INB_DOORBELL on KeyStone devices */
+		peer->rdev->pef |= RIO_PEF_INB_DOORBELL | RIO_PEF_INB_MBOX;
+#endif
 		if (dev_rionet_capable(peer->rdev)) {
 			rionet_active[peer->rdev->destid] = peer->rdev;
 		} 
@@ -395,17 +399,17 @@ static int rionet_close(struct net_device *ndev)
 
 	list_for_each_entry_safe(peer, tmp, &rionet_peers, node) {
 		if (rionet_active[peer->rdev->destid]) {
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 			rio_send_doorbell(peer->rdev, RIONET_DOORBELL_LEAVE);
 #endif
 			rionet_active[peer->rdev->destid] = NULL;
 		}
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 		rio_release_outb_dbell(peer->rdev, peer->res);
 #endif
 	}
 
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 	rio_release_inb_dbell(rnet->mport, RIONET_DOORBELL_JOIN,
 			      RIONET_DOORBELL_LEAVE);
 #endif
@@ -524,7 +528,7 @@ static int rionet_setup_netdev(struct rio_mport *mport)
 	ndev->dev_addr[5] = device_id & 0xff;
 
 	ndev->netdev_ops = &rionet_netdev_ops;
-#ifdef CONFIG_RAPIDIO_TCI648X
+#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 	ndev->mtu = ETH_FRAME_LEN - 14;
 #else
 	ndev->mtu = RIONET_MSG_SIZE - 14;
@@ -598,7 +602,7 @@ static int rionet_probe(struct rio_dev *rdev, const struct rio_device_id *id)
 		rionet_check = 1;
 	}
 
-#ifndef CONFIG_RAPIDIO_TCI648X
+#if !defined(CONFIG_RAPIDIO_TCI648X) && !defined(CONFIG_TI_KEYSTONE_RAPIDIO)
 	/*
 	 * If the remote device has mailbox/doorbell capabilities,
 	 * add it to the peer list.
