@@ -49,7 +49,7 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 		v = pktdma_read_reg(cfg->base_addr,
 				    cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
 		if ((v & PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE) == PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE ) {
-			v = v | PKTDMA_REG_VAL_RCHAN_A_RX_TDOWN;
+			v |= PKTDMA_REG_VAL_RCHAN_A_RX_TDOWN;
 			pktdma_write_reg(v, cfg->base_addr,
 					 cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
 		}
@@ -64,12 +64,17 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 				done = 0;
 		}
 		
-		if (done == 0)
+		if (done == 0) {
+			v = pktdma_read_reg(cfg->base_addr,
+					    cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+			v &= ~PKTDMA_REG_VAL_RCHAN_A_RX_TDOWN;
+			pktdma_write_reg(v, cfg->base_addr,
+					 cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
 			ret = -1;
+		}
 	}
 
 	/* Clear all of the flow registers */
-
 	for (f = cfg->rx_flow; f < cfg->n_rx_flows; f++)  {
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, f));
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, f));
@@ -175,9 +180,8 @@ int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
 	u32 i, c, f;
 	int ret = 0;
 
-	if (pktdma_rx_disable(cfg) != 0)
-		return -1;
-	
+	pktdma_rx_disable(cfg);
+
 	if (cfg->use_acc) {
 		/*
 		 * Setup Rx accumulator configuration for receive 
