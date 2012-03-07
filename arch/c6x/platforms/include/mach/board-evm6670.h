@@ -36,3 +36,29 @@
  */
 #define LINUX_TIMER_SRC (TIMER_0 + get_coreid())
 #define LINUX_TIMER_IRQ IRQ_TINT
+
+/*
+ * EVM FPGA and LED definitions
+ */
+#define EVM_FPGA_MISC_REG        0x0C
+#define EVM_FPGA_LED_REG         0x08
+
+#define EVM_FPGA_RD_CMD          (1 << 7)
+#define EVM_FPGA_WR_CMD          (0 << 7)
+
+#define EVM_FPGA_MISC_NAND_WP    2
+#define EVM_FPGA_MISC_XDS560     3
+#define EVM_FPGA_MISC_NOR_WP     4
+#define EVM_FPGA_MISC_EEPROM_WP  5
+#define EVM_FPGA_MISC_PCA9306_EN 6
+
+#define EVM_FPGA_LED1            0
+#define EVM_FPGA_LED2            1
+#define EVM_FPGA_LED3            2
+#define EVM_FPGA_LED4            3
+
+#define EVM_LED_ON               0
+#define EVM_LED_OFF              1
+
+#define EVM_LED_IDLE_NUM         2
+#define EVM_LED_TIMER_NUM        3
