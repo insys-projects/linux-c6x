@@ -74,6 +74,7 @@ struct keystone_rio_data {
 	spinlock_t		pw_fifo_lock;
 	struct pktdma_rx_cfg   *rx_cfg;
 	struct pktdma_tx_cfg   *tx_cfg;
+	u32                     mbox_type;        /* type of packet for outbound mailboxes */
 	u32                     max_mbox;         /* number of mailboxes */
 	u32                     free_queue;       /* queue for free descriptors */
 	u32                     rx_queues[KEYSTONE_RIO_MAX_MBOX];      /* receive queues per mailbox */
@@ -1500,6 +1501,12 @@ static int keystone_rio_port_write_init(struct keystone_rio_data *p_rio)
 static irqreturn_t txu_interrupt_handler(int irq, void *data);
 
 /*
+ * This macro defines the mapping from Linux RIO mailbox to stream id for type 9 packet
+ * Let use an one-to-one mapping for the time being, may be adjusted here if needed.
+ */
+#define mbox_to_strmid(mbox) ((mbox) & 0xffff)
+
+/*
  * Cleanup queues used by the QMSS/PKTDMA
  */
 static void keystone_rio_cleanup_qs(int queue)
@@ -1709,7 +1716,8 @@ static irqreturn_t rxu_interrupt_handler(int irq, void *data)
 }
 
 /**
- * keystone_rio_map_mbox - Map a mailbox to a given queue
+ * keystone_rio_map_mbox - Map a mailbox to a given queue.
+ * for both type 11 and type 9 packets.
  * @mbox: mailbox to map
  * @queue: associated queue number
  *
@@ -1721,9 +1729,13 @@ static int keystone_rio_map_mbox(int mbox, int queue, int flowid, int size)
 	u32 mapping_entry_low;
 	u32 mapping_entry_high;
 	u32 mapping_entry_qid;
+	u32 mapping_t9_reg0;
+	u32 mapping_t9_reg1;
+	u32 mapping_t9_reg2;
+	u32 t9_offset = KEYSTONE_RIO_RXU_T9_MAP_START - KEYSTONE_RIO_RXU_MAP_START;
 	int res;
 
-	/* Map the multi-segment mailbox to the corresponding Rx queue */
+	/* Map the multi-segment mailbox to the corresponding Rx queue for type 11 */
 	mapping_entry_low = ((mbox & 0x1f) << 16)
  		| (0x3f000000); /* Given mailbox, all letters, srcid = 0 */
 
@@ -1731,9 +1743,18 @@ static int keystone_rio_map_mbox(int mbox, int queue, int flowid, int size)
 		| KEYSTONE_RIO_MAP_FLAG_SRC_PROMISC
 		| KEYSTONE_RIO_MAP_FLAG_DST_PROMISC;       /* promiscuous (don't care about src/dst id) */
 
-	if (size)
-		mapping_entry_high |= KEYSTONE_RIO_MAP_FLAG_TT_16; /* tt */
-	
+	/* Map the multi-segment mailbox for type 9 as well */
+	mapping_t9_reg0 = 0;                               /* accept all COS and srcid = 0 */
+	mapping_t9_reg1 = KEYSTONE_RIO_MAP_FLAG_SRC_PROMISC
+		| KEYSTONE_RIO_MAP_FLAG_DST_PROMISC;       /* promiscuous (don't care about src/dst id) */
+	mapping_t9_reg2 = (0xffff << 16) | (mbox_to_strmid(mbox)); /* given stream id */
+
+	/* Set TT flag */
+	if (size) {
+		mapping_entry_high |= KEYSTONE_RIO_MAP_FLAG_TT_16;
+		mapping_t9_reg1    |= KEYSTONE_RIO_MAP_FLAG_TT_16;
+	}
+
 	/* QMSS/PktDMA mapping */
 	mapping_entry_qid = (queue & 0x3fff) | (flowid << 16);
 
@@ -1757,6 +1778,10 @@ static int keystone_rio_map_mbox(int mbox, int queue, int flowid, int size)
 	DEVICE_REG32_W(rx_mbox->map_res.start,     mapping_entry_low);
 	DEVICE_REG32_W(rx_mbox->map_res.start + 4, mapping_entry_high);
 	DEVICE_REG32_W(rx_mbox->map_res.start + 8, mapping_entry_qid);
+
+	DEVICE_REG32_W(rx_mbox->map_res.start + t9_offset,     mapping_t9_reg0);
+	DEVICE_REG32_W(rx_mbox->map_res.start + t9_offset + 4, mapping_t9_reg1);
+	DEVICE_REG32_W(rx_mbox->map_res.start + t9_offset + 8, mapping_t9_reg2);
 
         /*
 	 *  The RapidIO peripheral looks at the incoming RapidIO msgs
@@ -1798,11 +1823,6 @@ int rio_open_inb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entri
 	if (rx_mbox->port == mport)
 		return 0;
 	
-	if ((entries < KEYSTONE_RIO_MIN_RX_RING_SIZE) ||
-	    (entries > KEYSTONE_RIO_MAX_RX_RING_SIZE)) {
-		return -EINVAL;
-	}
-
 	rx_mbox->dev_id  = dev_id;
 	rx_mbox->entries = entries;
 	rx_mbox->port    = mport;
@@ -1879,11 +1899,6 @@ int rio_open_outb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entr
 	if (tx_mbox->port == mport)
 		return 0;
 
-	if ((entries < KEYSTONE_RIO_MIN_TX_RING_SIZE) ||
-	    (entries > KEYSTONE_RIO_MAX_TX_RING_SIZE)) {
-		return -EINVAL;
-	}
-
 	tx_mbox->dev_id  = dev_id;
 	tx_mbox->entries = entries;
 	tx_mbox->port    = mport;
@@ -1950,22 +1965,33 @@ int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev,
 	/* Fill descriptor */
 	QM_DESC_DINFO_SET_PKT_LEN(hd->desc_info, plen);
 	QM_DESC_DINFO_SET_PSINFO_LOC(hd->desc_info, 0);
-	QM_DESC_DINFO_SET_PKT_TYPE(hd->desc_info, 31); /* 31 for type11, 30 for type9 */
-
 	QM_DESC_TINFO_SET_S_TAG_LO(hd->tag_info, 0);
 
 	rio_desc = (struct keystone_rio_desc_info *) &hd->ps_data;
 
-	/* Word 1: source id and dest id */
+	/* Word 1: source id and dest id (common to packet 11 and packet 9) */
 	rio_desc->ps_desc[0] = (rdev->destid & 0xffff) | (mport->host_deviceid << 16);
-	
-	/* Word 2: ssize = 32 dword, 4 retries, letter = 0 */
-	rio_desc->ps_desc[1] = (KEYSTONE_RIO_MSG_SSIZE << 17) | (4 << 21) | (mbox & 0x1f);
+
+	if (_keystone_rio.mbox_type == RIO_PACKET_TYPE_MESSAGE) {
+		/* Packet 11 case (Message) */
+		QM_DESC_DINFO_SET_PKT_TYPE(hd->desc_info, 31); /* 31 for type11, 30 for type9 */
+		
+		/* Word 2: ssize = 32 dword, 4 retries, letter = 0, mbox */
+		rio_desc->ps_desc[1] = (KEYSTONE_RIO_MSG_SSIZE << 17) | (4 << 21)
+			| (mbox & 0x1f);
+	} else {
+		/* Packet 9 case (Data Streaming) */
+		QM_DESC_DINFO_SET_PKT_TYPE(hd->desc_info, 30); /* 30 for type9 */
+       
+		/* Word 2: COS = 0, stream id based on mbox */
+		rio_desc->ps_desc[1] = (mbox_to_strmid(mbox) << 16);
+	}
 
 	if (rdev->net->hport->sys_size)
 		rio_desc->ps_desc[1] |= KEYSTONE_RIO_DESC_FLAG_TT_16; /* tt */
 
-	DPRINTK("ps_desc[0] = 0x%x, ps_desc[1] = 0x%x\n", rio_desc->ps_desc[0], rio_desc->ps_desc[1]);
+	DPRINTK("packet type %d, ps_desc[0] = 0x%x, ps_desc[1] = 0x%x\n",
+		_keystone_rio.mbox_type, rio_desc->ps_desc[0], rio_desc->ps_desc[1]);
 
 	/* Word 3 is private data, use it to store the mbox */
 	rio_desc->mbox = mbox;
@@ -2086,11 +2112,12 @@ EXPORT_SYMBOL_GPL(rio_hw_get_inb_message);
 
 /*-------------------------- Main Linux driver functions -----------------------*/
 
-static char *cmdline_hdid  = NULL;
-static char *cmdline_ports = NULL;
-static char *cmdline_init  = NULL;
-static char *cmdline_mode  = NULL;
-static char *cmdline_size  = NULL;
+static char *cmdline_hdid      = NULL;
+static char *cmdline_ports     = NULL;
+static char *cmdline_init      = NULL;
+static char *cmdline_mode      = NULL;
+static char *cmdline_size      = NULL;
+static char *cmdline_mbox_type = NULL;
 
 static int keystone_rio_get_hdid(int index, int default_id, int size)
 {
@@ -2173,6 +2200,23 @@ static int keystone_rio_get_size(int index, int default_size)
 	return size;
 }
 
+static int keystone_rio_mbox_type(int index, int default_type)
+{
+	int type = 0;
+
+        if (!cmdline_mbox_type) 
+                type = default_type;
+	else {
+		if (strcmp(cmdline_mbox_type, "message") == 0)
+			type = RIO_PACKET_TYPE_MESSAGE;
+		else if (strcmp(cmdline_mbox_type, "streaming") == 0)
+			type = RIO_PACKET_TYPE_STREAM;
+		else 
+			type = default_type;
+	}
+	return type;
+}
+
 static int keystone_rio_get_cmdline_hdid(char *s)
 {
         if (!s)
@@ -2219,6 +2263,15 @@ static int keystone_rio_get_cmdline_size(char *s)
         return 1;
 }
 __setup("riosize=", keystone_rio_get_cmdline_size);
+
+static int keystone_rio_get_cmdline_mbox_type(char *s)
+{
+        if (!s)
+                return 0;
+        cmdline_mbox_type = s;
+        return 1;
+}
+__setup("riombox-type=", keystone_rio_get_cmdline_mbox_type);
 
 /**
  * keystone_rio_fixup - Architecture specific fixup fonction
@@ -2306,7 +2359,9 @@ static int keystone_rio_setup_controller(struct platform_device *pdev)
 
 	DPRINTK("size = %d, hostid = %d, ports = 0x%x, init = %d, mode = %d\n",
 		size, hostid, ports, init, mode);
-	
+
+	_keystone_rio.mbox_type = keystone_rio_mbox_type(idx, c->mbox_type);
+
 	_keystone_serdes_config = c->serdes_config;
 
 	if (mode >= c->serdes_config_num) {

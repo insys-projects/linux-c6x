@@ -19,7 +19,14 @@
 /*
  * Maximum message size fo RIONET 
  */
-#define MACH_RIO_MAX_MSG_SIZE 1552
+#define MACH_RIO_MAX_MSG_SIZE   1552
+
+/*
+ * Definition of the different RapidIO packet types according to the RapidIO 
+ * specification 2.0
+ */
+#define RIO_PACKET_TYPE_STREAM  9  /* Data Streaming */
+#define RIO_PACKET_TYPE_MESSAGE 11 /* Message */
 
 #ifdef __KERNEL__
 /*
@@ -47,6 +54,7 @@ struct keystone_rio_board_controller_info {
 			 * 1 - Large size, 65536 devices. */
 	struct keystone_serdes_config* serdes_config;
 	u16 serdes_config_num;
+	u16 mbox_type;  /* type of packet for outbound mailboxes */
 	u16 max_mbox;   /* max number of mailboxes */
 	u32 rxu_queues; /* RXU queues range */
 	u32 txu_queue;  /* TXU completion queue */
