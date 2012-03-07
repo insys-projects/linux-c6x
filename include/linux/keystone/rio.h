@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Texas Instruments Incorporated
+ * Copyright (C) 2010, 2011, 2012 Texas Instruments Incorporated
  * Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
@@ -19,7 +19,7 @@
 /*
  * Maximum message size fo RIONET 
  */
-#define MACH_RIO_MAX_MSG_SIZE            1552
+#define MACH_RIO_MAX_MSG_SIZE 1552
 
 #ifdef __KERNEL__
 /*
@@ -38,15 +38,20 @@ struct keystone_serdes_config {
  * Per board RIO devices controller configuration
  */
 struct keystone_rio_board_controller_info {
-        u16 ports; /* bitfield of port(s) to probe on this controller */
-        u16 mode;  /* hw mode (default serdes config) */
-        u16 id;    /* host id */
-        u16 init;  /* initialisation method */
-        u16 size;  /* RapidIO common transport system size.
-		    * 0 - Small size. 256 devices.
-		    * 1 - Large size, 65536 devices. */
+        u16 ports;      /* bitfield of port(s) to probe on this controller */
+        u16 mode;       /* hw mode (default serdes config) */
+        u16 id;         /* host id */
+        u16 init;       /* initialisation method */
+        u16 size;       /* RapidIO common transport system size.
+			 * 0 - Small size. 256 devices.
+			 * 1 - Large size, 65536 devices. */
 	struct keystone_serdes_config* serdes_config;
 	u16 serdes_config_num;
+	u16 max_mbox;   /* max number of mailboxes */
+	u32 rxu_queues; /* RXU queues range */
+	u32 txu_queue;  /* TXU completion queue */
+	u32 rxu_irqs;   /* interrupt events range used for RXU */
+	u32 txu_irq;    /* interrupt event used for TXU competion */
 };
 
 /*

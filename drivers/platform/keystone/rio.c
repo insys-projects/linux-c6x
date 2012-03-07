@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Texas Instruments Incorporated
+ * Copyright (C) 2010, 2011, 2012 Texas Instruments Incorporated
  * Authors: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  * This program is free software; you can redistribute it and/or
@@ -33,10 +33,12 @@
 #include <linux/rio.h>
 #include <linux/rio_drv.h>
 
+#include <mach/keystone_qmss.h>
+#include <linux/keystone/qmss.h>
+#include <linux/keystone/pktdma.h>
 #include <linux/keystone/rio.h>
 
 #undef KEYSTONE_RIO_DEBUG
-
 #ifdef KEYSTONE_RIO_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "RIO: [%s] " fmt, __FUNCTION__ , ## args)
 #define ASSERT(cond) if (!(cond)) DPRINTK("ASSERT %s FAILURE\n", # cond)
@@ -45,10 +47,11 @@
 #define DPRINTK(fmt, args...) 
 #endif
 
-static char banner[] __initdata = KERN_INFO "KeyStone RapidIO driver v1.0\n";
+static char banner[] __initdata = KERN_INFO "KeyStone RapidIO driver v1.1\n";
 
 static u32 rio_regs;
 static u32 rio_conf_regs;
+static u32 rio_pe_feat;
 
 struct port_write_msg {
 	union rio_pw_msg msg;
@@ -69,6 +72,19 @@ struct keystone_rio_data {
 	struct work_struct	pw_work;
 	struct kfifo		pw_fifo;
 	spinlock_t		pw_fifo_lock;
+	struct pktdma_rx_cfg   *rx_cfg;
+	struct pktdma_tx_cfg   *tx_cfg;
+	u32                     max_mbox;         /* number of mailboxes */
+	u32                     free_queue;       /* queue for free descriptors */
+	u32                     rx_queues[KEYSTONE_RIO_MAX_MBOX];      /* receive queues per mailbox */
+	u32                     rx_free_queues[KEYSTONE_RIO_MAX_MBOX]; /* pool of free message per mailbox*/
+	u32                     tx_queue;         /* transmit queue */
+	u32                     tx_cp_queue;      /* transmit completion queue */
+	u32                     rx_channel;       /* receive channel */
+	u32                     tx_channel;       /* transmit channel */
+	u32                     rx_flow;          /* receive flow */
+	u32                     rx_irqs;          /* receive irqs */
+	u32                     tx_irq;           /* transmit completion irq */
 };
 
 static struct keystone_rio_data       _keystone_rio;
@@ -79,9 +95,30 @@ static void keystone_rio_port_write_handler(struct keystone_rio_data *p_rio);
 static int  keystone_rio_port_write_init(struct keystone_rio_data *p_rio);
 static void keystone_rio_interrupt_setup(void);
 static void keystone_rio_interrupt_release(void);
+static void keystone_rio_mp_exit(int idx);
 
 #define index_to_port(index) (index)
 #define port_to_index(port)  (port)
+
+struct keystone_rio_desc_info {
+	u32 ps_desc[2];
+	u32 mbox;
+};
+
+struct keystone_rio_mbox_info {
+	struct rio_mport *port;
+	u32               id;
+	u32               running;
+	u32               entries;
+	u32               slot;
+	void             *dev_id;
+	struct resource   map_res;
+};
+
+static struct keystone_rio_mbox_info  keystone_rio_rx_mbox[KEYSTONE_RIO_MAX_MBOX];
+static struct keystone_rio_mbox_info  keystone_rio_tx_mbox[KEYSTONE_RIO_MAX_MBOX];
+static struct resource                keystone_rio_rxu_map_res;
+static void __iomem                  *keystone_rio_cdma_base_addr;
 
 /*------------------------- RapidIO hw controller setup ---------------------*/
 
@@ -129,12 +166,12 @@ static void keystone_rio_hw_init(u32 mode, u16 hostid)
 
 	/* Per-port SerDes configuration */
 	for (port = 0; port < KEYSTONE_RIO_MAX_PORT; port++) {
-	    DEVICE_REG32_W(KEYSTONE_RIO_SERDES_REG_BASE + KEYSTONE_RIO_SERDES_CFG_RX_REG(port),
-			   _keystone_serdes_config[mode].rx_chan_config[port]);
-	    DEVICE_REG32_W(KEYSTONE_RIO_SERDES_REG_BASE + KEYSTONE_RIO_SERDES_CFG_TX_REG(port),
-			   _keystone_serdes_config[mode].tx_chan_config[port]);
+		DEVICE_REG32_W(KEYSTONE_RIO_SERDES_REG_BASE + KEYSTONE_RIO_SERDES_CFG_RX_REG(port),
+			       _keystone_serdes_config[mode].rx_chan_config[port]);
+		DEVICE_REG32_W(KEYSTONE_RIO_SERDES_REG_BASE + KEYSTONE_RIO_SERDES_CFG_TX_REG(port),
+			       _keystone_serdes_config[mode].tx_chan_config[port]);
 	}
-
+	
 	/* Check for RIO SerDes PLL lock */
 	do {
 		val = DEVICE_REG32_R(KEYSTONE_RIO_SERDES_REG_BASE + KEYSTONE_RIO_SERDES_STS_REG);
@@ -150,15 +187,16 @@ static void keystone_rio_hw_init(u32 mode, u16 hostid)
 	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ASBLY_ID,   0x00000030); /* TI */
 	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ASBLY_INFO, 0x00000100);
 
-	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_PE_FEAT, 
-		       RIO_PEF_PROCESSOR
-		       | RIO_PEF_CTLS
-		       | RIO_PEF_FLOW_CONTROL
-		       | RIO_PEF_EXT_FEATURES 
-		       | RIO_PEF_ADDR_34
-		       | RIO_PEF_STD_RT
-		       | RIO_PEF_INB_DOORBELL
-		       | RIO_PEF_INB_MBOX);
+	rio_pe_feat = RIO_PEF_PROCESSOR
+		| RIO_PEF_CTLS
+		| RIO_PEF_FLOW_CONTROL
+		| RIO_PEF_EXT_FEATURES 
+		| RIO_PEF_ADDR_34
+		| RIO_PEF_STD_RT
+		| RIO_PEF_INB_DOORBELL
+		| RIO_PEF_INB_MBOX;
+
+	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_PE_FEAT, rio_pe_feat);
 
 	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_SW_PORT, KEYSTONE_RIO_MAX_PORT << 8);
 
@@ -231,7 +269,8 @@ static int keystone_add_flow_control(struct rio_dev *rdev)
 {
 	static int free_entry = 0;
 	u32        flow_mask;
-	int        queue;
+	/* The offset of the TXU queue we are using */
+	u32        qid = _keystone_rio.tx_queue - DEVICE_QM_SRIO_Q;
 
 	if (free_entry == 16)
 		return -ENOMEM;
@@ -251,8 +290,16 @@ static int keystone_add_flow_control(struct rio_dev *rdev)
 
 	DPRINTK("LSU flow mask 0x%x\n", flow_mask);
 
-	free_entry++;
+	/* Enable control flow for TXU */
+	flow_mask  = DEVICE_REG32_R(KEYSTONE_RIO_REG_BASE
+				    + KEYSTONE_RIO_TX_CPPI_FLOW_MASK(qid >> 1));
+	flow_mask |= 1 << (free_entry + ((qid & 0x1) << 4));
+	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE
+		       + KEYSTONE_RIO_TX_CPPI_FLOW_MASK(qid >> 1), flow_mask);
+	
+	DPRINTK("TX queue %d flow mask 0x%x\n", qid, flow_mask);
 
+	free_entry++;
 	return 0;
 }
 
@@ -380,10 +427,17 @@ static int keystone_rio_init(struct platform_device *pdev)
 	rio_regs      = (u32) ioremap(KEYSTONE_RIO_REG_BASE, KEYSTONE_RIO_REG_SIZE);
 	rio_conf_regs = rio_regs + KEYSTONE_RIO_CONF_SPACE; 
 
+	/* Initialize MP RXU map table resources */
+	memset(&keystone_rio_rxu_map_res, 0, sizeof(struct resource));
+	keystone_rio_rxu_map_res.start = KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_RXU_MAP_START;
+	keystone_rio_rxu_map_res.end   = KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_RXU_MAP_END;
+	keystone_rio_rxu_map_res.flags = RIO_RESOURCE_MEM;
+
 	return res;
 }
 
 static int keystone_rio_release(void) {
+	keystone_rio_mp_exit(0);
 	keystone_rio_interrupt_release();
 	return 0;
 }
@@ -458,6 +512,7 @@ static void special_interrupt_handler(int ics)
 static irqreturn_t rio_interrupt_handler(int irq, void *data)
 {
 	struct keystone_rio_data *p_rio = (struct keystone_rio_data *) data;
+
 	u32 pending_err_rst_evnt_int   =
 		DEVICE_REG32_R(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICSR)
 		& KEYSTONE_RIO_ERR_RST_EVNT_MASK;
@@ -473,9 +528,9 @@ static irqreturn_t rio_interrupt_handler(int irq, void *data)
 	dbell_handler(p_rio);
 
 	/* Re-arm the interrupt */
-	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_INTDST_RATE_CNTL(KEYSTONE_RXTX_RIO_INT),
+	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_INTDST_RATE_CNTL(KEYSTONE_GEN_RIO_INT),
 		       0);
-
+	
 	return IRQ_HANDLED;
 }
 
@@ -521,19 +576,19 @@ static void keystone_rio_interrupt_setup(void)
         keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_LSU1_ICRR0, 0x11111111, KEYSTONE_LSU_RIO_INT);
 
 	/* Doorbell interrupts are routed to RIO interrupt dest 1 (Rx/Tx) */
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL0_ICRR,  0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL0_ICRR2, 0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL1_ICRR,  0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL1_ICRR2, 0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL2_ICRR,  0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL2_ICRR2, 0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL3_ICRR,  0x11111111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL3_ICRR2, 0x11111111, KEYSTONE_RXTX_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL0_ICRR,  0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL0_ICRR2, 0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL1_ICRR,  0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL1_ICRR2, 0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL2_ICRR,  0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL2_ICRR2, 0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL3_ICRR,  0x11111111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_DOORBELL3_ICRR2, 0x11111111, KEYSTONE_GEN_RIO_INT);
 
 	/* Error, reset and special event interrupts are routed to RIO interrupt dest 1 (Rx/Tx) */
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR,  0x00000111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR2, 0x00001111, KEYSTONE_RXTX_RIO_INT);
-	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR3, 0x00000001, KEYSTONE_RXTX_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR,  0x00000111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR2, 0x00001111, KEYSTONE_GEN_RIO_INT);
+	keystone_rio_interrupt_map(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_ERR_RST_EVNT_ICRR3, 0x00000001, KEYSTONE_GEN_RIO_INT);
 
 	/* The doorbell interrupts routing table is for the 16 general purpose interrupts */
 	DEVICE_REG32_W(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_INTERRUPT_CTL, 0x1);
@@ -544,7 +599,7 @@ static void keystone_rio_interrupt_setup(void)
 			       0x0);
 
 	/* Attach interrupt handlers */
-	request_irq(KEYSTONE_RXTX_RIO_EVT,
+	request_irq(KEYSTONE_GEN_RIO_EVT,
 		    rio_interrupt_handler,
 		    0,
 		    "sRIO",
@@ -555,13 +610,12 @@ static void keystone_rio_interrupt_setup(void)
 		    0,
 		    "sRIO LSU",
 		    &_keystone_rio);
-
 }
 
 static void keystone_rio_interrupt_release(void)
 {
 	free_irq(KEYSTONE_LSU_RIO_EVT, &_keystone_rio);
-	free_irq(KEYSTONE_RXTX_RIO_EVT, &_keystone_rio);
+	free_irq(KEYSTONE_GEN_RIO_EVT, &_keystone_rio);
 }
 
 /*---------------------------------- Direct I/O -------------------------------*/
@@ -826,7 +880,6 @@ static inline int dbell_get(u16* pending)
 		return n;
 	} else 
 		return -1;
-	
 }
 
 static void dbell_handler(struct keystone_rio_data *p_rio)
@@ -1174,7 +1227,16 @@ out:
 static int keystone_local_config_read(struct rio_mport *mport, 
 				      int index, u32 offset, int len, u32 * data)
 {
-	*data = DEVICE_REG32_R(rio_conf_regs + offset);
+	/* 
+	 * Workaround for rionet: the processing element features must content
+	 * RIO_PEF_INB_MBOX and RIO_PEF_INB_DOORBELL bits that cannot be set on
+	 * KeyStone hardware. So cheat the read value in this case...
+	 */
+	if (unlikely(offset == RIO_PEF_CAR))
+		*data = rio_pe_feat;
+	else
+		*data = DEVICE_REG32_R(rio_conf_regs + offset);
+	
 	DPRINTK("index %d offset 0x%x data 0x%x\n", index, offset, *data);
 
 	return 0;
@@ -1433,6 +1495,286 @@ static int keystone_rio_port_write_init(struct keystone_rio_data *p_rio)
 	return 0;
 }
 
+/*----------------------------- Message passing management  ----------------------*/
+
+static irqreturn_t txu_interrupt_handler(int irq, void *data);
+
+/*
+ * Cleanup queues used by the QMSS/PKTDMA
+ */
+static void keystone_rio_cleanup_qs(int queue)
+{
+	struct qm_host_desc *hd = NULL;
+	while ((hd = hw_qm_queue_pop(queue)) != NULL)
+		hw_qm_queue_push(hd, _keystone_rio.free_queue, DEVICE_QM_DESC_SIZE_BYTES);
+}
+
+/*
+ * Global shutdown of RapidIO MP
+ */
+static void keystone_rio_mp_exit(int idx)
+{
+	int mbox;
+
+	DPRINTK("shutting down RXU PktDMA\n");
+
+	(void) pktdma_rx_disable(_keystone_rio.rx_cfg);
+
+	for (mbox = 0; mbox < _keystone_rio.max_mbox; mbox++) {
+		keystone_rio_cleanup_qs(_keystone_rio.rx_free_queues[mbox]);
+		keystone_rio_cleanup_qs(_keystone_rio.rx_queues[mbox]);
+	}
+
+	DPRINTK("shutting down TXU PktDMA\n");
+
+	(void) pktdma_tx_disable(_keystone_rio.tx_cfg);
+
+	keystone_rio_cleanup_qs(_keystone_rio.tx_cp_queue);
+
+	free_irq(_keystone_rio.tx_irq, &_keystone_rio);
+}
+
+/*
+ * Global initialization of RapidIO MP
+ */
+static int keystone_rio_mp_init(u32 max_mbox,
+				u32 rxu_queues,
+				u32 txu_queue,
+				u32 rxu_irqs,
+				u32 txu_irq) 
+{
+	struct keystone_rio_data *rio = &_keystone_rio;
+	u32 mbox;
+	int res;
+
+	if (max_mbox == 0)
+		return 0;
+
+	if ((max_mbox < 0) || (max_mbox > KEYSTONE_RIO_MAX_MBOX))
+		return -EINVAL;
+
+	/* Initialize PktDMA */
+	pktdma_region_init(KEYSTONE_RIO_CDMA_BASE,
+			   KEYSTONE_RIO_CDMA_SIZE,
+			   &keystone_rio_cdma_base_addr);
+	
+	if (keystone_rio_cdma_base_addr == NULL)
+		return -ENOMEM;
+	
+	rio->rx_cfg = (struct pktdma_rx_cfg*) kmalloc(sizeof(struct pktdma_rx_cfg), GFP_KERNEL);
+	if (rio->rx_cfg == NULL) {
+		return -ENOMEM;
+		goto out_error;
+	}
+	
+	rio->tx_cfg = (struct pktdma_tx_cfg*) kmalloc(sizeof(struct pktdma_tx_cfg), GFP_KERNEL);
+	if (rio->tx_cfg == NULL) {
+		res = -ENOMEM;
+		goto out_error;
+	}
+
+	/* 
+	 * Will use dts in the near future, let use platform defines instead for the
+	 * time being.
+	 */
+	rio->max_mbox        = max_mbox;
+	rio->rx_channel      = KEYSTONE_RIO_CDMA_RX_FIRST_CHANNEL;
+	rio->tx_channel      = KEYSTONE_RIO_CDMA_TX_FIRST_CHANNEL;
+	rio->rx_flow         = KEYSTONE_RIO_CDMA_RX_FIRST_FLOW;
+	rio->free_queue      = DEVICE_QM_RIO_FREE_Q;
+	rio->tx_queue        = DEVICE_QM_RIO_TX_Q;
+	rio->tx_cp_queue     = txu_queue;
+	rio->rx_irqs         = rxu_irqs;
+	rio->tx_irq          = txu_irq;
+
+	for (mbox = 0; mbox < max_mbox; mbox++) {
+		rio->rx_queues[mbox]      = rxu_queues + mbox;
+		rio->rx_free_queues[mbox] = DEVICE_QM_RIO_RX_FREE_Q + mbox;
+	}
+
+	/* Configure Rx PKTDMA */
+	rio->rx_cfg->base_addr           = (u32) keystone_rio_cdma_base_addr;
+	rio->rx_cfg->rx_base_offset      = KEYSTONE_RIO_CDMA_RX_CHAN_CFG_OFFSET;
+	rio->rx_cfg->rx_chan             = rio->rx_channel;
+	rio->rx_cfg->n_rx_chans          = max_mbox; /* We need one channel per mbox */
+	rio->rx_cfg->flow_base_offset    = KEYSTONE_RIO_CDMA_RX_FLOW_CFG_OFFSET;
+	rio->rx_cfg->rx_flow             = rio->rx_flow;
+	rio->rx_cfg->n_rx_flows          = max_mbox; /* We need one flow per mbox */
+	rio->rx_cfg->qmnum_free_buf      = 0;
+	rio->rx_cfg->queue_free_buf      = &rio->rx_free_queues[0];
+	rio->rx_cfg->qmnum_rx            = 0;
+	rio->rx_cfg->queue_rx            = &rio->rx_queues[0];
+	rio->rx_cfg->tdown_poll_count    = KEYSTONE_RIO_CDMA_RX_TIMEOUT_COUNT;
+	rio->rx_cfg->use_acc             = 0;
+
+	if (pktdma_rx_config(rio->rx_cfg)) {
+		DPRINTK("Setup of PktDMA Rx failed\n");
+		res = -EBUSY;
+		goto out_error;
+	}
+
+	/* Configure Tx PKTDMA */
+	rio->tx_cfg->base_addr           = (u32) keystone_rio_cdma_base_addr;
+	rio->tx_cfg->gbl_ctl_base_offset = KEYSTONE_RIO_CDMA_GLOBAL_CFG_OFFSET;
+	rio->tx_cfg->tx_base_offset      = KEYSTONE_RIO_CDMA_TX_CHAN_CFG_OFFSET;
+	rio->tx_cfg->tx_chan             = rio->tx_channel;
+	rio->tx_cfg->n_tx_chans	         = 1;
+	rio->tx_cfg->use_acc		 = 0;
+
+	if (pktdma_tx_config(rio->tx_cfg)) {
+		DPRINTK("Setup of PktDMA Tx failed\n");
+		res = -EBUSY;
+		goto out_error;
+	}
+
+	/* Initialize the QMSS queues */
+	for (mbox = 0; mbox < max_mbox; mbox++) {
+		keystone_rio_cleanup_qs(rio->rx_queues[mbox]);
+		keystone_rio_cleanup_qs(rio->rx_free_queues[mbox]);
+	}
+
+	keystone_rio_cleanup_qs(rio->tx_cp_queue);
+
+	request_irq(rio->tx_irq,
+		    txu_interrupt_handler,
+		    0,
+		    "sRIO TXU",
+		    (void *) rio);
+	return 0;
+
+out_error:
+	if (rio->rx_cfg)
+		kfree(rio->rx_cfg);
+
+	if (rio->tx_cfg)
+		kfree(rio->tx_cfg);
+
+	return res;
+}
+
+/*
+ * TXU interrupt handler
+ */
+static irqreturn_t txu_interrupt_handler(int irq, void *data)
+{
+	struct keystone_rio_data *rio = (struct keystone_rio_data*) data;
+	struct qm_host_desc *hd;
+
+	DPRINTK("Acknowledge transmitted message (irq = %d)\n", irq);
+
+	while((hd = hw_qm_queue_pop(rio->tx_cp_queue)) != NULL) {
+		struct keystone_rio_desc_info *rio_desc =
+			(struct keystone_rio_desc_info *) &hd->ps_data;
+		int mbox_id = rio_desc->mbox;
+		struct keystone_rio_mbox_info *mbox = &keystone_rio_tx_mbox[mbox_id];
+		struct rio_mport *port = mbox->port;
+		void *dev_id = mbox->dev_id;
+		
+		DPRINTK("release desc = 0x%x, mbox = %d, slot = %d\n",
+			(u32) hd, mbox_id, mbox->slot);
+
+		if (mbox->running) {
+			/*
+			 * Client is in charge of freeing the associated buffers
+			 * Because we do not have explicit hardware ring but queues, we
+			 * do not know where we are in the sw ring, let use fake slot.
+			 * But the semantic hereafter is dangerous in case of re-order:
+			 * bad buffer may be released...
+			 */
+			port->outb_msg[mbox_id].mcback(port, dev_id, mbox_id, mbox->slot++);
+			if (mbox->slot > mbox->entries)
+				mbox->slot = 0;
+		}
+		
+		/* Give back descriptor to the free queue */
+		hw_qm_queue_push(hd, rio->free_queue, DEVICE_QM_DESC_SIZE_BYTES);
+	}
+	return IRQ_HANDLED;
+}
+
+/*
+ * RXU interrupt handler
+ */
+static irqreturn_t rxu_interrupt_handler(int irq, void *data)
+{
+	struct keystone_rio_mbox_info *mbox = (struct keystone_rio_mbox_info *) data;
+	DPRINTK("Received message for mbox = %d\n", mbox->id);
+
+	if (mbox->running) {
+		/* Client callback (slot is not used) */
+		mbox->port->inb_msg[mbox->id].mcback(mbox->port, mbox->dev_id,
+						     mbox->id, 0);
+	}
+	return IRQ_HANDLED;
+}
+
+/**
+ * keystone_rio_map_mbox - Map a mailbox to a given queue
+ * @mbox: mailbox to map
+ * @queue: associated queue number
+ *
+ * Returns %0 on success or %-ENOMEM on failure.
+ */
+static int keystone_rio_map_mbox(int mbox, int queue, int flowid, int size)
+{
+	struct keystone_rio_mbox_info *rx_mbox = &keystone_rio_rx_mbox[mbox];
+	u32 mapping_entry_low;
+	u32 mapping_entry_high;
+	u32 mapping_entry_qid;
+	int res;
+
+	/* Map the multi-segment mailbox to the corresponding Rx queue */
+	mapping_entry_low = ((mbox & 0x1f) << 16)
+ 		| (0x3f000000); /* Given mailbox, all letters, srcid = 0 */
+
+	mapping_entry_high = KEYSTONE_RIO_MAP_FLAG_SEGMENT /* multi-segment messaging */
+		| KEYSTONE_RIO_MAP_FLAG_SRC_PROMISC
+		| KEYSTONE_RIO_MAP_FLAG_DST_PROMISC;       /* promiscuous (don't care about src/dst id) */
+
+	if (size)
+		mapping_entry_high |= KEYSTONE_RIO_MAP_FLAG_TT_16; /* tt */
+	
+	/* QMSS/PktDMA mapping */
+	mapping_entry_qid = (queue & 0x3fff) | (flowid << 16);
+
+	/* Allocate two look-up table entries for mbox to queue mapping */
+	res = allocate_resource(&keystone_rio_rxu_map_res,
+				&rx_mbox->map_res,
+				24,
+				KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_RXU_MAP_START,
+				KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_RXU_MAP_END,
+				0xc,
+				NULL,
+				NULL);
+	if (res)
+		return -ENOMEM;
+
+	DPRINTK("Using RXU map entries 0x%x to 0x%x, mbox = %d, flowid = %d, queue = %d\n", 
+		rx_mbox->map_res.start,
+		rx_mbox->map_res.end,
+		mbox, flowid, queue);
+
+	DEVICE_REG32_W(rx_mbox->map_res.start,     mapping_entry_low);
+	DEVICE_REG32_W(rx_mbox->map_res.start + 4, mapping_entry_high);
+	DEVICE_REG32_W(rx_mbox->map_res.start + 8, mapping_entry_qid);
+
+        /*
+	 *  The RapidIO peripheral looks at the incoming RapidIO msgs
+	 *  and if there is only one segment (the whole msg fits into one
+	 *  RapidIO msg), the peripheral uses the single segment mapping
+	 *  table. Therefore we need to map the single-segment mailbox too.
+	 *  The same Rx CPPI Queue is used (as for the multi-segment
+	 *  mailbox).
+	 */
+	mapping_entry_high &= ~KEYSTONE_RIO_MAP_FLAG_SEGMENT;
+	
+	DEVICE_REG32_W(rx_mbox->map_res.start + 12, mapping_entry_low);
+	DEVICE_REG32_W(rx_mbox->map_res.start + 16, mapping_entry_high);
+	DEVICE_REG32_W(rx_mbox->map_res.start + 20, mapping_entry_qid);
+
+	return 0;
+}
+
 /**
  * rio_open_inb_mbox - Initialize KeyStone inbound mailbox
  * @mport: Master port implementing the inbound message unit
@@ -1446,7 +1788,41 @@ static int keystone_rio_port_write_init(struct keystone_rio_data *p_rio)
  */
 int rio_open_inb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entries) 
 {
-	return -ENOSYS;
+	struct keystone_rio_mbox_info *rx_mbox = &keystone_rio_rx_mbox[mbox];
+	int res;
+
+	DPRINTK("mport = 0x%x, dev_id = 0x%x, mbox = %d, entries = %d\n",
+		(u32) mport, (u32) dev_id, mbox, entries);
+	
+	/* Check if the port is already registered in this queue */
+	if (rx_mbox->port == mport)
+		return 0;
+	
+	if ((entries < KEYSTONE_RIO_MIN_RX_RING_SIZE) ||
+	    (entries > KEYSTONE_RIO_MAX_RX_RING_SIZE)) {
+		return -EINVAL;
+	}
+
+	rx_mbox->dev_id  = dev_id;
+	rx_mbox->entries = entries;
+	rx_mbox->port    = mport;
+	rx_mbox->id      = mbox;
+	rx_mbox->running = 1;
+
+	/* Map the mailbox to queue/flow */
+	res = keystone_rio_map_mbox(mbox,
+				    _keystone_rio.rx_queues[mbox],
+				    _keystone_rio.rx_flow,
+				    mport->sys_size);
+	if (res)
+		return res;
+
+	request_irq(_keystone_rio.rx_irqs + mbox,
+		    rxu_interrupt_handler,
+		    0,
+		    "sRIO RXU",
+		    (void*) rx_mbox);
+	return 0;
 }
 
 /**
@@ -1458,6 +1834,27 @@ int rio_open_inb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entri
  */
 void rio_close_inb_mbox(struct rio_mport *mport, int mbox) 
 {
+	struct keystone_rio_mbox_info *rx_mbox = &keystone_rio_rx_mbox[mbox];
+
+	DPRINTK("mport = 0x%x, mbox = %d\n", (u32) mport, mbox);
+
+       	rx_mbox->running = 0;
+	
+	if (rx_mbox->port) {
+		int res;
+		rx_mbox->port = NULL;
+		
+		keystone_rio_cleanup_qs(_keystone_rio.rx_free_queues[mbox]);
+		keystone_rio_cleanup_qs(_keystone_rio.rx_queues[mbox]);
+
+		/* Release associated resource */
+		res = release_resource(&rx_mbox->map_res);
+		if (res)
+			printk("release of resource 0x%x failed", rx_mbox->map_res.start);
+
+		free_irq(_keystone_rio.rx_irqs + mbox, (void *)rx_mbox);
+	}
+	return;
 }
 
 /**
@@ -1473,7 +1870,28 @@ void rio_close_inb_mbox(struct rio_mport *mport, int mbox)
  */
 int rio_open_outb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entries)
 {
-	return -ENOSYS;
+	struct keystone_rio_mbox_info *tx_mbox = &keystone_rio_tx_mbox[mbox];
+
+	DPRINTK("mport = 0x%x, dev_id = 0x%x, mbox = %d, entries = %d\n",
+		(u32) mport, (u32) dev_id, mbox, entries);
+
+	/* Check if already initialized */
+	if (tx_mbox->port == mport)
+		return 0;
+
+	if ((entries < KEYSTONE_RIO_MIN_TX_RING_SIZE) ||
+	    (entries > KEYSTONE_RIO_MAX_TX_RING_SIZE)) {
+		return -EINVAL;
+	}
+
+	tx_mbox->dev_id  = dev_id;
+	tx_mbox->entries = entries;
+	tx_mbox->port    = mport;
+	tx_mbox->id      = mbox;
+	tx_mbox->slot    = 0;
+	tx_mbox->running = 1;
+
+	return 0;
 }
 
 /**
@@ -1485,7 +1903,186 @@ int rio_open_outb_mbox(struct rio_mport *mport, void *dev_id, int mbox, int entr
  */
 void rio_close_outb_mbox(struct rio_mport *mport, int mbox)
 {
+	struct keystone_rio_mbox_info *tx_mbox = &keystone_rio_tx_mbox[mbox];
+	DPRINTK("mport = 0x%x, mbox = %d\n", (u32) mport, mbox);
+	tx_mbox->port    = NULL;
+	tx_mbox->running = 0;
+
+	return;
 }
+
+/**
+ * rio_hw_add_outb_message - Add a message to the KeyStone outbound message queue
+ * @mport: Master port with outbound message queue
+ * @rdev: Target of outbound message
+ * @mbox: Outbound mailbox
+ * @buffer: Message to add to outbound queue
+ * @len: Length of message
+ *
+ * Adds the @buffer message to the KeyStone outbound message queue. Returns
+ * %0 on success or %-EBUSY on failure.
+ */
+int rio_hw_add_outb_message(struct rio_mport *mport, struct rio_dev *rdev, 
+			    int mbox, void *buffer, const size_t len)
+{
+	struct qm_host_desc *hd;
+	struct keystone_rio_desc_info *rio_desc;
+	int  loop  = 0;
+	u32  paddr = virt_to_phys((u32) buffer);
+	u32  plen  = ((len + 7) & ~0x7);
+
+	if (len == 0)
+		return -EINVAL;
+
+	/* Spin a little bit if free queue is empty until we get free desc */
+	while(((hd = hw_qm_queue_pop(_keystone_rio.free_queue)) == NULL)
+	      && (++loop < KEYSTONE_RIO_LOOP_FREE_QUEUE));
+
+	if (hd == NULL) {
+		DPRINTK("no free descriptor retrieved\n");
+		return -EBUSY;
+	}
+
+	/* Sync data if needed */
+	keystone_rio_data_sync_write((u32) buffer,
+				     (u32) buffer + len);
+
+	/* Fill descriptor */
+	QM_DESC_DINFO_SET_PKT_LEN(hd->desc_info, plen);
+	QM_DESC_DINFO_SET_PSINFO_LOC(hd->desc_info, 0);
+	QM_DESC_DINFO_SET_PKT_TYPE(hd->desc_info, 31); /* 31 for type11, 30 for type9 */
+
+	QM_DESC_TINFO_SET_S_TAG_LO(hd->tag_info, 0);
+
+	rio_desc = (struct keystone_rio_desc_info *) &hd->ps_data;
+
+	/* Word 1: source id and dest id */
+	rio_desc->ps_desc[0] = (rdev->destid & 0xffff) | (mport->host_deviceid << 16);
+	
+	/* Word 2: ssize = 32 dword, 4 retries, letter = 0 */
+	rio_desc->ps_desc[1] = (KEYSTONE_RIO_MSG_SSIZE << 17) | (4 << 21) | (mbox & 0x1f);
+
+	if (rdev->net->hport->sys_size)
+		rio_desc->ps_desc[1] |= KEYSTONE_RIO_DESC_FLAG_TT_16; /* tt */
+
+	DPRINTK("ps_desc[0] = 0x%x, ps_desc[1] = 0x%x\n", rio_desc->ps_desc[0], rio_desc->ps_desc[1]);
+
+	/* Word 3 is private data, use it to store the mbox */
+	rio_desc->mbox = mbox;
+
+	hd->buff_len	  = plen;
+	hd->orig_buff_len = plen;
+	hd->buff_ptr	  = paddr;
+	hd->next_bdptr    = 0;
+	hd->orig_buff_ptr = paddr;
+
+	DPRINTK("transmitting packet of len %d (paddr=0x%x, hd=0x%x) to queue = %d (return queue = %d)\n",
+		plen, paddr, (u32) hd, _keystone_rio.tx_queue, _keystone_rio.tx_cp_queue);
+
+	/* Return the descriptor back to the tx completion queue */
+	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
+	QM_DESC_PINFO_SET_SIZE(hd->packet_info, 2); /* sRIO protocol needs 2 words */
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, _keystone_rio.tx_cp_queue);
+	
+	hw_qm_queue_push(hd, _keystone_rio.tx_queue, DEVICE_QM_DESC_SIZE_BYTES);
+
+	return 0;
+}
+
+/**
+ * rio_hw_add_inb_buffer - Add buffer to the KeyStone inbound message queue
+ * @mport: Master port implementing the inbound message unit
+ * @mbox: Inbound mailbox number
+ * @buf: Buffer to add to inbound queue
+ *
+ * Adds the @buf buffer to the KeyStone inbound message queue. Returns
+ * %0 on success or %-EINVAL on failure.
+ */
+int rio_hw_add_inb_buffer(struct rio_mport *mport, int mbox, void *buffer)
+{
+	struct qm_host_desc *hd;
+	int  loop = 0;
+	u32  paddr = virt_to_phys((u32) buffer);
+
+	/* Spin a little bit if free queue is empty until we get free desc */
+	while(((hd = hw_qm_queue_pop(_keystone_rio.free_queue)) == NULL)
+	      && (++loop < KEYSTONE_RIO_LOOP_FREE_QUEUE));
+
+	if (hd == NULL) {
+		DPRINTK("no free descriptor retrieved\n");
+		return -EBUSY;
+	}
+
+	/* Fill descriptor */
+	QM_DESC_DINFO_SET_PSINFO_LOC(hd->desc_info, 0);
+	QM_DESC_TINFO_SET_S_TAG_LO(hd->tag_info, 0);
+
+	hd->buff_len	  = KEYSTONE_RIO_MSG_BUFFER_SIZE;
+	hd->orig_buff_len = KEYSTONE_RIO_MSG_BUFFER_SIZE;
+	hd->buff_ptr	  = paddr;
+	hd->next_bdptr    = 0;
+	hd->orig_buff_ptr = paddr;
+
+	DPRINTK("adding in receive queue packet (paddr=0x%x, hd=0x%x) to queue = %d\n",
+		paddr, (u32) hd, _keystone_rio.rx_free_queues[mbox]);
+
+	hw_qm_queue_push(hd, _keystone_rio.rx_free_queues[mbox],
+			 DEVICE_QM_DESC_SIZE_BYTES);
+
+	return 0;
+}
+
+/**
+ * rio_hw_get_inb_message - Fetch inbound message from the KeyStone message unit
+ * @mport: Master port implementing the inbound message unit
+ * @mbox: Inbound mailbox number
+ *
+ * Gets the next available inbound message from the inbound message queue.
+ * A pointer to the message is returned on success or NULL on failure.
+ */
+void *rio_hw_get_inb_message(struct rio_mport *mport, int mbox)
+{
+	struct qm_host_desc *hd;
+	struct keystone_rio_desc_info *rio_desc;
+	u32 paddr;
+	u32 len;
+	void *buff;
+	
+	hd = hw_qm_queue_pop(_keystone_rio.rx_queues[mbox]);
+	
+	if (hd == NULL)
+		return NULL;
+
+	rio_desc = (struct keystone_rio_desc_info *) &hd->ps_data;
+
+	DPRINTK("Fetching message 0x%x, mbox = %d\n",
+		(u32) rio_desc, mbox);
+
+	/* If mailbox is not our, re-queue the message but it should not happen */
+	if (unlikely(rio_desc->mbox != mbox)) {
+		DPRINTK("Discarding message, mbox = %d, expected = %d \n",
+			rio_desc->mbox, mbox);
+		hw_qm_queue_push(hd, _keystone_rio.rx_queues[rio_desc->mbox],
+				 DEVICE_QM_DESC_SIZE_BYTES);
+	}
+	
+	paddr = hd->buff_ptr;
+	buff  = phys_to_virt(paddr);
+	len   = QM_DESC_DINFO_GET_PKT_LEN(hd->desc_info);
+
+	/* Sync data if needed */
+	if (buff && len)
+		keystone_rio_data_sync_read((u32) buff, (u32) buff + len);
+
+	/* Give back descriptor to the free queue */
+	hw_qm_queue_push(hd, _keystone_rio.free_queue, DEVICE_QM_DESC_SIZE_BYTES);
+
+	return buff;
+}
+
+EXPORT_SYMBOL_GPL(rio_hw_add_outb_message);
+EXPORT_SYMBOL_GPL(rio_hw_add_inb_buffer);
+EXPORT_SYMBOL_GPL(rio_hw_get_inb_message);
 
 /*-------------------------- Main Linux driver functions -----------------------*/
 
@@ -1722,8 +2319,10 @@ static int keystone_rio_setup_controller(struct platform_device *pdev)
 	/* Hardware set up of the controller */
 	keystone_rio_hw_init(mode, hostid);
 
-	/* Init port write interface */
+	/* Initialize port write interface */
 	res = keystone_rio_port_write_init(&_keystone_rio);
+	if (res)
+		return res;
 
 	/* 
 	 * Configure all ports even if we do not use all of them.
@@ -1733,9 +2332,18 @@ static int keystone_rio_setup_controller(struct platform_device *pdev)
 		res = keystone_rio_port_init(p, mode);
 		if (res < 0) {
 			printk(KERN_WARNING "RIO: initialization of port %d failed\n", p);
-			goto out;
+			return res;
 		}
 	}
+
+	/* Global initialization of RapidIO MP */
+	res = keystone_rio_mp_init(c->max_mbox,
+				   c->rxu_queues,
+				   c->txu_queue,
+				   c->rxu_irqs,
+				   c->txu_irq);
+	if (res)
+		return res;	
 
 	/* Initialize interrupts */
 	keystone_rio_interrupt_setup();
