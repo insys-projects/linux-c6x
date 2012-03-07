@@ -230,10 +230,11 @@ static void init_power(void)
         set_psc_state(4, PSC_SRIO, PSC_ENABLE);
 #endif
 #if 0
-	/* HyperLink and MSMC RAM */
+	/* HyperLink */
         set_psc_state(5, PSC_HYPERLINK, PSC_ENABLE);
-        set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
 #endif
+	/* MSMC RAM */
+        set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
 }
 
 #ifdef CONFIG_TI_KEYSTONE_QM
