@@ -79,9 +79,12 @@
 #define QM_DESC_DINFO_PSINFO_IN_DESCR   0
 #define QM_DESC_DINFO_DEFAULT	        (QM_DESC_DINFO_TYPE_HOST << 30)    | \
 					(QM_DESC_DINFO_PSINFO_IN_DESCR << 22)
+#define QM_DESC_DINFO_SET_PSINFO_LOC(x,v) (x) = SET_BITFIELD((x), (v), 22, 22)
 #define QM_DESC_DINFO_GET_PSINFO_LOC(x)	READ_BITFIELD((x), 22, 22)
 #define QM_DESC_DINFO_SET_PKT_LEN(x,v)	(x) = SET_BITFIELD((x), (v), 21, 0)
 #define QM_DESC_DINFO_GET_PKT_LEN(x)	READ_BITFIELD((x), 21, 0)
+#define QM_DESC_DINFO_SET_PKT_TYPE(x,v) (x) = SET_BITFIELD((x), (v), 29, 25)
+#define QM_DESC_DINFO_GET_PKT_TYPE(x)   READ_BITFIELD((x), 29, 25)
 
 /* Tag info */
 #define QM_DESC_TINFO_SET_S_TAG_HI(x,v) (x) = SET_BITFIELD((x), (v), 31, 24)
@@ -176,18 +179,48 @@
 #define DEVICE_QM_FFTC_C_Q		864
 #define DEVICE_QM_BCP_Q		        868
 #define DEVICE_QM_VUSR_Q		864
-#define DEVICE_QM_VUSR_ALLOC_Q          4096 /* First allocable queue */
+#define DEVICE_QM_VUSR_ALLOC_Q          4096 /* First allocable queue, note that 
+						these queues cannot be used for PKTDMA */
 #define DEVICE_QM_VUSR_ALLOC_END_Q      8191 /* Last allocable queue */
+
+/* QPEND definitions (devices dependent) */
+#ifdef CONFIG_SOC_TMS320C6678
+#define DEVICE_QM_PEND12                652
+#define DEVICE_QM_PEND13                653
+#define DEVICE_QM_PEND14                654
+#define DEVICE_QM_PEND15                655
+#define DEVICE_QM_PEND16                656
+#define DEVICE_QM_PEND17                657
+#define DEVICE_QM_PEND18                658
+#define DEVICE_QM_PEND19                659
+#define DEVICE_QM_PEND20                660
+#define DEVICE_QM_PEND21                661
+#endif
+#define DEVICE_QM_PEND22                662
+#define DEVICE_QM_PEND23                663
+#define DEVICE_QM_PEND24                664
+#define DEVICE_QM_PEND25                665
+#define DEVICE_QM_PEND26                666
+#define DEVICE_QM_PEND27                667
+#define DEVICE_QM_PEND28                668
+#define DEVICE_QM_PEND29                669
+#define DEVICE_QM_PEND30                670
+#define DEVICE_QM_PEND31                671
 
 /* Generic free queue */
 #define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
 
 /* Ethernet (NetCP) queues */
 #define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
-#define DEVICE_QM_ETH_RX_FREE_Q         911 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                              /* Ethernet Rx free desc queue */
 #define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
 #define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_Q                                   /* Ethernet Tx queue (for PA) */
 #define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL) /* Ethernet Tx completion queue (filled by PA) */
+
+/* RapidIO queues */
+#define DEVICE_QM_RIO_FREE_Q            DEVICE_QM_FREE_Q
+#define DEVICE_QM_RIO_RX_FREE_Q         (DEVICE_QM_FREE_Q + 256)
+#define DEVICE_QM_RIO_TX_Q		DEVICE_QM_SRIO_Q /* RapidIO Tx queue */
 
 /* Accumulator channel definitions */
 #define DEVICE_QM_ETH_ACC_RX_IDX        0   /* Rx Ethernet accumulator channel index */
