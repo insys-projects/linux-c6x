@@ -737,6 +737,7 @@ core_initcall(evm_init_uart);
 #ifdef CONFIG_TI_KEYSTONE_RAPIDIO
 #include <linux/rio.h>
 #include <linux/keystone/rio.h>
+#include <mach/keystone_qmss.h>
 /* 
  * SerDes and port mode configurations for different sRIO modes.
  * All configurations are based on a 312.5 MHz SerDes reference clock,
@@ -781,6 +782,11 @@ static struct keystone_rio_board_controller_info evm6678_rio_controller = {
 	0,                           /* 8bit ID size */
 	evm6678_serdes_config,       /* SerDes configurations */
 	ARRAY_SIZE(evm6678_serdes_config), /* number of SerDes configurations */
+	4,                           /* number of mbox */
+	DEVICE_QM_PEND17,            /* RXU queues */
+	DEVICE_QM_PEND21,            /* TXU completion queue */
+	IRQ_QMPEND17,                /* RXU interrupts */
+	IRQ_QMPEND21,                /* TXU interrupt */
 };
 
 static struct platform_device evm6678_rio_device = {
@@ -793,6 +799,14 @@ static struct platform_device evm6678_rio_device = {
 
 static int __init evm_init_rio(void)
 {
+	if (get_coreid() >> 2) {
+		/*
+		 * On Shannon, interrupt mapping is different for CP_INTC1 (core 4 to 7),
+		 * we use here same IRQs but associated QPEND are shifted of 6.
+		 */
+		evm6678_rio_controller.rxu_queues = DEVICE_QM_PEND23;
+		evm6678_rio_controller.txu_queue  = DEVICE_QM_PEND27;
+	}
 	return platform_device_register(&evm6678_rio_device);
 }
 

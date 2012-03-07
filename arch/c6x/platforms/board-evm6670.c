@@ -410,6 +410,7 @@ core_initcall(evm_init_uart);
 #ifdef CONFIG_TI_KEYSTONE_RAPIDIO
 #include <linux/rio.h>
 #include <linux/keystone/rio.h>
+#include <mach/keystone_qmss.h>
 /* 
  * SerDes and port mode configurations for different sRIO modes.
  * All configurations are based on a 250MHz SerDes reference clock,
@@ -454,6 +455,11 @@ static struct keystone_rio_board_controller_info evm6670_rio_controller = {
 	0,                           /* 8bit ID size */
 	evm6670_serdes_config,       /* SerDes configurations */
 	ARRAY_SIZE(evm6670_serdes_config), /* number of SerDes configurations */
+	4,                           /* number of mbox */
+	DEVICE_QM_PEND22,            /* RXU queues */
+	DEVICE_QM_PEND26,            /* TXU completion queue */
+	IRQ_QMPEND22,                /* RXU interrupts */
+	IRQ_QMPEND26,                /* TXU interrupt */
 };
 
 static struct platform_device evm6670_rio_device = {
