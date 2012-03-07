@@ -66,6 +66,9 @@ static uint8_t cpintc_host_irq_map[] = {
 	IRQ_INTC0OUT + 7,
 };
 
+/* Interrupts that are level instead of pulse */
+u32 cpintc_level_irqs[] = IRQ_CPINTC_LEVEL_IRQS;
+
 /* Lock protecting irq mappings */
 static spinlock_t map_lock;
 
@@ -412,8 +415,8 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		unsigned int chan = __idx_to_chan(i);
 		struct c6x_irq_chip *chip;
 
-		CPINTC_ENABLECLR(__get_cpintc_id())[i] = ~0;	/* mask all events */
-		CPINTC_ENASTATUS(__get_cpintc_id())[i] = ~0;	/* clear all events */
+		CPINTC_ENABLECLR(__get_cpintc_id())[i] = ~0; /* mask all events */
+		CPINTC_ENASTATUS(__get_cpintc_id())[i] = ~0; /* clear all events */
 
 		/*
 		 * CP_INTC has no default combiner, so we need to map all incoming
@@ -438,7 +441,12 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 			
 			/* Set the individiual CP_INTC IRQs to use combiner */
 			set_irq_chip(evt + IRQ_CPINTC0_START, (struct irq_chip *)&cpintc_chips[i]);
-			set_irq_handler(evt + IRQ_CPINTC0_START, handle_level_irq);
+
+			/* 
+			 * Use edge interrupt handler, CP_INTC is using pulse inputs
+			 * signals for interrupts.
+			 */
+			set_irq_handler(evt + IRQ_CPINTC0_START, handle_edge_irq);
 		}
 
 		/* Retrieve the mapping channel -> host irq */
@@ -473,6 +481,12 @@ int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		desc         = irq_to_desc(parent_irq);
 		desc->action = &combiner_actions[NR_MEGAMOD_COMBINERS + i];
 		chip->chip.startup(parent_irq);
+	}
+
+	/* Some CP_INTC interrupts are level driven, change their handler here */
+	for (i = 0; i < ARRAY_SIZE(cpintc_level_irqs); i++) {
+		DPRINTK("Set irq %d as level signaled\n", cpintc_level_irqs[i]);
+		set_irq_handler(cpintc_level_irqs[i], handle_level_irq);
 	}
 
 	/* Enable all host interrupts */

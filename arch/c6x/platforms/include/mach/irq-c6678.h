@@ -287,13 +287,23 @@
 #define NR_SOC_IRQS	     (IRQ_CPINTC0_START + NR_CPINTC0_IRQS)
 #define NR_SOC_COMBINERS     (NR_CPINTC_COMBINERS) /* Number of combiners */
 
+/* 
+ * List of interrupts that are level signaled instead of pulse
+ */
+#define IRQ_CPINTC_LEVEL_IRQS { IRQ_QMPEND12, IRQ_QMPEND13, IRQ_QMPEND14, IRQ_QMPEND15, \
+	                        IRQ_QMPEND16, IRQ_QMPEND17, IRQ_QMPEND18, IRQ_QMPEND19, \
+	                        IRQ_QMPEND20, IRQ_QMPEND21, IRQ_QMPEND22, IRQ_QMPEND23, \
+                          	IRQ_QMPEND24, IRQ_QMPEND25 }
+
 extern int cpintc_irq(unsigned int irq);
 extern int cpintc_combined_irq(unsigned int irq);
 
-/* 
- * When handling IRQs through either INTC or CP_INTC, always ack before handling irq.
+/*
+ * This macros return 1 if ack must be performed before handling irq.
+ * When handling IRQs through the CP INTC0, ack after the handler runs.
  */
-#define IRQ_SOC_COMBINER_PRE_ACK(irq)  1
+#define IRQ_SOC_COMBINER_PRE_ACK(irq) \
+       ((irq) < IRQ_CPINTC0_START || (irq) >= (IRQ_CPINTC0_START + NR_CPINTC0_IRQS))
 
 /*
  * This macro returns 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
