@@ -455,6 +455,7 @@ static struct keystone_rio_board_controller_info evm6670_rio_controller = {
 	0,                           /* 8bit ID size */
 	evm6670_serdes_config,       /* SerDes configurations */
 	ARRAY_SIZE(evm6670_serdes_config), /* number of SerDes configurations */
+	RIO_PACKET_TYPE_MESSAGE,     /* default outbound mbox packet type */
 	4,                           /* number of mbox */
 	DEVICE_QM_PEND22,            /* RXU queues */
 	DEVICE_QM_PEND26,            /* TXU completion queue */

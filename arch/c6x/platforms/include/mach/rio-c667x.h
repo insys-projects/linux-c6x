@@ -138,16 +138,16 @@
 #define KEYSTONE_RIO_RXU_MAP_H_REG(idx)   (0x404 + (0xc * (idx)))
 #define KEYSTONE_RIO_RXU_MAP_QID_REG(idx) (0x408 + (0xc * (idx)))
 
-#define KEYSTONE_RIO_RXU_MAP_START         0x400
-#define KEYSTONE_RIO_RXU_MAP_END           0x700
+#define KEYSTONE_RIO_RXU_MAP_START        0x400
+#define KEYSTONE_RIO_RXU_MAP_END          0x700
 
 /* RXU for type 9 */
 #define KEYSTONE_RIO_RXU_T9_MAP_0_REG(idx) (0x700 + (0xc * (idx)))
 #define KEYSTONE_RIO_RXU_T9_MAP_1_REG(idx) (0x704 + (0xc * (idx)))
 #define KEYSTONE_RIO_RXU_T9_MAP_2_REG(idx) (0x708 + (0xc * (idx)))
 
-#define KEYSTONE_RIO_RXU_T9_MAP_START      0x700
-#define KEYSTONE_RIO_RXU_T9_MAP_END        0xa00
+#define KEYSTONE_RIO_RXU_T9_MAP_START     0x700
+#define KEYSTONE_RIO_RXU_T9_MAP_END       0xa00
 
 /* LSU */
 #define KEYSTONE_RIO_LSU_REG0(lsu)        (0xd00 + (0x1c * (lsu)))
@@ -334,9 +334,6 @@
  */
 #define KEYSTONE_RIO_MAX_MBOX             4    /* 4 in multi-segment, 64 in single-segment */
 
-#define KEYSTONE_RIO_MSG_RX_QUEUE_NUM     16
-#define KEYSTONE_RIO_MSG_TX_QUEUE_NUM     16
-
 #define KEYSTONE_RIO_MSG_DESC_SIZE        16
 #define KEYSTONE_RIO_MSG_MAX_BUFFER_SIZE  4096
 #define KEYSTONE_RIO_MSG_BUFFER_SIZE	  1552 /* to contain one Ethernet packet (1514) + reserve + alignement */
@@ -347,16 +344,10 @@
 #define KEYSTONE_RIO_MAP_FLAG_TT_16       (1 << 13)
 #define KEYSTONE_RIO_MAP_FLAG_DST_PROMISC (1 << 15)
 
-#define KEYSTONE_RIO_MIN_RING_SIZE        2
-#define KEYSTONE_RIO_MAX_RING_SIZE        2048
-#define KEYSTONE_RIO_MIN_TX_RING_SIZE	  KEYSTONE_RIO_MIN_RING_SIZE
-#define KEYSTONE_RIO_MAX_TX_RING_SIZE	  KEYSTONE_RIO_MAX_RING_SIZE
-#define KEYSTONE_RIO_MIN_RX_RING_SIZE	  KEYSTONE_RIO_MIN_RING_SIZE
-#define KEYSTONE_RIO_MAX_RX_RING_SIZE	  KEYSTONE_RIO_MAX_RING_SIZE
-
-#define KEYSTONE_RIO_DESC_FLAG_TT_16       (1 << 9)
+#define KEYSTONE_RIO_DESC_FLAG_TT_16      (1 << 9)
 
 #define KEYSTONE_RIO_LOOP_FREE_QUEUE      20 
+
 /* 
  * RapidIO global definitions
  */
