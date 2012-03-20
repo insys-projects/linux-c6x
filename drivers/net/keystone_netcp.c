@@ -33,6 +33,7 @@
 #include <asm/irq.h>
 #include <asm/msmc.h>
 
+#include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
 #include <mach/keystone_netcp.h>
 #include <mach/keystone_cpsw.h>
@@ -242,12 +243,12 @@ static void netcp_init_qs(struct net_device *ndev)
 		hd->buff_ptr       = (u32)skb->data;
 		hd->next_bdptr     = 0;
 		hd->orig_buff_ptr  = (u32)skb->data;
-		hd->private        = (u32)skb;
-
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);		
+		hd->private[5]     = (u32)skb;
 
 		L2_cache_block_writeback_invalidate((u32) skb->data,
 						    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
+
+		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 	}
 }
 
@@ -403,7 +404,7 @@ static int netcp_tx(struct net_device *ndev)
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	NETCP_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
+#define	NETCP_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
 #define NETCP_TX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)
@@ -411,14 +412,14 @@ static int netcp_tx(struct net_device *ndev)
 
 	/* Main loop */
 	while ((hd = NETCP_TX_LOOP_ITERATOR()) && (hd != NULL)) {
-		struct sk_buff *skb = (struct sk_buff*) hd->private;
+		struct sk_buff *skb = (struct sk_buff*) hd->private[5];
 
 		/* Release the attached sk_buff */
 		if (skb) {
 			DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
 				skb, hd);
 			
-			hd->private = 0;
+			hd->private[5] = 0;
 
 			/* Free the skbuff associated to this packet */
 			dev_kfree_skb_irq(skb);
@@ -468,7 +469,7 @@ static int netcp_rx(struct net_device *ndev,
 	acc_list_p = acc_list;
 
 /* With interrupt support: get the descriptors from the accumulator list */
-#define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov(*acc_list_p++))
+#define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
 #else
 /* Without interrupt support: get the descriptors directly from the queue */
 #define NETCP_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
@@ -481,11 +482,13 @@ static int netcp_rx(struct net_device *ndev,
 			return 0;
 
 		pkt_size = QM_DESC_DINFO_GET_PKT_LEN(hd->desc_info);
-		if (unlikely(pkt_size == 0))
+		if (unlikely(pkt_size == 0)) {
+			hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 			return 0;
+		}
 
 		/* Get the incoming skbuff */
-		skb_rcv = (struct sk_buff *) hd->private;
+		skb_rcv = (struct sk_buff *) hd->private[5];
 
 		DPRINTK("received a packet of len %d (skb=0x%x, hd=0x%x) buffer = 0x%x\n",
 			pkt_size, skb_rcv, hd, hd->desc_info);
@@ -504,11 +507,12 @@ static int netcp_rx(struct net_device *ndev,
 			hd->buff_ptr      = (u32)skb->data;
 			hd->next_bdptr    = 0;
 			hd->orig_buff_ptr = (u32)skb->data;
-			hd->private       = (u32)skb;
-			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
+			hd->private[5]    = (u32)skb;
 
 			L2_cache_block_writeback_invalidate((u32) skb->data,
 							    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
+
+			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 		}
 		
 		/* Fill statistic */
@@ -637,7 +641,8 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	hd->orig_buff_len	= pkt_len;
 	hd->buff_ptr		= (u32) skb->data;
 	hd->orig_buff_ptr	= (u32) skb->data;
-	hd->private             = (u32) skb;
+	hd->private[5]          = (u32) skb;
+	hd->software_info0      = 0; /* Not a PA command */
 
 	ndev->stats.tx_packets++;
 	ndev->stats.tx_bytes += pkt_len;
@@ -816,7 +821,7 @@ static void netcp_get_drvinfo(struct net_device *ndev,
 	struct netcp_priv *priv = netdev_priv(ndev);
 	strcpy(info->driver, NETCP_DRIVER_NAME);
 	strcpy(info->version, NETCP_DRIVER_VERSION);
-	sprintf(info->fw_version, "%d", priv->data.pa_pdsp.firmware_version);
+	sprintf(info->fw_version, "%d", priv->data.pa_pdsp[0].firmware_version);
 }
 
 static u32 netcp_get_msglevel(struct net_device *ndev)
@@ -1055,7 +1060,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	struct pktdma_tx_cfg	    c_tx_cfg;
 	struct pktdma_rx_cfg	   *rx_cfg = &c_rx_cfg;
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
-	const struct firmware      *fw;
 	u32                         acc_list_num_rx;
 	u32                         acc_list_num_tx;
 	u32                         acc_list_size; 
@@ -1117,7 +1121,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	else
 		random_ether_addr(ndev->dev_addr);
 
-	/* Configure Rx and Tx PKTDMA */
+	/* Cleanup PKTDMA */
 	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
 	rx_cfg->rx_base_offset   = DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET;
 	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
@@ -1125,6 +1129,18 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->flow_base_offset = DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET;
 	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRST_FLOW;
 	rx_cfg->n_rx_flows       = DEVICE_PA_CDMA_RX_NUM_FLOWS;
+	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
+
+	pktdma_rx_disable(rx_cfg);
+
+	/* Configure Rx and Tx PKTDMA */
+	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
+	rx_cfg->rx_base_offset   = DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET;
+	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
+	rx_cfg->n_rx_chans       = 1;
+	rx_cfg->flow_base_offset = DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET;
+	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRMWARE_FLOW;
+	rx_cfg->n_rx_flows       = 1; 
 	rx_cfg->qmnum_free_buf   = 0;
 	rx_cfg->queue_free_buf   = &queue_free_buf[0];
 	rx_cfg->qmnum_rx         = 0;
@@ -1166,7 +1182,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	tx_cfg->base_addr               = (u32) pa_cdma_base_addr;
 	tx_cfg->gbl_ctl_base_offset     = DEVICE_PA_CDMA_GLOBAL_CFG_OFFSET;
 	tx_cfg->tx_base_offset          = DEVICE_PA_CDMA_TX_CHAN_CFG_OFFSET;
-	tx_cfg->tx_chan                 = DEVICE_PA_CDMA_TX_FIRST_CHANNEL;
+	tx_cfg->tx_chan                 = DEVICE_PA_CDMA_TX_PDSP0_CHANNEL;
 	tx_cfg->n_tx_chans		= DEVICE_PA_CDMA_TX_NUM_CHANNELS;
 	tx_cfg->queue_tx		= DEVICE_QM_ETH_TX_CP_Q;
 #ifndef EMAC_ARCH_HAS_INTERRUPT
@@ -1194,29 +1210,18 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	/* Streaming switch configuration */
 	streaming_switch_setup();
 
-	/* Reset the PA */
-	ret = keystone_pa_reset();
-	if (ret != 0) {
-		printk(KERN_ERR "%s: PA reset failed d\n", __FUNCTION__);
-		return ret;
-	}
-
-	/* Request PA firmware */
-	ret = request_firmware(&fw, data->pa_pdsp.firmware, &pdev->dev);
-	if (ret != 0) {
-		printk(KERN_ERR "PA: Cannot find  %s firmware\n", data->pa_pdsp.firmware);
-		return ret;
-	}
-
 	/* Configure the PA */
-	ret = keystone_pa_config(data->pa_pdsp.pdsp, (const unsigned int*) fw->data,
-				 fw->size, ndev->dev_addr);
+	ret = keystone_pa_config(&pdev->dev,
+				 &data->pa_pdsp[0],
+				 data->pa_pdsp_num,
+				 ndev->dev_addr,
+				 rx_cfg->rx_flow,
+				 queue_rx[0],
+				 DEVICE_QM_ETH_FREE_Q);
 	if (ret != 0) {
 		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;
 	}
-
-	release_firmware(fw);
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);

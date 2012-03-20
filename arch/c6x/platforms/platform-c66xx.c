@@ -296,11 +296,39 @@ core_initcall(setup_qmss);
 struct netcp_platform_data netcp_data = {
 	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
 	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,
-	.pa_pdsp = {
-		.pdsp              = 0, /* PA PDSP 0 */
-		.firmware          = DEVICE_PA_PDSP_FIRMWARE,
-		.firmware_version  = 1,
-	},
+        .pa_pdsp_num       = 6,
+	.pa_pdsp           = {
+		{
+			.pdsp              = 0, /* PA PDSP 0 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_012,
+			.firmware_version  = 1,
+		},
+		{
+			.pdsp              = 1, /* PA PDSP 1 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_012,
+			.firmware_version  = 1,
+		},
+		{
+			.pdsp              = 2, /* PA PDSP 2 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_012,
+			.firmware_version  = 1,
+		},
+		{
+			.pdsp              = 3, /* PA PDSP 3 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_3,
+			.firmware_version  = 1,
+		},
+		{
+			.pdsp              = 4, /* PA PDSP 4 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_45,
+			.firmware_version  = 1,
+		},
+		{
+			.pdsp              = 5, /* PA PDSP 5 */
+			.firmware          = DEVICE_PA_PDSP_FIRMWARE_45,
+			.firmware_version  = 1,
+		},
+	 },
 	.sgmii_port        = 1,
 	.phy_id            = 1,
 };

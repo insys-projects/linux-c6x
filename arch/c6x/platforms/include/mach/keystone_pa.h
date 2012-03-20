@@ -16,19 +16,24 @@
 #define __MACH_C6X_KEYSTONE_PA_H
 
 #define DEVICE_PA_BASE				0x02000000
-#define DEVICE_PA_REGION_SIZE			0x40000
+#define DEVICE_PA_REGION_SIZE                   0x48000
 #define DEVICE_PA_RUN_CHECK_COUNT		100
 #define DEVICE_PA_NUM_PDSPS			6
 
-#define PA_CMD_SIZE				16
+#define PA_CMD_SIZE                             16
 #define PA_MAGIC_ID				0x0CEC11E0
 #define PA_REG_MAILBOX_SLOT(pdsp, slot)		(0x00 + ((pdsp) * 0x10) + ((slot) * 0x04))
 #define PA_REG_PDSP_CTL(pdsp)			(0x1000 + ((pdsp) * 0x100))
+#define PA_REG_PDSP_CONSTANT_TBL_BLOCK_INDEX0(pdsp) (0x1000 + 0x20 + ((pdsp) * 0x100))
+#define PA_REG_PDSP_CONSTANT_TBL_BLOCK_INDEX1(pdsp) (0x1000 + 0x24 + ((pdsp) * 0x100))
+#define PA_REG_PDSP_CONSTANT_TABLE_PROG_PTR_0(pdsp) (0x1000 + 0x28 + ((pdsp) * 0x100))
+#define PA_REG_PDSP_CONSTANT_TABLE_PROG_PTR_1(pdsp) (0x1000 + 0x2C + ((pdsp) * 0x100))
 #define PA_REG_TIMER_CTL(pdsp)			(0x3000 + ((pdsp) * 0x100))
 #define PA_REG_TIMER_LOAD(pdsp)			(0x3000 + ((pdsp) * 0x100) + 0x4)
 #define PA_REG_TIMER_VAL(pdsp)			(0x3000 + ((pdsp) * 0x100) + 0x8)
 #define PA_REG_TIMER_TIMER_IRQ(pdsp)	        (0x3000 + ((pdsp) * 0x100) + 0xC)
 #define PA_MEM_PDSP_IRAM(pdsp)			(0x10000 + ((pdsp) * 0x8000))
+#define PA_MEM_PDSP_SRAM(num)			(0x40000 + ((num) * 0x2000))
 #define PA_REG_PKTID_REV	                0x00400
 #define PA_REG_PKTID_SOFT_RESET	                0x00404
 #define PA_REG_PKTID_RANGE_LIM	                0x00408
@@ -53,9 +58,43 @@
 #define PA_REG_VAL_PDSP_CTL_ENABLE_PDSP(pcval)	(((pcval) << 16)	\
 						 | PA_REG_VAL_PDSP_CTL_ENABLE \
 						 | PA_REG_VAL_PDSP_CTL_SOFT_RESET)
+/* PA PktDMA defines */
+#define DEVICE_PA_CDMA_BASE			0x02004000
+#define DEVICE_PA_CDMA_SIZE			0x1400
+#define DEVICE_PA_CDMA_GLOBAL_CFG_OFFSET	0x0000
+#define DEVICE_PA_CDMA_TX_CHAN_CFG_OFFSET	0x0400
+#define DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET	0x0800
+#define DEVICE_PA_CDMA_TX_SCH_CFG_OFFSET	0x0C00
+#define DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET	0x1000
+
+#define DEVICE_PA_CDMA_TX_PDSP0_CHANNEL         0
+#define DEVICE_PA_CDMA_TX_PDSP1_CHANNEL         1
+#define DEVICE_PA_CDMA_TX_PDSP2_CHANNEL         2
+#define DEVICE_PA_CDMA_TX_PDSP3_CHANNEL         3
+#define DEVICE_PA_CDMA_TX_PDSP4_CHANNEL         4
+#define DEVICE_PA_CDMA_TX_PDSP5_CHANNEL         5
+#define DEVICE_PA_CDMA_TX_ETH_CHANNEL           8
+#define DEVICE_PA_CDMA_TX_NUM_CHANNELS		9
+
+#define DEVICE_PA_CDMA_RX_FIRST_CHANNEL 	0
+#define DEVICE_PA_CDMA_RX_NUM_CHANNELS		24
+#define DEVICE_PA_CDMA_RX_FIRST_FLOW 	        0
+#define DEVICE_PA_CDMA_RX_NUM_FLOWS		32
+#define DEVICE_PA_CDMA_RX_FIRMWARE_FLOW         31 /* Rx flow used by the firmware */
+
+/* Firmware */
+#define DEVICE_PA_PDSP_FIRMWARE_012             "keystone/pa_pdsp02_1_0_2_1.fw"
+#define DEVICE_PA_PDSP_FIRMWARE_3               "keystone/pa_pdsp3_1_0_2_1.fw"
+#define DEVICE_PA_PDSP_FIRMWARE_45              "keystone/pa_pdsp45_1_0_2_1.fw"
 
 /* Number of mailbox slots for each PDPS */
 #define PA_NUM_MAILBOX_SLOTS			4
 
+/* System Timestamp */
+#define PAFRM_SRAM_SIZE			        0x2000		
+#define PAFRM_SYS_TIMESTAMP_ADDR	        0x6460
+#define PAFRM_SYS_TIMESTAMP_SRAM_INDEX	        (PAFRM_SYS_TIMESTAMP_ADDR / PAFRM_SRAM_SIZE)
+#define PAFRM_SYS_TIMESTAMP_OFFSET	        ((PAFRM_SYS_TIMESTAMP_ADDR % \
+						  PAFRM_SRAM_SIZE)/sizeof(u32))
 #endif /* __MACH_C6X_KEYSTONE_PA_H */
 

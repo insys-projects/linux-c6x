@@ -119,7 +119,7 @@ struct qm_host_desc {
 	/* Optional protocol specific data */
 	u32	ps_data;
 	/* SW data */
-	u32     private;
+	u32     private[6];
 };
 
 /* 

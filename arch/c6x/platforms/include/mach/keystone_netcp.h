@@ -18,23 +18,9 @@
 
 #include <linux/netdevice.h>
 #include <linux/io.h>
+#include <mach/keystone_pa.h>
 
 #define MAX_SIZE_STREAM_BUFFER		        1520
-
-#define DEVICE_PA_CDMA_BASE			0x02004000
-#define DEVICE_PA_CDMA_SIZE			0x1400
-#define DEVICE_PA_CDMA_GLOBAL_CFG_OFFSET	0x0000
-#define DEVICE_PA_CDMA_TX_CHAN_CFG_OFFSET	0x0400
-#define DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET	0x0800
-#define DEVICE_PA_CDMA_TX_SCH_CFG_OFFSET	0x0C00
-#define DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET	0x1000
-
-#define DEVICE_PA_CDMA_RX_FIRST_CHANNEL 	0
-#define DEVICE_PA_CDMA_RX_NUM_CHANNELS		24
-#define DEVICE_PA_CDMA_RX_FIRST_FLOW 	        0
-#define DEVICE_PA_CDMA_RX_NUM_FLOWS		1
-#define DEVICE_PA_CDMA_TX_FIRST_CHANNEL 	0
-#define DEVICE_PA_CDMA_TX_NUM_CHANNELS		9
 
 #define DEVICE_EMACSL_BASE			0x02090900
 #define DEVICE_EMACSL_PORT(x)			((x) * 0x040)
@@ -56,7 +42,8 @@ struct netcp_platform_data {
 	unsigned int tx_irq;
 
 	/* PA PDSP */
-	struct pdsp_platform_data pa_pdsp;
+	unsigned int pa_pdsp_num;
+	struct pdsp_platform_data pa_pdsp[DEVICE_PA_NUM_PDSPS];
 
 	/* PHY and SGMII indexes */
 	unsigned int sgmii_port;
@@ -91,11 +78,6 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 	return 0;
 }
 #endif
-
-/*
- * Firmware 
- */
-#define DEVICE_PA_PDSP_FIRMWARE "keystone-pdsp/pa_pdsp_default.fw"
 
 /*
  * Configure the streaming switch

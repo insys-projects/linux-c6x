@@ -65,7 +65,7 @@
 #define DEVICE_QM_NUM_MEMREGIONS	20
 
 /* The driver supports only a single descriptor size */
-#define DEVICE_QM_DESC_SIZE_BYTES       64 
+#define DEVICE_QM_DESC_SIZE_BYTES       128
 #define DEVICE_QM_NUM_DESCS             512 /* total number of queue descriptors */
 #define DEVICE_QM_DESC_RAM_SIZE         (DEVICE_QM_DESC_SIZE_BYTES * DEVICE_QM_NUM_DESCS)
 
@@ -166,8 +166,6 @@
 #define DEVICE_QM_LOW_PRIO_Q            0
 #define DEVICE_QM_AIF_Q                 512
 #define DEVICE_QM_PA_Q		        640
-#define DEVICE_QM_PA_CFG_Q		640 /* PA configuration queue */
-#define DEVICE_QM_PA_TX_Q               648 /* PA transmit queue */
 #define DEVICE_QM_INTC_Q                652
 #define DEVICE_QM_SRIO_Q                672
 #define DEVICE_QM_FFTC_A_Q              688
@@ -210,11 +208,21 @@
 /* Generic free queue */
 #define DEVICE_QM_FREE_Q		910 /* Free buffer desc queue */
 
+/* PA queues */
+#define DEVICE_QM_PA_TX_PDSP0_Q         (DEVICE_QM_PA_Q + 0)
+#define DEVICE_QM_PA_TX_PDSP1_Q         (DEVICE_QM_PA_Q + 1)
+#define DEVICE_QM_PA_TX_PDSP2_Q         (DEVICE_QM_PA_Q + 2)
+#define DEVICE_QM_PA_TX_PDSP3_Q         (DEVICE_QM_PA_Q + 3)
+#define DEVICE_QM_PA_TX_PDSP4_Q         (DEVICE_QM_PA_Q + 4)
+#define DEVICE_QM_PA_TX_PDSP5_Q         (DEVICE_QM_PA_Q + 5)
+#define DEVICE_QM_PA_TX_ETH_Q           (DEVICE_QM_PA_Q + 8)
+#define DEVICE_QM_PA_CMD_TX_CP_Q        4002
+
 /* Ethernet (NetCP) queues */
 #define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
-#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                              /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                                    /* Ethernet Rx free desc queue */
 #define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_Q                                   /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q          /* Ethernet Tx queue (for PA) */
 #define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL) /* Ethernet Tx completion queue (filled by PA) */
 
 /* RapidIO queues */
@@ -280,9 +288,9 @@ struct qmss_platform_data {
  */
 #include <asm/byteorder.h>
 #ifdef CONFIG_CPU_BIG_ENDIAN
-#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_be.fw"
+#define DEVICE_QM_PDSP_FIRMWARE "keystone/qmss_pdsp_acc48_be_1_0_2_0.fw"
 #else
-#define DEVICE_QM_PDSP_FIRMWARE "keystone-pdsp/qmss_pdsp_acc48_le.fw"
+#define DEVICE_QM_PDSP_FIRMWARE "keystone/qmss_pdsp_acc48_le_1_0_2_0.fw"
 #endif
 
 /*

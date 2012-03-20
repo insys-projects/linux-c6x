@@ -125,9 +125,12 @@ fw-shipped- += keyspan/mpr.fw keyspan/usa18x.fw keyspan/usa19.fw	\
 	keyspan/usa28.fw keyspan/usa28xa.fw keyspan/usa28xb.fw		\
 	keyspan/usa28x.fw keyspan/usa49w.fw keyspan/usa49wlc.fw
 endif
-fw-shipped-$(CONFIG_TI_KEYSTONE) += keystone-pdsp/pa_pdsp_default.fw \
-				    keystone-pdsp/qmss_pdsp_acc48_be.fw \
-				    keystone-pdsp/qmss_pdsp_acc48_le.fw
+fw-shipped-$(CONFIG_TI_KEYSTONE) += keystone/pa_pdsp02_1_0_2_1.fw \
+                                    keystone/pa_pdsp3_1_0_2_1.fw \
+                                    keystone/pa_pdsp45_1_0_2_1.fw \
+                                    keystone/qmss_pdsp_acc48_le_1_0_2_0.fw \
+                                    keystone/qmss_pdsp_acc48_be_1_0_2_0.fw
+
 fw-shipped-$(CONFIG_USB_SERIAL_TI) += ti_3410.fw ti_5052.fw \
 				      mts_cdma.fw mts_gsm.fw mts_edge.fw
 fw-shipped-$(CONFIG_USB_SERIAL_EDGEPORT) += edgeport/boot.fw edgeport/boot2.fw \
