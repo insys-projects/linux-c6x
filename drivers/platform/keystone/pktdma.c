@@ -44,7 +44,7 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 	u32 done;
 	int ret = 0;
 
-	for (c = cfg->rx_chan; c < cfg->n_rx_chans; c++) {
+	for (c = cfg->rx_chan; c < (cfg->rx_chan + cfg->n_rx_chans); c++) {
 		/* If enabled, set the teardown bit */
 		v = pktdma_read_reg(cfg->base_addr,
 				    cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
@@ -74,8 +74,8 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 		}
 	}
 
-	/* Clear all of the flow registers */
-	for (f = cfg->rx_flow; f < cfg->n_rx_flows; f++)  {
+	/* Clear flow registers */
+	for (f = cfg->rx_flow; f < (cfg->rx_flow + cfg->n_rx_flows); f++)  {
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_A, f));
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_B, f));
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_C, f));
@@ -85,6 +85,9 @@ int pktdma_rx_disable(struct pktdma_rx_cfg *cfg)
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_G, f));
 		pktdma_write_reg(0, cfg->base_addr, cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_H, f));
 	}
+
+	if (ret < 0)
+		printk(KERN_ERR "%s: Cannot disable Rx channel\n", __FUNCTION__);
 
 	return ret;
 }
@@ -96,7 +99,7 @@ int pktdma_tx_disable(struct pktdma_tx_cfg *cfg)
 {
 	u32 i, v;
 
-	for (i = cfg->tx_chan; i < cfg->n_tx_chans; i++) {
+	for (i = cfg->tx_chan; i < (cfg->tx_chan + cfg->n_tx_chans); i++) {
 		v = pktdma_read_reg(cfg->base_addr,
 				    cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(i));
 		
@@ -153,9 +156,9 @@ void pktdma_flow_config(struct pktdma_rx_cfg *cfg,
 
 	pktdma_write_reg(v, cfg->base_addr,
 			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_D, flow));
-	
-	/* Register E uses the same setup as D */
-	pktdma_write_reg(v, cfg->base_addr,
+
+	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_E_DEFAULT,
+			 cfg->base_addr,
 			 cfg->flow_base_offset + PKTDMA_RX_FLOW_CFG(PKTDMA_RX_FLOW_REG_E, flow));
 	
 	pktdma_write_reg(PKTDMA_REG_VAL_RX_FLOW_F_DEFAULT,
@@ -209,17 +212,18 @@ int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
 	}
 	
 	/* Configue rx flows */
-	for (f = cfg->rx_flow, i = 0; f < cfg->n_rx_flows; f++, i++)  {
+	for (f = cfg->rx_flow, i = 0; f < (cfg->rx_flow + cfg->n_rx_flows); f++, i++)  {
 		pktdma_flow_config(cfg, f,
 				   cfg->queue_rx[i],
 				   cfg->queue_free_buf[i]);
 	}
-
+	
 	/* Enable the rx channels */
-	for (c = cfg->rx_chan; c < cfg->n_rx_chans; c++) 
+	for (c = cfg->rx_chan; c < (cfg->rx_chan + cfg->n_rx_chans); c++) {
 		pktdma_write_reg(PKTDMA_REG_VAL_RCHAN_A_RX_ENABLE,
 				 cfg->base_addr,
 				 cfg->rx_base_offset + PKTDMA_REG_RCHAN_CFG_REG_A(c));
+	}
 
 	return ret;
 }
@@ -230,7 +234,7 @@ int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
 int pktdma_tx_config(struct pktdma_tx_cfg *cfg)
 {
 	struct qm_acc_cmd_config acc_cmd_cfg;
-	u32                      i;
+	u32                      c;
 	int                      ret;
 
 	if (cfg->use_acc) {
@@ -265,12 +269,12 @@ int pktdma_tx_config(struct pktdma_tx_cfg *cfg)
 			 cfg->gbl_ctl_base_offset + PKTDMA_REG_EMU_CTL);
 
 	/* Enable all channels. The current state isn't important */
-	for (i = cfg->tx_chan; i < cfg->n_tx_chans; i++) {
+	for (c = cfg->tx_chan; c < (cfg->tx_chan + cfg->n_tx_chans); c++) {
 		pktdma_write_reg(0, cfg->base_addr,
-				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_B(i));  /* Priority */
+				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_B(c));  /* Priority */
 		pktdma_write_reg(PKTDMA_REG_VAL_TCHAN_A_TX_ENABLE,
 				 cfg->base_addr,
-				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(i));
+				 cfg->tx_base_offset + PKTDMA_REG_TCHAN_CFG_REG_A(c));
 	}
 	
 	return 0;
