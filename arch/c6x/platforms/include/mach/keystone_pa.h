@@ -80,7 +80,8 @@
 #define DEVICE_PA_CDMA_RX_NUM_CHANNELS		24
 #define DEVICE_PA_CDMA_RX_FIRST_FLOW 	        0
 #define DEVICE_PA_CDMA_RX_NUM_FLOWS		32
-#define DEVICE_PA_CDMA_RX_FIRMWARE_FLOW         31 /* Rx flow used by the firmware */
+#define DEVICE_PA_CDMA_RX_ETH_FLOW              30 /* Rx flow used for Ethernet */
+#define DEVICE_PA_CDMA_RX_FIRMWARE_FLOW         31 /* Rx flow used for PA commands */
 
 /* Firmware */
 #define DEVICE_PA_PDSP_FIRMWARE_012             "keystone/pa_pdsp02_1_0_2_1.fw"

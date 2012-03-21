@@ -1137,10 +1137,10 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
 	rx_cfg->rx_base_offset   = DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET;
 	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
-	rx_cfg->n_rx_chans       = 1;
+	rx_cfg->n_rx_chans       = 2;
 	rx_cfg->flow_base_offset = DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET;
-	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRMWARE_FLOW;
-	rx_cfg->n_rx_flows       = 1; 
+	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_ETH_FLOW;
+	rx_cfg->n_rx_flows       = 2; /* One for Ethernet, one for PA command */
 	rx_cfg->qmnum_free_buf   = 0;
 	rx_cfg->queue_free_buf   = &queue_free_buf[0];
 	rx_cfg->qmnum_rx         = 0;
@@ -1153,8 +1153,13 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->acc_threshold    = DEVICE_RX_INT_THRESHOLD;
 	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
 
+	/* Queues used for Ethernet */
 	queue_free_buf[0]        = DEVICE_QM_ETH_RX_FREE_Q;
 	queue_rx[0]              = DEVICE_QM_ETH_RX_Q;
+
+	/* Queues used for PA commands */
+	queue_free_buf[1]        = DEVICE_QM_PA_CMD_FREE_Q;
+	queue_rx[1]              = DEVICE_QM_PA_CMD_CP_Q;
 
 	/* Set the accumulator list memory in the descriptor memory */
 	acc_list_num_rx = ((rx_cfg->acc_threshold + 1) * 2);

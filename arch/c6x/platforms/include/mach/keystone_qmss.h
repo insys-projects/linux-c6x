@@ -216,13 +216,14 @@
 #define DEVICE_QM_PA_TX_PDSP4_Q         (DEVICE_QM_PA_Q + 4)
 #define DEVICE_QM_PA_TX_PDSP5_Q         (DEVICE_QM_PA_Q + 5)
 #define DEVICE_QM_PA_TX_ETH_Q           (DEVICE_QM_PA_Q + 8)
-#define DEVICE_QM_PA_CMD_TX_CP_Q        4002
+#define DEVICE_QM_PA_CMD_FREE_Q         4001
+#define DEVICE_QM_PA_CMD_CP_Q           4002
 
 /* Ethernet (NetCP) queues */
 #define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
-#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                                    /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                              /* Ethernet Rx free desc queue */
 #define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q          /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q                               /* Ethernet Tx queue (for PA) */
 #define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL) /* Ethernet Tx completion queue (filled by PA) */
 
 /* RapidIO queues */
