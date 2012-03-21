@@ -144,8 +144,8 @@ int evm_phy_init(void)
 		/* Configure the SGMII */
 		sgmii_init();
 		
-		/* Enable port 0 with max pkt size to 9000 */
-		cpsw_config(CPSW_CTL_P0_ENABLE, 9000);
+		/* Enable port 0 with max pkt size to 9504 */
+		cpsw_config(CPSW_CTL_P0_ENABLE, 9504);
 	}
 
 	return 0;
