@@ -638,7 +638,7 @@ static int master_coreid_setup(char *str)
 
 	return 1;
 }
-__setup("master_core=", master_coreid_setup);
+__setup("master-core=", master_coreid_setup);
 
 int get_master_coreid(void)
 {
