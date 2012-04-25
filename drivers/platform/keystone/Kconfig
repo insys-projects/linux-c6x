@@ -45,4 +45,9 @@ config TI_KEYSTONE_RAPIDIO
 	help
 	  This driver supports TI's Keystone RapidIO.
 
+config TI_KEYSTONE_PCIE
+	tristate "TI Keystone TI's PCIe support"
+	help
+	  This driver supports TI's Keystone PCIe (root complex).
+
 endif
