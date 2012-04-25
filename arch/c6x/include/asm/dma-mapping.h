@@ -58,6 +58,11 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
 	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
 }
 
+static inline int dma_set_mask(struct device *dev, u64 mask)
+{
+	return 0;
+}
+
 static inline int dma_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 			     enum dma_data_direction direction)
 {

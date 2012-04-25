@@ -167,5 +167,10 @@ static inline void ioport_unmap(void __iomem *p)
 {
 }
 
+struct pci_dev;
+
+extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen);
+extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+
 #endif /* __KERNEL__ */
 #endif /* __ASM_C6X_IO_H */

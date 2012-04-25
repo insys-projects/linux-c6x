@@ -11,6 +11,7 @@ config TMS320C6X
 	select HAVE_KERNEL_BZIP2
 	select HAVE_KERNEL_LZMA
 	select ARCH_REQUIRE_GPIOLIB
+	select ARCH_SUPPORTS_MSI
 
 config MMU
 	def_bool n
@@ -293,8 +294,13 @@ menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
 config PCI
 	bool "PCI support"
+	depends on TI_KEYSTONE_PCIE
+	default y
 	help
 	  Support for PCI bus.
+
+source "drivers/pci/Kconfig"
+
 endmenu
 
 menu "Executable file formats"

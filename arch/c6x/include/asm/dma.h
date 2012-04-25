@@ -22,4 +22,10 @@ extern int request_dma(unsigned int dmanr, const char * device_id);
 /* Release it again */
 extern void free_dma(unsigned int dmanr);
 
+#ifdef CONFIG_PCI
+extern int isa_dma_bridge_buggy;
+#else
+#define isa_dma_bridge_buggy    (0)
+#endif
+
 #endif /* __ASM_C6X_DMA_H */
