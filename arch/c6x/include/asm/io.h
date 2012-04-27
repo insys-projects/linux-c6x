@@ -33,36 +33,109 @@ static inline unsigned long __readl(volatile unsigned int *addr) { return (*addr
 #define writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
 #define writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
 
-static inline unsigned char get_user_byte_io(volatile const char * addr)
-{
-	register unsigned char _v;
+/*
+ * traditional input/output functions (got from include/asm-generic/io.h)
+ */
 
-	_v = *addr;
-	return _v;
+static inline u8 inb(unsigned long addr)
+{
+	return readb((volatile void __iomem *) addr);
 }
 
-#define inb_p(addr) get_user_byte_io((volatile char *)(addr))
-#define inb(addr)   get_user_byte_io((volatile char *)(addr))
-
-static inline void put_user_byte_io(char val,volatile char *addr)
+static inline u16 inw(unsigned long addr)
 {
-	*addr = val;
+	return readw((volatile void __iomem *) addr);
 }
-#define outb_p(x,addr) put_user_byte_io((x),(volatile char *)(addr))
-#define outb(x,addr)   put_user_byte_io((x),(volatile char *)(addr))
 
-#define in_le16(addr) \
-    ({ unsigned short __v = le16_to_cpu(*(volatile unsigned short *) (addr)); __v; })
-#define in_le32(addr) \
-    ({ unsigned int __v = le32_to_cpu(*(volatile unsigned int *) (addr)); __v; })
-#define out_le16(addr,w) (void)((*(volatile unsigned short *) (addr)) = cpu_to_le16(w))
-#define out_le32(addr,l) (void)((*(volatile unsigned int *) (addr)) = cpu_to_le32(l))
+static inline u32 inl(unsigned long addr)
+{
+	return readl((volatile void __iomem *) addr);
+}
 
-#define inw(port)        in_le16(port)
-#define inl(port)        in_le32(port)
+static inline void outb(u8 b, unsigned long addr)
+{
+	writeb(b, (volatile void __iomem *) addr);
+}
 
-#define outw(val,port)   out_le16((port),(val))
-#define outl(val,port)   out_le32((port),(val))
+static inline void outw(u16 b, unsigned long addr)
+{
+	writew(b, (volatile void __iomem *) addr);
+}
+
+static inline void outl(u32 b, unsigned long addr)
+{
+	writel(b, (volatile void __iomem *) addr);
+}
+
+#define inb_p(addr)	inb(addr)
+#define inw_p(addr)	inw(addr)
+#define inl_p(addr)	inl(addr)
+#define outb_p(x, addr)	outb((x), (addr))
+#define outw_p(x, addr)	outw((x), (addr))
+#define outl_p(x, addr)	outl((x), (addr))
+
+static inline void insb(unsigned long addr, void *buffer, int count)
+{
+	if (count) {
+		u8 *buf = buffer;
+		do {
+			u8 x = inb(addr);
+			*buf++ = x;
+		} while (--count);
+	}
+}
+
+static inline void insw(unsigned long addr, void *buffer, int count)
+{
+	if (count) {
+		u16 *buf = buffer;
+		do {
+			u16 x = inw(addr);
+			*buf++ = x;
+		} while (--count);
+	}
+}
+
+static inline void insl(unsigned long addr, void *buffer, int count)
+{
+	if (count) {
+		u32 *buf = buffer;
+		do {
+			u32 x = inl(addr);
+			*buf++ = x;
+		} while (--count);
+	}
+}
+
+static inline void outsb(unsigned long addr, const void *buffer, int count)
+{
+	if (count) {
+		const u8 *buf = buffer;
+		do {
+			outb(*buf++, addr);
+		} while (--count);
+	}
+}
+
+static inline void outsw(unsigned long addr, const void *buffer, int count)
+{
+	if (count) {
+		const u16 *buf = buffer;
+		do {
+			outw(*buf++, addr);
+		} while (--count);
+	}
+}
+
+static inline void outsl(unsigned long addr, const void *buffer, int count)
+{
+	if (count) {
+		const u32 *buf = buffer;
+		do {
+			outl(*buf++, addr);
+		} while (--count);
+	}
+}
 
 #define ioread8(addr)		readb(addr)
 #define ioread16(addr)		readw(addr)
