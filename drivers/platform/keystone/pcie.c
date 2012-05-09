@@ -77,6 +77,7 @@ static DEFINE_SPINLOCK(keystone_pci_io_lock);
 #define CFG_SETUP			0x008
 #define IOBASE				0x00c
 #define OB_SIZE				0x030
+#define IRQ_EOI                         0x050
 #define MSI_IRQ				0x054
 #define OB_OFFSET_INDEX(n)		(0x200 + (8 * n))     /* 32 Registers */
 #define OB_OFFSET_HI(n)			(0x204 + (8 * n))     /* 32 Registers */
@@ -140,23 +141,12 @@ static DEFINE_SPINLOCK(keystone_pci_io_lock);
 /* Maximum MSIs supported by PCIESS */
 #define CFG_MAX_MSI_NUM		        32
 
-#define IB_BUFFER_DEFAULT_SIZE	        SZ_32K
-#define IB_BUFFER_ALIGN_SIZE	        0x100
-#define IB_BUFFER_ALIGN_MASK	        (IB_BUFFER_ALIGN_SIZE - 1)
+#define IRQ_INTA_NUM                    0
+#define IRQ_MSI0_NUM                    4
+#define IRQ_ERR_NUM                     12
+#define IRQ_PM_NUM                      13
 
-volatile u32 *ib_buffer = 0;
-
-int pcie_get_inbound_buffer(void **buffer, u32 *size)
-{
-	if (buffer) 
-		*buffer = (void *)ib_buffer;
-	
-	if (size)
-		*size = IB_BUFFER_DEFAULT_SIZE;
-	
-	return 0;
-}
-EXPORT_SYMBOL(pcie_get_inbound_buffer);
+volatile u32 *__ib_buffer = 0;
 
 void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
 {
@@ -271,27 +261,6 @@ static void disable_bars(void)
 	clear_dbi_mode();
 }
 
-static u32 *alloc_inbound_buffer(u32 len)
-{
-	u32 align_sz;
-	u32 *b = 0;
-	
-	/* 256B may be wasted here due to alignment requirement */
-	align_sz = L1_CACHE_ALIGN(len) + IB_BUFFER_ALIGN_SIZE;
-	b = (u32*)kzalloc(align_sz, GFP_KERNEL);
-	if (b) {
-		if((u32)b & IB_BUFFER_ALIGN_MASK) {
-			/* buffer pointer is not aligned on 256B boundary, 
-			   move to next 256B boundary */
-			b = (u32 *)(((u32)b & ~IB_BUFFER_ALIGN_SIZE) + IB_BUFFER_ALIGN_SIZE);
-		}
-	} else {
-		pr_err(DRIVER_NAME ": Inbound buffer allocation FAILED, align_sz=%d\n", align_sz);
-	}
-	
-	return b;
-}
-
 /**
  * set_inbound_trans() - Setup inbound access
  *
@@ -311,7 +280,6 @@ static void set_inbound_trans(void)
 	
 	/* Enable BAR0 */
 	__raw_writel(1,         reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_0);
-	
 	__raw_writel(SZ_4K - 1, reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_0);
 	
 	clear_dbi_mode();
@@ -340,8 +308,7 @@ static void set_inbound_trans(void)
 		__raw_writel(0,        reg_virt + IB_START0_HI);
 		__raw_writel(1,        reg_virt + IB_BAR0);
 
-		ib_buffer = alloc_inbound_buffer(IB_BUFFER_DEFAULT_SIZE);
-		__raw_writel((u32)ib_buffer, reg_virt + IB_OFFSET0);
+		__raw_writel((u32)ram_base, reg_virt + IB_OFFSET0);
 
 		/*
 		 * Set BAR1 mask to accomodate inbound window
@@ -403,7 +370,8 @@ static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 		generic_handle_irq(msi_irq_base + bit);
 		status = __raw_readl(reg_virt + MSI0_IRQ_STATUS);
 	}
-	
+	__raw_writel(IRQ_MSI0_NUM, reg_virt + IRQ_EOI);
+
 	desc->chip->unmask(irq);
 }
 
@@ -491,22 +459,22 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
 	} else {
 		irq = msi_irq_base + ret;
 		msg.data = ret;
-
+		
 		dynamic_irq_init(irq);
 		ret = set_irq_msi(irq, desc);
-
+		
 		if (!ret) {
 			msg.address_hi = 0;
 			msg.address_lo = reg_phys + MSI_IRQ;
 
 			pr_debug(DRIVER_NAME ": MSI %d @%#x:%#x, irq = %d\n",
-					msg.data, msg.address_hi,
-					msg.address_lo, irq);
-
+				 msg.data, msg.address_hi,
+				 msg.address_lo, irq);
+			
 			write_msi_msg(irq, &msg);
-
+			
 			set_irq_chip_and_handler(irq, &keystone_msi_chip,
-						handle_level_irq);
+						 handle_level_irq);
 			set_irq_flags(irq, IRQF_VALID);
 		}
 	}
