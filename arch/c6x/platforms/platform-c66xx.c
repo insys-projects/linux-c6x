@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2011 Texas Instruments Incorporated
+ *  Copyright (C) 2011, 2012 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -320,6 +320,97 @@ static int __init setup_netcp(void)
 
 core_initcall(setup_netcp);
 #endif /* CONFIG_TI_KEYSTONE_NETCP */
+
+#if defined(CONFIG_PCI)
+/*
+ * Configure PCIe
+ */
+#include <mach/pci.h>
+
+static struct keystone_pcie_data c6x_pcie_data = {
+	.msi_irq_base	= MSI_IRQ_BASE,
+	.msi_irq_num	= MSI_NR_IRQS,
+};
+
+static struct resource c6x_pcie_resources[] = {
+	{
+		/* Register space */
+		.name		= "pcie-regs",
+		.start		= C6X_PCIE_REG_BASE,
+		.end		= C6X_PCIE_REG_BASE + SZ_16K - 1,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		/* Non-prefetch memory */
+		.name		= "pcie-nonprefetch",
+		.start		= C6X_PCIE_MEM_BASE,
+		.end		= C6X_PCIE_MEM_BASE + SZ_256M - 1,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		/* IO window */
+		.name		= "pcie-io",
+		.start		= C6X_PCIE_IO_BASE,
+		.end		= C6X_PCIE_IO_BASE + SZ_16K - 1,
+		.flags		= IORESOURCE_IO,
+	},
+	{
+		/* Inbound memory window */
+	    .name		= "pcie-inbound0",
+		.start		= PLAT_PHYS_OFFSET,
+		.end		= PLAT_PHYS_OFFSET + SZ_512M - 1,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		/* Legacy Interrupt */
+		.name		= "legacy_int",
+		.start		= IRQ_PCIEINTA,
+		.end		= IRQ_PCIEINTA,
+		.flags		= IORESOURCE_IRQ,
+	},
+#ifdef CONFIG_PCI_MSI
+	{
+		/* MSI Interrupt Line */
+		.name		= "msi_int",
+		.start		= IRQ_PCIEMSI0,
+		.end		= IRQ_PCIEMSI0,
+		.flags		= IORESOURCE_IRQ,
+	},
+#endif
+};
+
+static struct platform_device c6x_pcie_device = {
+	.name		= "keystone-pcie",
+	.id		= 0,
+	.dev		= {
+	.platform_data	= &c6x_pcie_data,
+	},
+	.num_resources	= ARRAY_SIZE(c6x_pcie_resources),
+	.resource	= c6x_pcie_resources,
+};
+
+__init int c6x_init_pcie(void)
+{
+	/* Set PCIe as RC */
+	dscr_set_reg(DSCR_DEVSTAT, 
+		     ((dscr_get_reg(DSCR_DEVSTAT) & ~C6X_PCIE_DEVTYPE_MASK) | 
+		      C6X_PCIE_DEVTYPE_RC));
+	
+	/*
+	 * Disable caching of the PCIe outbound non-prefetch region as 
+	 * ioremap_nocache() does not uncache region on C6x (due to the lack
+	 * of per page cacheability attribute).
+	 */
+	disable_caching((u32 *) C6X_PCIE_MEM_BASE,
+			(u32*) (C6X_PCIE_MEM_BASE + SZ_256M - 1));
+
+	platform_device_register(&c6x_pcie_device);
+
+	return 0;
+}
+
+core_initcall(c6x_init_pcie);
+#endif /* CONFIG_PCI */
 
 void c6x_soc_setup_arch(void)
 {

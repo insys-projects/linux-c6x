@@ -262,7 +262,7 @@
 #define IRQ_VPMINVDD         (IRQ_CPINTC0_START + 144)
 #define IRQ_VPINIDLE         (IRQ_CPINTC0_START + 145)
 #define IRQ_VPOPPCDONE       (IRQ_CPINTC0_START + 146)
-#define IRQ_UART             (IRQ_CPINTC0_START + 148) /* UART */
+#define IRQ_UARTINT          (IRQ_CPINTC0_START + 148) /* UART */
 #define IRQ_UARTREVT         (IRQ_CPINTC0_START + 149)
 #define IRQ_UARTXEVT         (IRQ_CPINTC0_START + 150)
 #define IRQ_QMPEND17         (IRQ_CPINTC0_START + 151)  /* QM SS PASS */
@@ -293,7 +293,8 @@
 #define IRQ_CPINTC_LEVEL_IRQS { IRQ_QMPEND12, IRQ_QMPEND13, IRQ_QMPEND14, IRQ_QMPEND15, \
 	                        IRQ_QMPEND16, IRQ_QMPEND17, IRQ_QMPEND18, IRQ_QMPEND19, \
 	                        IRQ_QMPEND20, IRQ_QMPEND21, IRQ_QMPEND22, IRQ_QMPEND23, \
-                          	IRQ_QMPEND24, IRQ_QMPEND25 }
+                        	IRQ_QMPEND24, IRQ_QMPEND25, IRQ_PCIEINTA, IRQ_PCIEINTB, \
+	                        IRQ_PCIEINTC, IRQ_PCIEINTD }
 
 extern int cpintc_irq(unsigned int irq);
 extern int cpintc_combined_irq(unsigned int irq);

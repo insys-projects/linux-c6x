@@ -686,7 +686,7 @@ static struct plat_serial8250_port serial8250_platform_data [] = {
         {
                 .membase  = (void *) UART_BASE_ADDR,
                 .mapbase  = UART_BASE_ADDR,
-                .irq      = IRQ_UART,
+                .irq      = IRQ_UARTINT,
                 .flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
                 .iotype   = UPIO_MEM32,
                 .regshift = 2,
@@ -813,84 +813,6 @@ static int __init evm_init_rio(void)
 
 core_initcall(evm_init_rio);
 #endif /* CONFIG_TI_KEYSTONE_RAPIDIO */
-
-#if defined(CONFIG_PCI)
-#include <mach/pci.h>
-
-static struct keystone_pcie_data c6x_pcie_data = {
-	.msi_irq_base	= MSI_IRQ_BASE,
-	.msi_irq_num	= MSI_NR_IRQS,
-};
-
-static struct resource c6x_pcie_resources[] = {
-	{
-		/* Register space */
-		.name		= "pcie-regs",
-		.start		= C6X_PCIE_REG_BASE,
-		.end		= C6X_PCIE_REG_BASE + SZ_16K - 1,
-		.flags		= IORESOURCE_MEM,
-	},
-	{
-		/* Non-prefetch memory */
-		.name		= "pcie-nonprefetch",
-		.start		= C6X_PCIE_MEM_BASE,
-		.end		= C6X_PCIE_MEM_BASE + SZ_256M - 1,
-		.flags		= IORESOURCE_MEM,
-	},
-	{
-		/* IO window */
-		.name		= "pcie-io",
-		.start		= C6X_PCIE_IO_BASE,
-		.end		= C6X_PCIE_IO_BASE + SZ_16K - 1,
-		.flags		= IORESOURCE_IO,
-	},
-	{
-		/* Inbound memory window */
-		.name		= "pcie-inbound0",
-		.start		= PLAT_PHYS_OFFSET,
-		.end		= PLAT_PHYS_OFFSET + SZ_512M - 1,
-		.flags		= IORESOURCE_MEM,
-	},
-	{
-		/* Legacy Interrupt */
-		.name		= "legacy_int",
-		.start		= IRQ_PCIEINTA,
-		.end		= IRQ_PCIEINTA,
-		.flags		= IORESOURCE_IRQ,
-	},
-#ifdef CONFIG_PCI_MSI
-	{
-		/* MSI Interrupt Line */
-		.name		= "msi_int",
-		.start		= IRQ_PCIEINTB,
-		.end		= IRQ_PCIEINTB,
-		.flags		= IORESOURCE_IRQ,
-	},
-#endif
-};
-
-static struct platform_device c6x_pcie_device = {
-	.name		= "keystone-pcie",
-	.id		= 0,
-	.dev		= {
-	.platform_data	= &c6x_pcie_data,
-	},
-	.num_resources	= ARRAY_SIZE(c6x_pcie_resources),
-	.resource	= c6x_pcie_resources,
-};
-
-__init int c6x_init_pcie(void)
-{
-	dscr_set_reg(DSCR_DEVSTAT, 
-		((dscr_get_reg(DSCR_DEVSTAT) & ~C6X_PCIE_DEVTYPE_MASK) | 
-		  C6X_PCIE_DEVTYPE_RC));
-	platform_device_register(&c6x_pcie_device);
-
-	return 0;
-}
-
-core_initcall(c6x_init_pcie);
-#endif /* CONFIG_PCI */
 
 static void dummy_print_dummy(char *s, unsigned long hex) {}
 static void dummy_progress(unsigned int step, char *s) {}

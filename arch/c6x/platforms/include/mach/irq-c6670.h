@@ -254,7 +254,7 @@
 #define IRQ_TCP3EWEVT        (IRQ_CPINTC0_START + 161)
 #define IRQ_TCP3DBREVT0      (IRQ_CPINTC0_START + 162)
 #define IRQ_TCP3DBREVT1      (IRQ_CPINTC0_START + 163)
-#define IRQ_UART             (IRQ_CPINTC0_START + 164) /* UART */
+#define IRQ_UARTINT          (IRQ_CPINTC0_START + 164) /* UART */
 #define IRQ_UARTREVT         (IRQ_CPINTC0_START + 165)
 #define IRQ_UARTXEVT         (IRQ_CPINTC0_START + 166)
 #define IRQ_MSMCMPF4         (IRQ_CPINTC0_START + 170) /* MSMC */
@@ -302,7 +302,8 @@
  */
 #define IRQ_CPINTC_LEVEL_IRQS { IRQ_QMPEND22, IRQ_QMPEND23, IRQ_QMPEND24, IRQ_QMPEND25, \
 	                        IRQ_QMPEND26, IRQ_QMPEND27, IRQ_QMPEND28, IRQ_QMPEND29, \
-	                        IRQ_QMPEND30, IRQ_QMPEND31 }
+	                        IRQ_QMPEND30, IRQ_QMPEND31, IRQ_PCIEINTA, IRQ_PCIEINTB, \
+	                        IRQ_PCIEINTC, IRQ_PCIEINTD }
 
 extern int cpintc_irq(unsigned int irq);
 extern int cpintc_combined_irq(unsigned int irq);
