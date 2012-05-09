@@ -1,7 +1,7 @@
 /*
- * Platform data for c6x PCIe Root Complex module.
+ * Platform data for C6x PCIe Root Complex module.
  *
- * Copyright (C) 2010 Texas Instruments, Inc. - http://www.ti.com/
+ * Copyright (C) 2010, 2012 Texas Instruments, Inc. - http://www.ti.com/
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -22,11 +22,21 @@ struct keystone_pcie_data {
 	int force_x1;
 };
 
-#define C6X_PCIE_REG_BASE	0x21800000
-#define C6X_PCIE_MEM_BASE	0x70000000
-#define PLAT_PHYS_OFFSET	0x90000000
-#define C6X_PCIE_IO_BASE	C6X_PCIE_REG_BASE
-
+/*
+ * This is the definitions for the PCIe to RC memory mapping.
+ * The current PCIe RC driver is assuming a 1:1 mapping between the RC address
+ * space and the PCI address space.
+ */
+#define C6X_PCIE_REG_BASE	0x21800000   /* PCIe config: this cannot be changed 
+						and this is defined per device family.
+					        This is same for all KeyStone (I) SoC */
+#define C6X_PCIE_MEM_BASE	0x60000000   /* The PCIe data non-prefetched memory */
+#define C6X_PCIE_IO_BASE	0x70000000   /* The PCIe I/O does not use real memory,
+						so can be mapped everywhere in the 
+						address space, we use here a 64MB free
+						segment*/
+#define PLAT_PHYS_OFFSET        RAM_DDR2_CE0 /* This this the start of the physical 
+						DDR memory */
 
 /* C6X CONTROL_PCIE_CFG bits */
 #define C6X_PCIE_DEVTYPE_SHIFT	14
