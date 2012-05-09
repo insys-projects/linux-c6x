@@ -5,9 +5,10 @@
 extra-y	 := head.o vmlinux.lds
 
 obj-y 	 := process.o traps.o irq.o signal.o ptrace.o \
-	    setup.o bios32.o sys_c6x.o time.o \
+	    setup.o sys_c6x.o time.o \
             entry.o vectors.o c6x_ksyms.o tags.o
 
+obj-$(CONFIG_PCI)              += bios32.o
 obj-$(CONFIG_MODULES)          += module.o
 obj-$(CONFIG_COMMON_CLKDEV)    += clkdev.o
 

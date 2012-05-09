@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.34
-# Tue Jan 31 16:07:08 2012
+# Mon Apr 30 10:03:31 2012
 #
 CONFIG_TMS320C6X=y
 # CONFIG_MMU is not set
@@ -248,7 +248,7 @@ CONFIG_HIGH_RES_TIMERS=y
 #
 # Bus options (PCI, PCMCIA, EISA, MCA, ISA)
 #
-# CONFIG_PCI is not set
+CONFIG_ARCH_SUPPORTS_MSI=y
 
 #
 # Executable file formats
@@ -749,6 +749,7 @@ CONFIG_TI_KEYSTONE_PKTDMA=y
 CONFIG_TI_KEYSTONE_CPSW=y
 CONFIG_TI_KEYSTONE_SGMII=y
 CONFIG_TI_KEYSTONE_RAPIDIO=y
+# CONFIG_TI_KEYSTONE_PCIE is not set
 
 #
 # File systems
