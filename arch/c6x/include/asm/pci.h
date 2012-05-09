@@ -3,7 +3,7 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010 Texas Instruments Incorporated
+ *  Copyright (C) 2004, 2009, 2010, 2012 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <aurelien.jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -64,10 +64,6 @@ extern void pcibios_resource_to_bus(struct pci_dev *, struct pci_bus_region *,
 
 extern void pcibios_bus_to_resource(struct pci_dev *dev, struct resource *res,
 				    struct pci_bus_region *region);
-
-/****************************************************** 
-   +++TODO:  ref arch/arm/include/asm/mach/pci.h 
-*******************************************************/
 
 struct pci_sys_data;
 struct pci_bus;
