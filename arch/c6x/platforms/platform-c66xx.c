@@ -404,6 +404,15 @@ __init int c6x_init_pcie(void)
 	disable_caching((u32 *) C6X_PCIE_MEM_BASE,
 			(u32*) (C6X_PCIE_MEM_BASE + SZ_256M - 1));
 
+	disable_caching((u32 *) C6X_PCIE_REG_BASE,
+			(u32*) (C6X_PCIE_REG_BASE + SZ_16K - 1));
+
+	/* Setup SerDes configuration */
+	__raw_writel(C6X_PCIE_SERDES_CFG_VAL, C6X_PCIE_SERDES_CFGPLL);
+
+	/* Wait PLL to lock */
+	while ((__raw_readl(C6X_PCIE_SERDES_STS) & 0x1) != 0x1);
+
 	platform_device_register(&c6x_pcie_device);
 
 	return 0;

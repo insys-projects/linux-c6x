@@ -38,7 +38,14 @@ struct keystone_pcie_data {
 #define PLAT_PHYS_OFFSET        RAM_DDR2_CE0 /* This this the start of the physical 
 						DDR memory */
 
-/* C6X CONTROL_PCIE_CFG bits */
+/* PCIe SerDes registers */
+#define C6X_PCIE_SERDES_CFGPLL  0x02620358
+#define C6X_PCIE_SERDES_STS     0x0262015c
+
+/* Default value for SerDes configuration (PLL = 25x, DIVCLK output) */
+#define C6X_PCIE_SERDES_CFG_VAL (BIT(0) | BIT(8) | (0x64 << 1))
+
+/* C6x CONTROL_PCIE_CFG bits */
 #define C6X_PCIE_DEVTYPE_SHIFT	14
 #define C6X_PCIE_DEVTYPE_MASK	(0x3 << C6X_PCIE_DEVTYPE_SHIFT)
 #define C6X_PCIE_DEVTYPE_RC	(0x2 << C6X_PCIE_DEVTYPE_SHIFT)
