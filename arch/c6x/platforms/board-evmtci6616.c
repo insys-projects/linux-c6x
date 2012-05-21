@@ -634,7 +634,7 @@ static struct plat_serial8250_port serial8250_platform_data [] = {
         {
                 .membase  = (void *) UART_BASE_ADDR,
                 .mapbase  = UART_BASE_ADDR,
-                .irq      = IRQ_UART,
+                .irq      = IRQ_UARTINT,
                 .flags    = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
                 .iotype   = UPIO_MEM32,
                 .regshift = 2,

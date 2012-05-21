@@ -13,3 +13,6 @@ obj-$(CONFIG_TI_KEYSTONE_SGMII)	 += sgmii.o
 
 # RapidIO drivers
 obj-$(CONFIG_TI_KEYSTONE_RAPIDIO) += rio.o
+
+# PCIe drivers
+obj-$(CONFIG_TI_KEYSTONE_PCIE)   += pcie.o
