@@ -217,6 +217,9 @@ static void init_power(void)
 #endif
 #ifdef CONFIG_TI_KEYSTONE_NETCP
 	/* NetCP, PA and SA */
+        set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
+        set_psc_state(2, PSC_PA,     PSC_DISABLE);
+	mdelay(100);
         set_psc_state(2, PSC_PA,     PSC_ENABLE);
         set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
 /*      set_psc_state(2, PSC_SA,     PSC_ENABLE); */
