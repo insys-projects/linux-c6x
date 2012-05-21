@@ -278,7 +278,7 @@ int mac_sl_reset(u16 port)
 /*
  * Configure the mac sliver
  */
-int mac_sl_config(u16 port, struct mac_sliver *cfg)
+int mac_sl_port_config(u16 port, struct mac_sliver *cfg)
 {
 	u32 v, i;
 	int ret = GMACSL_RET_OK;
@@ -304,6 +304,35 @@ int mac_sl_config(u16 port, struct mac_sliver *cfg)
 	return ret;
 }
 
+/* 
+ * Integrated Ethernet switch configuration
+ */
+static int cpsw_config(u32 ctl, u32 max_pkt_size)
+{
+	u32 i;
+
+	/* Max length register */
+	__raw_writel(max_pkt_size, (DEVICE_CPSW_BASE + CPSW_REG_MAXLEN));
+	
+	/* Control register */
+	__raw_writel(ctl, (DEVICE_CPSW_BASE + CPSW_REG_CTL));
+	
+	/* All statistics enabled by default */
+	__raw_writel(CPSW_REG_VAL_STAT_ENABLE_ALL, (DEVICE_CPSW_BASE +
+						    CPSW_REG_STAT_PORT_EN));
+	
+	/* Reset and enable the ALE */
+	__raw_writel(CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE, (DEVICE_CPSW_BASE
+							     + CPSW_REG_ALE_CONTROL));
+
+	/* All ports put into forward mode */
+	for (i = 0; i < CPSW_NUM_PORTS; i++)
+		__raw_writel(CPSW_REG_VAL_PORTCTL_FORWARD_MODE,
+			     (DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
+
+	return 0;
+}
+
 static int cpmac_init(void)
 {
 	mac_sl_base = ioremap(DEVICE_EMACSL_BASE, 0x100);
@@ -321,9 +350,12 @@ static int cpmac_drv_start(void)
 		GMACSL_ENABLE_FULL_DUPLEX | 
 		GMACSL_ENABLE_GIG_MODE;
        
+	/* Enable port 0 with max pkt size to 9504 */
+	cpsw_config(CPSW_CTL_P0_ENABLE, 9504);
+
 	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
 		mac_sl_reset(i);
-		mac_sl_config(i, &cfg);
+		mac_sl_port_config(i, &cfg);
         }
 
 	return 0;

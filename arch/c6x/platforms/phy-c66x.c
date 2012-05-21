@@ -24,11 +24,6 @@
 #include <asm/io.h>
 #include <asm/dscr.h>
 
-#include <mach/keystone_qmss.h>
-#include <mach/keystone_netcp.h>
-#include <mach/keystone_pa.h>
-#include <mach/keystone_cpsw.h>
-
 #include <linux/keystone/sgmii.h>
 
 static int serdes_init(void)
@@ -101,32 +96,6 @@ static int sgmii_init(void)
 	return 0;
 }
 
-static int cpsw_config(u32 ctl, u32 max_pkt_size)
-{
-	u32 i;
-
-	/* Max length register */
-	__raw_writel(max_pkt_size, (DEVICE_CPSW_BASE + CPSW_REG_MAXLEN));
-	
-	/* Control register */
-	__raw_writel(ctl, (DEVICE_CPSW_BASE + CPSW_REG_CTL));
-	
-	/* All statistics enabled by default */
-	__raw_writel(CPSW_REG_VAL_STAT_ENABLE_ALL, (DEVICE_CPSW_BASE +
-						    CPSW_REG_STAT_PORT_EN));
-	
-	/* Reset and enable the ALE */
-	__raw_writel(CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE, (DEVICE_CPSW_BASE
-							     + CPSW_REG_ALE_CONTROL));
-    
-	/* All ports put into forward mode */
-	for (i = 0; i < CPSW_NUM_PORTS; i++)
-		__raw_writel(CPSW_REG_VAL_PORTCTL_FORWARD_MODE,
-			     (DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
-
-	return 0;
-}
-
 int evm_phy_init(void)
 {	
 	if (get_coreid() == get_master_coreid()) {
@@ -143,9 +112,6 @@ int evm_phy_init(void)
 		
 		/* Configure the SGMII */
 		sgmii_init();
-		
-		/* Enable port 0 with max pkt size to 9504 */
-		cpsw_config(CPSW_CTL_P0_ENABLE, 9504);
 	}
 
 	return 0;
