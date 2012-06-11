@@ -152,56 +152,53 @@ static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
 	volatile unsigned int *pdctl;
 	int timeout;
 
-	/* Only core 0 can set PSC */
-	if (get_coreid() == get_master_coreid()) {
-		mdctl  = (volatile unsigned int *) (PSC_MDCTL0 + (id << 2));
-		mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
-		pdctl  = (volatile unsigned int *) (PSC_PDCTL0 + (pd << 2));
-		
-		if (state == PSC_SYNCRESET)
-			return 0; /* not yet supported */
-
-		/* If state is already set, do nothing */
-		if ((*mdstat & 0x1f) == state)
-			return 1;
-
-		/* Wait transition and check if we got timeout error while waiting */
-		timeout = 0;
-		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
-			udelay(1);
-			if (timeout++ > 150) {
-				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
-				return -1;
-			}
-		}
-
-		/* Set power domain control */
-		*pdctl = (*pdctl) | 0x00000001;
-            
-		/* Set MDCTL NEXT to new state */
-		*mdctl = ((*mdctl) & ~(0x1f)) | state;
-			
-		/* Start power transition by setting PTCMD GO to 1 */
-		*(volatile unsigned int *) (PSC_PTCMD) =
-			*(volatile unsigned int *) (PSC_PTCMD) | (0x1 << pd);
-
-		/* Wait for PTSTAT GOSTAT to clear */
-		timeout = 0;
-		while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
-			udelay(1);
-			if (timeout++ > 150) {
-				printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
-				return -1;
-			}
-		}
-
-		/* Verify that state changed */
+	mdctl  = (volatile unsigned int *) (PSC_MDCTL0 + (id << 2));
+	mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
+	pdctl  = (volatile unsigned int *) (PSC_PDCTL0 + (pd << 2));
+	
+	if (state == PSC_SYNCRESET)
+		return 0; /* not yet supported */
+	
+	/* If state is already set, do nothing */
+	if ((*mdstat & 0x1f) == state)
+		return 1;
+	
+	/* Wait transition and check if we got timeout error while waiting */
+	timeout = 0;
+	while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
 		udelay(1);
-		if((*mdstat & 0x1f ) != state) {
-			printk(KERN_DEBUG "PSC: pd %d, id %d state did not change (%d != %d)\n",
-			       pd, id, state, *mdstat);
+		if (timeout++ > 150) {
+			printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
 			return -1;
-		}
+			}
+	}
+	
+	/* Set power domain control */
+	*pdctl = (*pdctl) | 0x00000001;
+        
+	/* Set MDCTL NEXT to new state */
+	*mdctl = ((*mdctl) & ~(0x1f)) | state;
+	
+	/* Start power transition by setting PTCMD GO to 1 */
+	*(volatile unsigned int *) (PSC_PTCMD) =
+		*(volatile unsigned int *) (PSC_PTCMD) | (0x1 << pd);
+	
+	/* Wait for PTSTAT GOSTAT to clear */
+	timeout = 0;
+	while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
+		udelay(1);
+		if (timeout++ > 150) {
+			printk(KERN_DEBUG "PSC: pd %d, id %d timeout\n", pd, id);
+			return -1;
+			}
+	}
+	
+	/* Verify that state changed */
+	udelay(1);
+	if((*mdstat & 0x1f ) != state) {
+		printk(KERN_DEBUG "PSC: pd %d, id %d state did not change (%d != %d)\n",
+		       pd, id, state, *mdstat);
+		return -1;
 	}
 	return 0;
 }
@@ -211,18 +208,28 @@ static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
  */
 static void init_power(void)
 {
+	/* Only master core is allowed to set those global PSC */
+	if (get_coreid() == get_master_coreid()) {
+#if 0
+		/* HyperLink */
+		set_psc_state(5, PSC_HYPERLINK, PSC_ENABLE);
+#endif
+		/* MSMC RAM */
+		set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
+#ifdef CONFIG_TI_KEYSTONE_NETCP
+		/* NetCP, PA and SA */
+		set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
+		set_psc_state(2, PSC_PA,     PSC_DISABLE);
+		mdelay(100);
+		set_psc_state(2, PSC_PA,     PSC_ENABLE);
+		set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
+/*              set_psc_state(2, PSC_SA,     PSC_ENABLE); */
+#endif
+	}
+	
 #if defined(CONFIG_SOC_TMS320C6678) && (defined(CONFIG_SPI) || defined(CONFIG_MTD))
 	/* EMIF16 and SPI (C6678 only) */
 	set_psc_state(0, PSC_EMIF25_SPI, PSC_ENABLE);
-#endif
-#ifdef CONFIG_TI_KEYSTONE_NETCP
-	/* NetCP, PA and SA */
-        set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
-        set_psc_state(2, PSC_PA,     PSC_DISABLE);
-	mdelay(100);
-        set_psc_state(2, PSC_PA,     PSC_ENABLE);
-        set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
-/*      set_psc_state(2, PSC_SA,     PSC_ENABLE); */
 #endif
 #ifdef CONFIG_PCI
 	/* PCIe */
@@ -232,12 +239,6 @@ static void init_power(void)
 	/* sRIO */
         set_psc_state(4, PSC_SRIO, PSC_ENABLE);
 #endif
-#if 0
-	/* HyperLink */
-        set_psc_state(5, PSC_HYPERLINK, PSC_ENABLE);
-#endif
-	/* MSMC RAM */
-        set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
 }
 
 #ifdef CONFIG_TI_KEYSTONE_QM
@@ -457,11 +458,13 @@ void c6x_soc_setup_arch(void)
  	/* Initialize C66x IRQs */          	
 	clear_all_irq(); /* acknowledge all pending irqs */
 
-	/* Unlock DSCR boot config */
-	dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
-	dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
-
-	init_pll();
+	if (get_coreid() == get_master_coreid()) {
+		/* Unlock DSCR boot config */
+		dscr_set_reg(DSCR_KICK0, DSCR_KICK0_KEY);
+		dscr_set_reg(DSCR_KICK1, DSCR_KICK1_KEY);
+		
+		init_pll();
+	}
 
 	init_power();
 
