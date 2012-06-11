@@ -31,7 +31,6 @@
 
 #include <asm/system.h>
 #include <asm/irq.h>
-#include <asm/msmc.h>
 
 #include <mach/keystone_pa.h>
 #include <mach/keystone_qmss.h>
@@ -43,9 +42,9 @@
 #include <linux/keystone/cpsw.h>
 
 #define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
-#define NETCP_DRIVER_VERSION "v1.2"
-#undef NETCP_DEBUG
-#ifdef NETCP_DEBUG
+#define NETCP_DRIVER_VERSION "v1.3"
+#undef NETCP_DEBUG_TRACES
+#ifdef NETCP_DEBUG_TRACES
 #define DPRINTK(fmt, args...) printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
 #else
 #define DPRINTK(fmt, args...)
@@ -84,6 +83,11 @@
 #define MDIO_B_ENABLE                   (1 << 30)
 #define MDIO_B_IDLE                     (1 << 31)
 
+#define rx_free_q()                     (DEVICE_QM_ETH_RX_FREE_Q + netcp_instance())
+/* Accumulator queues are already indexed on instances */
+#define rx_q()                          (DEVICE_QM_ETH_RX_Q)
+#define tx_cp_q()                       (DEVICE_QM_ETH_TX_CP_Q)
+
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
 MODULE_PARM_DESC(rx_packet_max, "maximum receive packet size (bytes)");
@@ -110,13 +114,12 @@ struct netcp_priv {
 	struct clk		       *clk;
 };
 
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 /* The QM accumulator RAM */
+static u32 *acc_list_addr_top;
 static u32 *acc_list_addr_rx;
 static u32 *acc_list_addr_tx;
 static u32 *acc_list_phys_addr_rx;
 static u32 *acc_list_phys_addr_tx;
-#endif
 static u32 netcp_irq_enabled = 0;
 
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
@@ -220,14 +223,14 @@ static void netcp_cleanup_qs(struct net_device *ndev)
 {
 	struct qm_host_desc *hd = NULL;
 
-	while ((hd = hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)) && (hd != NULL))
+	while ((hd = hw_qm_queue_pop(rx_q())) && (hd != NULL))
 		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 }
 
 /*
  * Initialize queues used by the QMSS/PKTDMA
  */
-static void netcp_init_qs(struct net_device *ndev)
+static int netcp_init_qs(struct net_device *ndev)
 {
 	u32 i;
 	struct qm_host_desc *hd;
@@ -237,7 +240,11 @@ static void netcp_init_qs(struct net_device *ndev)
 		skb = netdev_alloc_skb_ip_align(ndev, NETCP_MAX_PACKET_SIZE);
 
 		hd = hw_qm_queue_pop(DEVICE_QM_ETH_FREE_Q);
-
+		if (!hd) {
+			printk(KERN_ERR "%s: Out of descriptor\n", __FUNCTION__);
+			return -1;
+		}
+			
 		hd->buff_len       = skb_tailroom(skb);
 		hd->orig_buff_len  = skb_tailroom(skb);
 		hd->buff_ptr       = (u32)skb->data;
@@ -248,8 +255,9 @@ static void netcp_init_qs(struct net_device *ndev)
 		L2_cache_block_writeback_invalidate((u32) skb->data,
 						    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 
-		hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, rx_free_q(), DEVICE_QM_DESC_SIZE_BYTES);
 	}
+	return 0;
 }
 
 /*
@@ -391,24 +399,20 @@ static inline void netcp_irq_enable(struct net_device *ndev)
 
 static inline void netcp_rx_irq_ack(struct net_device *ndev)
 {
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 	if (netcp_irq_enabled) {
 		/* Ack Rx interrupt */
-		hw_qm_ack_interrupt(QM_REG_INTD_EOI_HIGH_PRIO_INDEX,
-				 DEVICE_QM_ETH_ACC_RX_CHANNEL);
+		hw_qm_ack_interrupt(DEVICE_QM_ETH_INTD_EOI_INDEX ,
+				    DEVICE_QM_ETH_ACC_RX_CHANNEL);
 	}
-#endif
 }
 
 static inline void netcp_tx_irq_ack(struct net_device *ndev)
 {
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 	if (netcp_irq_enabled) {
 		/* Ack Tx interrupt */
-		hw_qm_ack_interrupt(QM_REG_INTD_EOI_HIGH_PRIO_INDEX,
-				 DEVICE_QM_ETH_ACC_TX_CHANNEL);
+		hw_qm_ack_interrupt(DEVICE_QM_ETH_INTD_EOI_INDEX ,
+				    DEVICE_QM_ETH_ACC_TX_CHANNEL);
 	}
-#endif
 }
 
 /*
@@ -419,7 +423,6 @@ static int netcp_tx(struct net_device *ndev)
 	struct qm_host_desc *hd       = NULL;
 	int qm_tx_int_status = 0;
 	int                  released = 0;
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 
@@ -435,12 +438,8 @@ static int netcp_tx(struct net_device *ndev)
 
 	acc_list_p = acc_list;
 
-/* With interrupt support: get the descriptors from the accumulator list */
-#define	NETCP_TX_LOOP_ITERATOR()  ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
-#else
-/* Without interrupt support: get the descriptors directly from the queue */
-#define NETCP_TX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_TX_CP_Q)
-#endif
+/* Get the descriptors from the accumulator list */
+#define	NETCP_TX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
 
 	/* Main loop */
 	while ((hd = NETCP_TX_LOOP_ITERATOR()) && (hd != NULL)) {
@@ -448,8 +447,7 @@ static int netcp_tx(struct net_device *ndev)
 
 		/* Release the attached sk_buff */
 		if (skb) {
-			DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x)\n",
-				skb, hd);
+			DPRINTK("tx packet relaxed (skbuff=0x%x, hd=0x%x, acc_list_p=0%x)\n", skb, hd, acc_list_p);
 			
 			hd->private[5] = 0;
 
@@ -484,7 +482,6 @@ static int netcp_rx(struct net_device *ndev,
 	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 
@@ -500,12 +497,8 @@ static int netcp_rx(struct net_device *ndev,
 
 	acc_list_p = acc_list;
 
-/* With interrupt support: get the descriptors from the accumulator list */
+/* Get the descriptors from the accumulator list */
 #define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
-#else
-/* Without interrupt support: get the descriptors directly from the queue */
-#define NETCP_RX_LOOP_ITERATOR() hw_qm_queue_pop(DEVICE_QM_ETH_RX_Q)
-#endif
 
 	/* Main loop */
 	while ((hd = NETCP_RX_LOOP_ITERATOR()) && (hd != NULL)) {
@@ -515,7 +508,7 @@ static int netcp_rx(struct net_device *ndev,
 
 		pkt_size = QM_DESC_DINFO_GET_PKT_LEN(hd->desc_info);
 		if (unlikely(pkt_size == 0)) {
-			hw_qm_queue_push(hd, DEVICE_QM_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
+			hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 			return 0;
 		}
 
@@ -544,7 +537,7 @@ static int netcp_rx(struct net_device *ndev,
 			L2_cache_block_writeback_invalidate((u32) skb->data,
 							    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 
-			hw_qm_queue_push(hd, DEVICE_QM_ETH_RX_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
+			hw_qm_queue_push(hd, rx_free_q(), DEVICE_QM_DESC_SIZE_BYTES);
 		}
 		
 		/* Fill statistic */
@@ -680,15 +673,15 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	ndev->stats.tx_bytes += pkt_len;
 	ndev->trans_start     = jiffies;
 
-	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x)\n",
-		skb->len, skb, hd);
+	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x), return queue=%d\n",
+		skb->len, skb, hd, tx_cp_q());
 
 	/* Return the descriptor back to the tx completion queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, DEVICE_QM_ETH_TX_CP_Q);
-	
-	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, DEVICE_QM_DESC_SIZE_BYTES);
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, tx_cp_q());
 
+	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, DEVICE_QM_DESC_SIZE_BYTES);
+	
 	return NETDEV_TX_OK;
 }
 
@@ -712,7 +705,8 @@ static int netcp_ndo_open(struct net_device *ndev)
 	struct netcp_priv *p = netdev_priv(ndev);
 	
 	/* Start EMAC */
-	cpmac_drv_start();
+	if (netcp_master())
+		cpmac_drv_start();
 
 	netif_wake_queue(ndev);
 
@@ -745,7 +739,8 @@ static int netcp_ndo_stop(struct net_device *ndev)
 	napi_disable(&p->napi);
 	netif_stop_queue(ndev);
 	
-	cpmac_drv_stop();
+	if (netcp_master())
+		cpmac_drv_stop();
 
 	return 0;
 }
@@ -1078,6 +1073,45 @@ static const struct net_device_ops keystone_netdev_ops = {
 #endif
 };
 
+/*
+ * Configure QMSS accumulator for interrupts 
+ */
+static int netcp_setup_accumulator(u32 queue,
+				   u32 acc_channel,
+				   u32 acc_list_phys_addr,
+				   u8  acc_threshold)
+{
+	struct qm_acc_cmd_config acc_cmd_cfg;
+	int res;
+
+	DPRINTK("accumulator channel %d programmed with queue %d, addr = 0x%x\n",
+		acc_channel, queue, acc_list_phys_addr);
+
+	/*
+	 * Setup accumulator configuration
+	 */
+	acc_cmd_cfg.channel          = acc_channel;
+	acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
+	acc_cmd_cfg.queue_mask       = 0;  /* none */
+	acc_cmd_cfg.list_addr        = acc_list_phys_addr;
+	acc_cmd_cfg.queue_index      = queue; /* first queue */
+	acc_cmd_cfg.max_entries      = acc_threshold + 1;
+	acc_cmd_cfg.timer_count      = 40;
+	acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
+	acc_cmd_cfg.list_entry_size  = 0;  /* D register only */
+	acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
+	acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
+		
+	res = hw_qm_program_accumulator(0, &acc_cmd_cfg);
+		
+	if (res != 0) {
+		printk(KERN_ERR "%s: PKTDMA accumulator config failed (%d)\n",
+		       __FUNCTION__, res);
+		return res;
+	}
+	return 0;
+}
+
 static int __devinit netcp_probe(struct platform_device *pdev)
 {
 	struct netcp_platform_data *data = pdev->dev.platform_data;
@@ -1094,7 +1128,9 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	struct pktdma_tx_cfg	   *tx_cfg = &c_tx_cfg;
 	u32                         acc_list_num_rx;
 	u32                         acc_list_num_tx;
-	u32                         acc_list_size; 
+	u32                         acc_list_off_rx;
+	u32                         acc_list_off_tx;
+	u32                         acc_list_size;
 	u32                         queue_free_buf[DEVICE_PA_CDMA_RX_NUM_FLOWS];
 	u32                         queue_rx[DEVICE_PA_CDMA_RX_NUM_FLOWS];
 
@@ -1142,9 +1178,11 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
 	    config.enetaddr[2] == 0 && config.enetaddr[3] == 0 &&
 	    config.enetaddr[4] == 0 && config.enetaddr[5] == 0) {
-		if (!emac_arch_get_mac_addr(hw_emac_addr))
+		if (!emac_arch_get_mac_addr(hw_emac_addr)) {
 			for (i = 0; i <= 5; i++)
 				config.enetaddr[i] = hw_emac_addr[i] & 0xff;
+			emac_arch_adjust_mac_addr(config.enetaddr, netcp_instance());
+		}
 	}
 #endif
 
@@ -1152,6 +1190,33 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		memcpy(ndev->dev_addr, config.enetaddr, ETH_ALEN);
 	else
 		random_ether_addr(ndev->dev_addr);
+
+	/* Allocate the accumulator list memory in the descriptor memory */
+	acc_list_off_rx = (DEVICE_RX_INT_THRESHOLD + 1) * 2;
+	acc_list_off_tx = (DEVICE_TX_INT_THRESHOLD + 1) * 2;
+	acc_list_num_rx = acc_list_off_rx * DEVICE_NETCP_NUM_INSTANCES;
+	acc_list_num_tx = acc_list_off_tx * DEVICE_NETCP_NUM_INSTANCES;
+	acc_list_size   = (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
+	
+	acc_list_addr_top = (u32*) qm_mem_alloc(acc_list_size,
+						(u32*)&acc_list_phys_addr_rx);
+	if (acc_list_addr_top == NULL) {
+		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
+		       __FUNCTION__);
+		return -ENOMEM;
+	}
+
+	acc_list_phys_addr_tx = acc_list_phys_addr_rx + acc_list_num_rx;
+	acc_list_addr_rx      = acc_list_addr_top + (acc_list_off_rx * netcp_instance());
+	acc_list_addr_tx      = acc_list_addr_top + acc_list_num_rx + (acc_list_off_tx * netcp_instance());
+
+	/* Check if we are NetCP master or slave */
+	if (!netcp_master())
+		goto slave_only;
+	
+	DPRINTK("master core configuration\n");
+
+	memset((void *) acc_list_addr_top, 0, acc_list_size);
 
 	/* Cleanup PKTDMA */
 	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
@@ -1162,82 +1227,56 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_FIRST_FLOW;
 	rx_cfg->n_rx_flows       = DEVICE_PA_CDMA_RX_NUM_FLOWS;
 	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
-
+	
 	pktdma_rx_disable(rx_cfg);
 
-	/* Configure Rx and Tx PKTDMA */
+	/* Configure Rx queues and accumulators */
+	for (i = 0; i < DEVICE_NETCP_NUM_INSTANCES; i++) {
+		queue_free_buf[i]        = DEVICE_QM_ETH_RX_FREE_Q_I(i);
+		queue_rx[i]              = DEVICE_QM_ETH_RX_Q_I(i);
+
+		netcp_setup_accumulator(queue_rx[i],
+					DEVICE_QM_ETH_ACC_RX_CHANNEL_I(i),
+					(u32) (acc_list_phys_addr_rx + (acc_list_off_rx * i)),
+					DEVICE_RX_INT_THRESHOLD);
+	}
+
+	/* Queues used for PA commands (at the end )*/
+	queue_free_buf[DEVICE_NETCP_NUM_INSTANCES] = DEVICE_QM_PA_CMD_FREE_Q;
+	queue_rx[DEVICE_NETCP_NUM_INSTANCES]       = DEVICE_QM_PA_CMD_CP_Q;
+
+	/* Configure Tx accumulators */
+	for (i = 0; i < DEVICE_NETCP_NUM_INSTANCES; i++) {
+		netcp_setup_accumulator(DEVICE_QM_ETH_TX_CP_Q_I(i),
+					DEVICE_QM_ETH_ACC_TX_CHANNEL_I(i),
+					(u32) (acc_list_phys_addr_tx + (acc_list_off_tx * i)),
+					DEVICE_TX_INT_THRESHOLD);
+	}
+
+	/* Configure Rx PKTDMA */
 	rx_cfg->base_addr        = (u32) pa_cdma_base_addr;
 	rx_cfg->rx_base_offset   = DEVICE_PA_CDMA_RX_CHAN_CFG_OFFSET;
 	rx_cfg->rx_chan          = DEVICE_PA_CDMA_RX_FIRST_CHANNEL;
-	rx_cfg->n_rx_chans       = 2;
+	rx_cfg->n_rx_chans       = DEVICE_PA_CDMA_RX_NUM_ETH_CHANNELS;
 	rx_cfg->flow_base_offset = DEVICE_PA_CDMA_RX_FLOW_CFG_OFFSET;
 	rx_cfg->rx_flow          = DEVICE_PA_CDMA_RX_ETH_FLOW;
-	rx_cfg->n_rx_flows       = 2; /* One for Ethernet, one for PA command */
+	rx_cfg->n_rx_flows       = DEVICE_PA_CDMA_RX_NUM_ETH_FLOWS;
 	rx_cfg->qmnum_free_buf   = 0;
 	rx_cfg->queue_free_buf   = &queue_free_buf[0];
 	rx_cfg->qmnum_rx         = 0;
 	rx_cfg->queue_rx         = &queue_rx[0];
 	rx_cfg->tdown_poll_count = DEVICE_RX_CDMA_TIMEOUT_COUNT;
-#ifndef EMAC_ARCH_HAS_INTERRUPT
-	rx_cfg->use_acc          = 0;
-#else
-	rx_cfg->use_acc          = 1;
-	rx_cfg->acc_threshold    = DEVICE_RX_INT_THRESHOLD;
-	rx_cfg->acc_channel      = DEVICE_QM_ETH_ACC_RX_CHANNEL;
-
-	/* Queues used for Ethernet */
-	queue_free_buf[0]        = DEVICE_QM_ETH_RX_FREE_Q;
-	queue_rx[0]              = DEVICE_QM_ETH_RX_Q;
-
-	/* Queues used for PA commands */
-	queue_free_buf[1]        = DEVICE_QM_PA_CMD_FREE_Q;
-	queue_rx[1]              = DEVICE_QM_PA_CMD_CP_Q;
-
-	/* Set the accumulator list memory in the descriptor memory */
-	acc_list_num_rx = ((rx_cfg->acc_threshold + 1) * 2);
-	acc_list_num_tx = ((tx_cfg->acc_threshold + 1) * 2);
-	acc_list_size   =  (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
-
-	acc_list_addr_rx = (u32*) qm_mem_alloc(acc_list_size,
-					       (u32*)&acc_list_phys_addr_rx);
-	if (acc_list_addr_rx == NULL) {
-		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-	memset((void *) acc_list_addr_rx, 0, acc_list_size);
-
-	acc_list_addr_tx      = acc_list_addr_rx + acc_list_num_rx;
-	acc_list_phys_addr_tx = acc_list_phys_addr_rx + acc_list_num_rx;
-	
-	rx_cfg->acc_list_addr      = (u32) acc_list_addr_rx;
-	rx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_rx;
-#endif
 
 	pktdma_rx_config(rx_cfg);
 
+	/* Configure Tx PKTDMA */
 	tx_cfg->base_addr               = (u32) pa_cdma_base_addr;
 	tx_cfg->gbl_ctl_base_offset     = DEVICE_PA_CDMA_GLOBAL_CFG_OFFSET;
 	tx_cfg->tx_base_offset          = DEVICE_PA_CDMA_TX_CHAN_CFG_OFFSET;
 	tx_cfg->tx_chan                 = DEVICE_PA_CDMA_TX_PDSP0_CHANNEL;
 	tx_cfg->n_tx_chans		= DEVICE_PA_CDMA_TX_NUM_CHANNELS;
-	tx_cfg->queue_tx		= DEVICE_QM_ETH_TX_CP_Q;
-#ifndef EMAC_ARCH_HAS_INTERRUPT
-	tx_cfg->use_acc			= 0;
-#else
-	tx_cfg->use_acc			= 1;
-	tx_cfg->acc_threshold		= DEVICE_TX_INT_THRESHOLD;
-	tx_cfg->acc_channel		= DEVICE_QM_ETH_ACC_TX_CHANNEL;
-	
-	tx_cfg->acc_list_addr      = (u32) acc_list_addr_tx;
-	tx_cfg->acc_list_phys_addr = (u32) acc_list_phys_addr_tx;
-#endif
 
 	pktdma_tx_config(tx_cfg);
-
-	/* Initialize QMSS/PKTDMA queues */
-	netcp_cleanup_qs(ndev);
-	netcp_init_qs(ndev);
 
 	cpmac_init();
 
@@ -1252,13 +1291,26 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 				 &data->pa_pdsp[0],
 				 data->pa_pdsp_num,
 				 ndev->dev_addr,
+				 DEVICE_NETCP_NUM_INSTANCES,
 				 rx_cfg->rx_flow,
-				 queue_rx[0],
+				 queue_rx,
 				 DEVICE_QM_ETH_FREE_Q);
 	if (ret != 0) {
 		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
 		return ret;
 	}
+
+slave_only:
+	/* Initialize QMSS/PKTDMA queues */
+	netcp_cleanup_qs(ndev);
+
+	ret = netcp_init_qs(ndev);
+	if (ret != 0) {
+		printk(KERN_ERR "%s: NetCP Rx queue init failed\n", __FUNCTION__);
+		return ret;
+	}
+
+	DPRINTK("rx_free_q = %d, rx_q = %d, tx_cp_q = %d\n", rx_free_q(), rx_q(), tx_cp_q());
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);
@@ -1266,7 +1318,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	/* NAPI register */
 	netif_napi_add(ndev, &priv->napi, netcp_poll, DEVICE_NAPI_WEIGHT);
 
-#ifdef EMAC_ARCH_HAS_INTERRUPT
 	/* Register interrupts */
 	ret = request_irq(data->rx_irq, netcp_rx_interrupt, 0, ndev->name, ndev);
 	if (ret == 0) {
@@ -1282,10 +1333,6 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		       __FUNCTION__, ret);
 		ndev->irq = -1;
 	}
-
-#else
-	ndev->irq = -1;
-#endif
 
 	/* Register the network device */
 	ndev->dev_id         = 0;

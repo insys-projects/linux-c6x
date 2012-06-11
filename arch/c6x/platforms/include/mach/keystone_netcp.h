@@ -35,6 +35,13 @@
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
+/* Multiple instances support */
+#define DEVICE_NETCP_NUM_INSTANCES              (CORE_NUM)
+
+static inline unsigned int netcp_instance(void) { return (get_coreid() - get_master_coreid()) & (CORE_NUM - 1); }
+static inline unsigned int netcp_coreid(unsigned int i)  { return (i + get_master_coreid()) & (CORE_NUM - 1); }
+static inline int          netcp_master(void)   { return (get_coreid() == get_master_coreid()); }
+
 struct netcp_platform_data {
 
 	/* Rx/tx interrupts */
@@ -76,6 +83,15 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
 	iounmap(efuse_mac);
 
 	return 0;
+}
+
+/* 
+ * When using multiple instances of Linux with shared NetCP, compute one different
+ * MAC address per instance
+ */
+static void inline emac_arch_adjust_mac_addr(char *mac, int instance)
+{
+	mac[5] = instance << 1;
 }
 #endif
 
