@@ -111,6 +111,13 @@ EXPORT_SYMBOL(ticks_per_ns_scaled);
 unsigned int c6x_core_freq;
 EXPORT_SYMBOL(c6x_core_freq);
 
+static int __master_coreid = 0;
+
+int get_master_coreid(void)
+{
+	return __master_coreid;
+}
+
 static unsigned long dummy_gettimeoffset(void)
 {
 	return 0;
@@ -301,7 +308,12 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			/* This is for the case we want to use a very early UART console */
 			c6x_early_uart_cons = 1;
 		}
-
+		else if (!memcmp(from, "master-core=", 12)) {
+			if (to != c6x_command_line)
+				to--;
+			from += 12;
+			(void) get_option(&from, &__master_coreid);
+		}
 #ifdef CONFIG_BLK_DEV_INITRD
 		else if (!memcmp(from, "initrd=", 7)) {
 			if (to != c6x_command_line)
@@ -598,49 +610,4 @@ void arch_gettod(int *year, int *mon, int *day, int *hour, int *min, int *sec)
 		mach_gettod(year, mon, day, hour, min, sec);
 	else
 		*year = *mon = *day = *hour = *min = *sec = 0;
-}
-
-static inline long _hex_chartol (char c)
-{
-	if ((c >= '0') && (c <= '9')) return (c - '0');
-	if ((c >= 'A') && (c <= 'F')) return (c - 'A') + 10;
-	if ((c >= 'a') && (c <= 'f')) return (c - 'a') + 10;
-	
-	return -1;
-}
-
-static u8 _hex_strtoul (const char* str, const char** end)
-{
-	unsigned long ul = 0;
-	long          ud;
-	while ((ud = _hex_chartol(*str)) >= 0) {
-		ul = (ul << 4) | ud;
-		str++;
-	}
-	*end = str;
-	return (u8) ul;
-}
-
-static int __master_coreid = 0;
-
-static int master_coreid_setup(char *str)
-{
-	const char *end;
-
-	__master_coreid = _hex_strtoul(str, &end);
-	if (str == end)
-		return 0;
-
-	if (__master_coreid >= CORE_NUM) {
-		__master_coreid = 0; /* default value */
-		return 0;
-	}
-
-	return 1;
-}
-__setup("master-core=", master_coreid_setup);
-
-int get_master_coreid(void)
-{
-	return __master_coreid;
 }
