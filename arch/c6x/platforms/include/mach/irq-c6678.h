@@ -36,7 +36,7 @@
 #define IRQ_RIOINT16    20  /* RapidIO interrupts */
 #define IRQ_INTC0OUT    21  /* CP_INTC per-core outputs: 21 to 31  */
 #define IRQ_QML         32  /* QM low: 32 to 47 */
-#define IRQ_QMH         48  /* QM high: 48 to 55 */
+#define IRQ_QMH         48  /* QM high: 48 to 51 */
 #define IRQ_TSIP0RFS	52
 #define IRQ_TSIP0RSF	53
 #define IRQ_TSIP0XFS	54
