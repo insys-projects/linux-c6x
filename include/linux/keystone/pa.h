@@ -17,6 +17,13 @@
 
 #ifdef __KERNEL__
 
+/*
+ * PA rules
+ */
+#define PA_PACKET_DROP	0
+#define PA_PACKET_PARSE	1
+#define PA_PACKET_HST	2
+
 #define PAFRM_MAX_CMD_SET_SIZE       124
 
 #define	PA_DEST_DISCARD              3  /**< Packet is discarded */
@@ -236,7 +243,7 @@ struct pa_frm_com_l1_standard {
 	/* LUT1 view 1 */
 	u8	dmac[6];	/* Destination mac */
 	u8	smac[6];	/* Source mac */
-	u16	etype;		/* Ethernrt type, the field is also used for the previous match PDSP number */
+	u16	etype;		/* Ethernet type, the field is also used for the previous match PDSP number */
 	u16	vlan;		/* VLAN tag, the field is also used for the previous match LUT1 index */
   
 	/* LUT1 view 2 */
@@ -744,11 +751,12 @@ int keystone_pa_get_firmware(int pdsp, unsigned int *buffer, int len);
 int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len);
 int keystone_pa_config(struct device *dev,
 		       struct pdsp_platform_data *pdsp_data,
-		       int pdsp_num,
-		       u8* mac_addr,
-		       u32 rx_flow,
-		       u32 rx_queue,
-		       u32 free_queue);
+		       int  pdsp_num,
+		       u8*  mac_addr,
+		       u32  num_inst,
+		       u32  rx_flow,
+		       u32* rx_queue,
+		       u32  free_queue);
 int pktdma_region_init(u32 base_paddr,
 		       u32 size,
 		       void __iomem **vaddr);

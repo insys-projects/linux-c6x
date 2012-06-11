@@ -24,7 +24,7 @@
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pktdma.h>
 
-struct pa_priv {
+struct pa_device {
 	struct device	*dev;
 	u32              tx_queue;
 	u32              rx_queue;
@@ -37,13 +37,13 @@ struct pa_priv {
 	u32		 cmd_flow_num;
 	u32		 cmd_queue_num;
 	u32		 data_flow_num;
-	u32		 data_queue_num;
+	u32		*data_queue_num;
 	u32              free_queue;
 };
 
 struct pa_packet {
 	enum dma_data_direction		 direction;
-	struct pa_priv			*priv;
+	struct pa_device		*pa_dev;
 	u32			         chan;
 	u32                              queue;
 	u32                              retqueue;
@@ -207,8 +207,8 @@ static inline void swizAl1 (struct pa_frm_cmd_add_lut1 *al1)
 }
 
 int pa_conv_routing_info(struct	pa_frm_forward *fwd_info,
-				struct	pa_route_info *route_info,
-				int cmd_dest, u16 fail_route)
+			 struct	pa_route_info *route_info,
+			 int cmd_dest, u16 fail_route)
 {
 	u8 *pcmd = NULL;
 	fwd_info->flow_id = route_info->flow_id;
@@ -217,48 +217,45 @@ int pa_conv_routing_info(struct	pa_frm_forward *fwd_info,
 	if (route_info->dest == PA_DEST_HOST) {
 		fwd_info->forward_type   = PAFRM_FORWARD_TYPE_HOST;
 		fwd_info->u.host.context = route_info->sw_info_0;
-
+		
 		if (route_info->m_route_index >= 0) {
 			if (route_info->m_route_index >= PA_MAX_MULTI_ROUTE_SETS) {
-			return (PA_ERR_CONFIG);
+				return (PA_ERR_CONFIG);
 			}
-
-		fwd_info->u.host.multi_route	= 1;
-		fwd_info->u.host.multi_idx	= route_info->m_route_index;
-		fwd_info->u.host.pa_pdsp_router	= PAFRM_DEST_PA_M_0;
+			
+			fwd_info->u.host.multi_route	= 1;
+			fwd_info->u.host.multi_idx	= route_info->m_route_index;
+			fwd_info->u.host.pa_pdsp_router	= PAFRM_DEST_PA_M_0;
 		}
-    
 		pcmd = fwd_info->u.host.cmd;
 	} else if (route_info->dest == PA_DEST_DISCARD)	{
 		fwd_info->forward_type = PAFRM_FORWARD_TYPE_DISCARD;
 	} else if (route_info->dest == PA_DEST_EMAC) {
 		fwd_info->forward_type = PAFRM_FORWARD_TYPE_ETH;
 		fwd_info->u.eth.ps_flags = (route_info->pkt_type_emac_ctrl &
-						PA_EMAC_CTRL_CRC_DISABLE)?
-						PAFRM_ETH_PS_FLAGS_DISABLE_CRC:0;
+					    PA_EMAC_CTRL_CRC_DISABLE)?
+			PAFRM_ETH_PS_FLAGS_DISABLE_CRC:0;
 		fwd_info->u.eth.ps_flags |= ((route_info->pkt_type_emac_ctrl &
-						PA_EMAC_CTRL_PORT_MASK) <<
-						PAFRM_ETH_PS_FLAGS_PORT_SHIFT);
-  
+					      PA_EMAC_CTRL_PORT_MASK) <<
+					     PAFRM_ETH_PS_FLAGS_PORT_SHIFT);
 	} else if (fail_route) {
 		return (PA_ERR_CONFIG);
-
 	} else if (((route_info->dest == PA_DEST_CONTINUE_PARSE_LUT1) &&
-			(route_info->custom_type != PA_CUSTOM_TYPE_LUT2)) ||
-			((route_info->dest == PA_DEST_CONTINUE_PARSE_LUT2) &&
-			(route_info->custom_type != PA_CUSTOM_TYPE_LUT1))) {
-
+		    (route_info->custom_type != PA_CUSTOM_TYPE_LUT2)) ||
+		   ((route_info->dest == PA_DEST_CONTINUE_PARSE_LUT2) &&
+		    (route_info->custom_type != PA_CUSTOM_TYPE_LUT1))) {
+		
 		/* Custom Error check */
 		if (((route_info->custom_type == PA_CUSTOM_TYPE_LUT1) &&
-			(route_info->custom_index >= PA_MAX_CUSTOM_TYPES_LUT1)) ||
-			((route_info->custom_type == PA_CUSTOM_TYPE_LUT2) &&
-			(route_info->custom_index >= PA_MAX_CUSTOM_TYPES_LUT2)))
+		     (route_info->custom_index >= PA_MAX_CUSTOM_TYPES_LUT1)) ||
+		    ((route_info->custom_type == PA_CUSTOM_TYPE_LUT2) &&
+		     (route_info->custom_index >= PA_MAX_CUSTOM_TYPES_LUT2)))
 			return(PA_ERR_CONFIG); 
-
+		
 		fwd_info->forward_type = PAFRM_FORWARD_TYPE_PA;
 		fwd_info->u.pa.custom_type = (u8)route_info->custom_type;
 		fwd_info->u.pa.custom_idx  = route_info->custom_index; 
-
+		
 		if (route_info->dest == PA_DEST_CONTINUE_PARSE_LUT2) {
 			fwd_info->u.pa.pa_dest = PAFRM_DEST_PA_C2;
 		} else {
@@ -282,37 +279,36 @@ int pa_conv_routing_info(struct	pa_frm_forward *fwd_info,
 	} else {
 		return (PA_ERR_CONFIG);
 	}
-  
-
+	
 	if (pcmd && route_info->pcmd) {
 		struct pa_cmd_info *pacmd = route_info->pcmd;
 		struct pa_patch_info *patch_info;
 		struct pa_cmd_set *cmd_set;
-    
+		
 		switch (pacmd->cmd) {
-			case PA_CMD_PATCH_DATA:
-				patch_info = &pacmd->params.patch;
-				if ((patch_info->n_patch_bytes > 2) ||
-					(patch_info->overwrite) ||
-					(patch_info->patch_data == NULL))
-					return (PA_ERR_CONFIG); 
-          
-				pcmd[0] = PAFRM_RX_CMD_CMDSET;
-				pcmd[1] = patch_info->n_patch_bytes;
-				pcmd[2] = patch_info->patch_data[0];
-				pcmd[3] = patch_info->patch_data[1];
-				break;
-      
-			case PA_CMD_CMDSET:
-				cmd_set = &pacmd->params.cmd_set;
-				if(cmd_set->index >= PA_MAX_CMD_SETS)
-					return (PA_ERR_CONFIG); 
-				
-				pcmd[0] = PAFRM_RX_CMD_CMDSET;
-				pcmd[1] = (u8)cmd_set->index; 
-				break;
-			default:
-				return(PA_ERR_CONFIG);
+		case PA_CMD_PATCH_DATA:
+			patch_info = &pacmd->params.patch;
+			if ((patch_info->n_patch_bytes > 2) ||
+			    (patch_info->overwrite) ||
+			    (patch_info->patch_data == NULL))
+				return (PA_ERR_CONFIG); 
+			
+			pcmd[0] = PAFRM_RX_CMD_CMDSET;
+			pcmd[1] = patch_info->n_patch_bytes;
+			pcmd[2] = patch_info->patch_data[0];
+			pcmd[3] = patch_info->patch_data[1];
+			break;
+			
+		case PA_CMD_CMDSET:
+			cmd_set = &pacmd->params.cmd_set;
+			if(cmd_set->index >= PA_MAX_CMD_SETS)
+				return (PA_ERR_CONFIG); 
+			
+			pcmd[0] = PAFRM_RX_CMD_CMDSET;
+			pcmd[1] = (u8)cmd_set->index; 
+			break;
+		default:
+			return(PA_ERR_CONFIG);
 		}    
 	}
 	return (PA_OK);
@@ -543,7 +539,7 @@ int keystone_pa_set_firmware(int pdsp, const unsigned int *buffer, int len)
 	return 0;
 }
 
-static struct pa_packet *pa_alloc_packet(struct pa_priv *priv,
+static struct pa_packet *pa_alloc_packet(struct pa_device *pa_dev,
 					 unsigned cmd_size,
 					 enum dma_data_direction direction)
 {
@@ -559,22 +555,22 @@ static struct pa_packet *pa_alloc_packet(struct pa_priv *priv,
 	if (!p_info)
 		return NULL;
 
-	p_info->priv      = priv;
+	p_info->pa_dev    = pa_dev;
 	p_info->data      = kzalloc(size, GFP_KERNEL);
 	if (!p_info->data) {
 		kfree(p_info);
 		return NULL;
 	}
 	p_info->direction = direction;
-	p_info->queue     = (direction == DMA_TO_DEVICE) ? priv->tx_queue :
-		priv->rx_queue;
-	p_info->retqueue  = (direction == DMA_TO_DEVICE) ? priv->tx_retqueue :
-		priv->rx_retqueue;
+	p_info->queue     = (direction == DMA_TO_DEVICE) ? pa_dev->tx_queue :
+		pa_dev->rx_queue;
+	p_info->retqueue  = (direction == DMA_TO_DEVICE) ? pa_dev->tx_retqueue :
+		pa_dev->rx_retqueue;
 	p_info->cmd_size  =  cmd_size;
 	
-	hd = hw_qm_queue_pop(priv->free_queue);
+	hd = hw_qm_queue_pop(pa_dev->free_queue);
 	if (hd == NULL) {
-		dev_err(priv->dev, "no more free desc hd = 0x%x\n", (u32) hd);
+		dev_err(pa_dev->dev, "no more free desc hd = 0x%x\n", (u32) hd);
 		return NULL;
 	}
 
@@ -651,8 +647,8 @@ static void pa_complete_packet(struct pa_packet *p_info)
 	}
 }
 
-int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
-			unsigned etype, int index)
+static int keystone_pa_add_mac(struct pa_device *pa_dev, int inst, u8 *mac,
+			       int rule, unsigned etype, int index)
 {
 	struct pa_frm_command *fcmd;
 	struct pa_frm_cmd_add_lut1 *al1;
@@ -662,35 +658,43 @@ int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
 	int size, ret;
 	
 	memset(&fail_info, 0, sizeof(fail_info));
-
-	fail_info.dest		= PA_DEST_HOST;
-	fail_info.flow_id	= priv->data_flow_num;
-	fail_info.queue		= priv->data_queue_num;
-	fail_info.m_route_index	= -1;
-
 	memset(&route_info, 0, sizeof(route_info));
 
-	if (to_host) {
+	if (rule == PA_PACKET_HST) {
 		route_info.dest			= PA_DEST_HOST;
-		route_info.flow_id		= priv->data_flow_num;
-		route_info.queue		= priv->data_queue_num;
+		route_info.flow_id		= pa_dev->data_flow_num + inst;
+		route_info.queue		= pa_dev->data_queue_num[inst];
 		route_info.m_route_index	= -1;
-	} else {
+		fail_info.dest			= PA_DEST_HOST;
+		fail_info.flow_id		= pa_dev->data_flow_num + inst;
+		fail_info.queue			= pa_dev->data_queue_num[inst];
+		fail_info.m_route_index		= -1;
+	} else if (rule == PA_PACKET_PARSE) {
 		route_info.dest			= PA_DEST_CONTINUE_PARSE_LUT1;
+		route_info.m_route_index	= -1;
+		fail_info.dest			= PA_DEST_HOST;
+		fail_info.flow_id		= pa_dev->data_flow_num + inst;
+		fail_info.queue			= pa_dev->data_queue_num[inst];
+		fail_info.m_route_index		= -1;
+	} else if (rule == PA_PACKET_DROP) {
+		route_info.dest			= PA_DEST_DISCARD;
+		route_info.m_route_index	= -1;
+		fail_info.dest			= PA_DEST_DISCARD;
+		fail_info.m_route_index		= -1;
 	}
 
 	size = (sizeof(struct pa_frm_command) +
 		sizeof(struct pa_frm_cmd_add_lut1) + 4);
 
-	tx = pa_alloc_packet(priv, size, DMA_TO_DEVICE);
+	tx = pa_alloc_packet(pa_dev, size, DMA_TO_DEVICE);
 	if (!tx) {
-		dev_err(priv->dev, "could not allocate cmd tx packet\n");
+		dev_err(pa_dev->dev, "could not allocate cmd tx packet\n");
 		return -ENOMEM;
 	}
 
-	rx = pa_alloc_packet(priv, size, DMA_FROM_DEVICE);
+	rx = pa_alloc_packet(pa_dev, size, DMA_FROM_DEVICE);
 	if (!rx) {
-		dev_err(priv->dev, "could not allocate cmd rx packet\n");
+		dev_err(pa_dev->dev, "could not allocate cmd rx packet\n");
 		pa_free_packet(tx);
 		return -ENOMEM;
 	}
@@ -705,12 +709,16 @@ int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
 	fcmd->magic		= PAFRM_CONFIG_COMMAND_SEC_BYTE;
 	fcmd->com_id		= PA_COMID_L2;
 	fcmd->ret_context	= context;
-	fcmd->flow_id		= priv->cmd_flow_num;
-	fcmd->reply_queue	= priv->cmd_queue_num;
+	fcmd->flow_id		= pa_dev->cmd_flow_num;
+	fcmd->reply_queue	= pa_dev->cmd_queue_num;
 	fcmd->reply_dest	= PAFRM_DEST_PKTDMA;
 
 	al1->index		= index;
 	al1->type		= PAFRM_COM_ADD_LUT1_STANDARD;
+
+	if (mac) {
+		al1->u.eth_ip.match_flags = PAFRM_LUT1_MATCH_DMAC;
+	}
 
 	if (etype) {
 		al1->u.eth_ip.etype	   = etype;
@@ -739,11 +747,53 @@ int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
 
 	ret = pa_conv_routing_info(&al1->match, &route_info, 0, 0);
 	if (ret != 0) 
-		dev_err(priv->dev, "route info config failed\n");
+		dev_err(pa_dev->dev, "route info config failed\n");
 
 	ret = pa_conv_routing_info(&al1->next_fail, &fail_info, 0, 1);
 	if (ret != 0)
-		dev_err(priv->dev, "fail info config failed\n");
+		dev_err(pa_dev->dev, "fail info config failed\n");
+
+#ifdef KEYSTONE_PA_DUMP_CMD
+	printk("PA cmd dump: index=%d type=%d cust_index=%d\n",
+	       al1->index, al1->type, al1->cust_index);
+
+	if (al1->type == PAFRM_COM_ADD_LUT1_STANDARD) {
+		printk("PA cmd dump: DMAC %x:%x:%x:%x:%x:%x\n",
+		       al1->u.eth_ip.dmac[0],
+		       al1->u.eth_ip.dmac[1],
+		       al1->u.eth_ip.dmac[2],
+		       al1->u.eth_ip.dmac[3],
+		       al1->u.eth_ip.dmac[4],
+		       al1->u.eth_ip.dmac[5]);
+		printk("PA cmd dump: SMAC %x:%x:%x:%x:%x:%x\n",
+		       al1->u.eth_ip.smac[0],
+		       al1->u.eth_ip.smac[1],
+		       al1->u.eth_ip.smac[2],
+		       al1->u.eth_ip.smac[3],
+		       al1->u.eth_ip.smac[4],
+		       al1->u.eth_ip.smac[5]);
+		printk("PA cmd dump: etype=%d, vlan=%d\n", 
+		       al1->u.eth_ip.etype, al1->u.eth_ip.vlan);
+		printk("PA cmd dump: proto_next=%d, key=%d\n", 
+		       al1->u.eth_ip.proto_next, al1->u.eth_ip.key);
+		printk("PA cmd dump: match_flags=%d\n",
+		       al1->u.eth_ip.match_flags);
+	}
+
+	printk("PA cmd dump: MATCH forward_type=%d, flow_id=%d, queue=%d\n", 
+	       al1->match.forward_type, al1->match.flow_id, al1->match.queue);
+	if (al1->match.forward_type == PAFRM_FORWARD_TYPE_HOST) {
+		printk("PA cmd dump: MATCH context= 0x%x, multi_route=%d\n",
+		       al1->match.u.host.context, al1->match.u.host.multi_route);
+	}
+	printk("PA cmd dump: NEXT_FAIL forward_type=%d, flow_id=%d, queue=%d\n", 
+	       al1->next_fail.forward_type, al1->next_fail.flow_id, al1->next_fail.queue);
+	if (al1->next_fail.forward_type == PAFRM_FORWARD_TYPE_HOST) {
+		printk("PA cmd dump: NEXT_FAIL context= 0x%x, multi_route=%d\n",
+		       al1->next_fail.u.host.context, al1->next_fail.u.host.multi_route);
+	}
+	printk("\n");
+#endif
 
 	swizFcmd(fcmd);
 	swizAl1((struct pa_frm_cmd_add_lut1 *)&(fcmd->cmd));
@@ -755,19 +805,19 @@ int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
 	tx->swdata[2] = 0;
 	       
 	pa_submit_packet(tx);
-	dev_dbg(priv->dev, "waiting for command transmit complete\n");
+	dev_dbg(pa_dev->dev, "waiting for command transmit complete\n");
 
 	pa_complete_packet(tx);
-	dev_dbg(priv->dev, "command transmit complete\n");
+	dev_dbg(pa_dev->dev, "command transmit complete\n");
 
-	dev_dbg(priv->dev, "waiting for command response complete\n");
+	dev_dbg(pa_dev->dev, "waiting for command response complete\n");
 
 	pa_complete_packet(rx);
 	if (rx->swdata[0] != context) {
-		dev_warn(priv->dev, "bad response context, have %x, want %x\n",
+		dev_warn(pa_dev->dev, "bad response context, have %x, want %x\n",
 			 rx->swdata[0], context);
 	} else {
-		dev_dbg(priv->dev, "command response complete\n");
+		dev_dbg(pa_dev->dev, "command response complete\n");
 	}
 
 	pa_free_packet(tx);
@@ -787,21 +837,24 @@ int keystone_pa_add_mac(struct pa_priv *priv, const u8 *mac, bool to_host,
  */
 int keystone_pa_config(struct device *dev,
 		       struct pdsp_platform_data *pdsp_data,
-		       int pdsp_num,
-		       u8* mac_addr,
-		       u32 rx_flow,
-		       u32 rx_queue,
-		       u32 free_queue)
+		       int  pdsp_num,
+		       u8  *mac_addr,
+		       u32  num_inst,
+		       u32  rx_flow,
+		       u32 *rx_queue,
+		       u32  free_queue)
 {
-	struct pa_priv      *priv;
+	u8                   bcast_addr[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	struct pa_device    *pa_dev;
 	int                  ret = 0;
 	int                  i;
 	int                  factor;
+	int                  index;
 
-	priv = kzalloc(sizeof(struct pa_priv), GFP_KERNEL);
-	if (!priv)
+	pa_dev = kzalloc(sizeof(struct pa_device), GFP_KERNEL);
+	if (!pa_dev)
 		return -ENOMEM;
-	priv->dev = dev;
+	pa_dev->dev = dev;
 
 	if ((pdsp_num < 0) || (pdsp_num > DEVICE_PA_NUM_PDSPS)) {
 		ret = -EINVAL;
@@ -813,7 +866,7 @@ int keystone_pa_config(struct device *dev,
 		/* Reset PDSP */
 		ret = keystone_pa_reset();
 		if (ret != 0) {
-			dev_err(priv->dev, "PA reset failed\n");
+			dev_err(pa_dev->dev, "PA reset failed\n");
 			goto fail;
 		}
 
@@ -827,7 +880,7 @@ int keystone_pa_config(struct device *dev,
 					       pdsp_data[i].firmware,
 					       dev);
 			if (ret != 0) {
-				dev_err(priv->dev, "cannot find %s firmware\n",
+				dev_err(pa_dev->dev, "cannot find %s firmware\n",
 					pdsp_data[i].firmware);
 				goto fail;
 			}
@@ -840,7 +893,7 @@ int keystone_pa_config(struct device *dev,
 	}
 	ret = keystone_pa_reset_control(PA_STATE_ENABLE);
 	if (ret != 1) {
-		dev_err(priv->dev, "enabling failed, ret = %d\n", ret);
+		dev_err(pa_dev->dev, "enabling failed, ret = %d\n", ret);
 		return ret;
 	}
 
@@ -848,33 +901,43 @@ int keystone_pa_config(struct device *dev,
 
 	ret = keystone_pa_config_timestamp(factor);
 	if (ret != 0) {
-		dev_err(priv->dev, "timestamp configuration failed, ret = %d\n", ret);
+		dev_err(pa_dev->dev, "timestamp configuration failed, ret = %d\n", ret);
 		return ret;
 	}
 
 	/* Configuration of flow/queues for PA command rx */
-	priv->rx_queue       = DEVICE_QM_PA_CMD_FREE_Q;
-	priv->rx_retqueue    = DEVICE_QM_PA_CMD_CP_Q;
-	priv->cmd_flow_num   = DEVICE_PA_CDMA_RX_FIRMWARE_FLOW;
-	priv->cmd_queue_num  = priv->rx_retqueue;
+	pa_dev->rx_queue       = DEVICE_QM_PA_CMD_FREE_Q;
+	pa_dev->rx_retqueue    = DEVICE_QM_PA_CMD_CP_Q;
+	pa_dev->cmd_flow_num   = DEVICE_PA_CDMA_RX_FIRMWARE_FLOW;
+	pa_dev->cmd_queue_num  = pa_dev->rx_retqueue;
 
 	/* Configuration of flow/queues for PA command tx */
-	priv->tx_queue       = DEVICE_QM_PA_TX_PDSP0_Q;
-	priv->tx_retqueue    = free_queue;
+	pa_dev->tx_queue       = DEVICE_QM_PA_TX_PDSP0_Q;
+	pa_dev->tx_retqueue    = free_queue;
 
 	/* Configuration of flow/queues for PA data rx */
-	priv->data_queue_num = rx_queue;
-	priv->data_flow_num  = rx_flow;
-	priv->free_queue     = free_queue;
+	pa_dev->data_queue_num = rx_queue;
+	pa_dev->data_flow_num  = rx_flow;
+	pa_dev->free_queue     = free_queue;
 
-	dev_dbg(priv->dev, "configuring command receive flow %d, queue %d\n",
-		rx_flow, rx_queue);
+	index = 0;
 
-	ret = keystone_pa_add_mac(priv, NULL,     true,  0x0000,               63);
-	ret = keystone_pa_add_mac(priv, mac_addr, false, PAFRM_ETHERTYPE_IP,   62);
-	ret = keystone_pa_add_mac(priv, mac_addr, false, PAFRM_ETHERTYPE_IPV6, 61);
+	for (i = 0; i < num_inst; i++) {
+		u8 __mac_addr[6];
+
+		/* Compute Ethernet MAC address for each Linux instance */
+		memcpy((void*) __mac_addr, mac_addr, 6);
+		emac_arch_adjust_mac_addr(__mac_addr, i);
+
+		/* Route this instance MAC address to the corresponding flow/queues */
+		ret = keystone_pa_add_mac(pa_dev, i, __mac_addr, PA_PACKET_HST, 0x0000, index++);
+	}
+	
+	/* Broadcast packets are forwarded to master NetCP (instance 0), others are dropped */
+	ret = keystone_pa_add_mac(pa_dev, 0, bcast_addr, PA_PACKET_HST, 0x0000, index++);
+	ret = keystone_pa_add_mac(pa_dev, 0, NULL,       PA_PACKET_DROP, 0x0000, index++);
 fail:
-	kfree(priv);
+	kfree(pa_dev);
 
 	return ret;
 }
