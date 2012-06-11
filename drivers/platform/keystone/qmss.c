@@ -55,11 +55,26 @@ static inline u32 qm_read_reg(int reg)
  */
 void hw_qm_ack_interrupt(u32 index, u32 channel)
 {
-	if (qm_read_reg(DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS0) &
-		    (1 << channel)) {
-			qm_write_reg(1, QM_REG_INTD_COUNT_IRQ(channel));
-			qm_write_reg(index + channel,
-				     DEVICE_QM_INTD_OFFSET + QM_REG_INTD_EOI);
+	u32 reg;
+	u32 offset = 0;
+
+	switch (index) {
+	case QM_REG_INTD_EOI_STARV_INDEX:
+		reg = DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS4;
+		break;
+	case QM_REG_INTD_EOI_HIGH_PRIO_INDEX:
+		reg = DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS0;
+		break;
+	case QM_REG_INTD_EOI_LOW_PRIO_INDEX:
+	default:
+		reg    = DEVICE_QM_INTD_OFFSET + QM_REG_INTD_STATUS1;
+		offset = QM_LOW_PRIO_CHANNEL_OFFSET;
+		break;
+	}
+	if (qm_read_reg(reg) & (1 << channel)) {
+		qm_write_reg(1, QM_REG_INTD_COUNT_IRQ(channel + offset));
+		qm_write_reg(index + channel,
+			     DEVICE_QM_INTD_OFFSET + QM_REG_INTD_EOI);
 	}
 }
 
@@ -194,7 +209,7 @@ u32 hw_qm_program_accumulator(u32 pdsp_id, struct qm_acc_cmd_config *cfg)
 
 	for (index = 0; index < QM_ACC_CMD_SIZE; index += 4)
 		*reg-- = *p_cmd--;
-	
+
 	/* Wait for the command to clear */
 	reg++;
 	do {
@@ -397,11 +412,6 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 
 	qm_base = ioremap(DEVICE_QM_BASE, DEVICE_QM_SIZE);
 
-	/* Only master core can initialize QMSS in a multi-Linux environment */
- 	if (data->slave) {
-		goto slave_core;
-	}
-
 	q_cfg->link_ram_base = data->link_ram_base;
 	q_cfg->link_ram_size = data->link_ram_size;
 	
@@ -413,6 +423,10 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 		       __FUNCTION__);
 		return -ENOMEM;
 	}
+
+	/* Only master core can initialize QMSS in a multi-Linux environment */
+ 	if (data->slave)
+		goto slave_core;
 	    
 	q_cfg->mem_regnum_descriptors = data->desc_num;
 	q_cfg->dest_q		      = data->free_queue;
