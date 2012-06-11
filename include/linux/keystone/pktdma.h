@@ -232,11 +232,6 @@ struct pktdma_rx_cfg {
 	u32 qmnum_rx;		/* Queue manager for received packets */
 	u32 *queue_rx;		/* Default Rx queue for received packets */
 	u32 tdown_poll_count;	/* Number of loop iterations to wait for teardown */
-	u8  use_acc;            /* Use accumulators if non zero */
-	u8  acc_threshold;      /* Accumulator threshold */
-	u32 acc_channel;        /* Accumulator channel */
-	u32 acc_list_addr;      /* Virtual address of the accumulator list memory */
-        u32 acc_list_phys_addr; /* Physical address of the accumulator list memory */
 }; 
 
 struct pktdma_tx_cfg {
@@ -245,12 +240,6 @@ struct pktdma_tx_cfg {
 	u32 tx_base_offset;	/* Offset of the tx registers */
 	u32 tx_chan;            /* Index of first tx channel */
 	u32 n_tx_chans;		/* The number of tx channels */
-	u32 queue_tx;		/* Default Tx queue for Tx completion packets */
-	u8  use_acc;            /* Use accumulators if non zero */
-	u8  acc_threshold;      /* Accumulator threshold */
-	u32 acc_channel;        /* Accumulator channel */
-	u32 acc_list_addr;      /* Virtual address of the accumulator list memory */
-        u32 acc_list_phys_addr; /* Physical address of the accumulator list memory */
 };
 
 /* 

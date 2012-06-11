@@ -179,37 +179,8 @@ void pktdma_flow_config(struct pktdma_rx_cfg *cfg,
  */
 int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
 {
-	struct qm_acc_cmd_config acc_cmd_cfg;
 	u32 i, c, f;
 	int ret = 0;
-
-	pktdma_rx_disable(cfg);
-
-	if (cfg->use_acc) {
-		/*
-		 * Setup Rx accumulator configuration for receive 
-		 */
-		acc_cmd_cfg.channel          = cfg->acc_channel;
-		acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
-		acc_cmd_cfg.queue_mask       = 0;  /* none */
-		acc_cmd_cfg.list_addr        = cfg->acc_list_phys_addr;
-		acc_cmd_cfg.queue_index      = cfg->queue_rx[0]; /* First queue */
-		acc_cmd_cfg.max_entries      = cfg->acc_threshold + 1;
-		/* In the future these parameters should be given in config too */
-		acc_cmd_cfg.timer_count      = 40;
-		acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
-		acc_cmd_cfg.list_entry_size  = 0;  /* D registers */
-		acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
-		acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
-		
-		ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
-		
-		if (ret != 0) {
-			printk(KERN_ERR "%s: PKTDMA accumulator config failed (%d)\n",
-			       __FUNCTION__, ret);
-			return ret;
-		}
-	}
 	
 	/* Configue rx flows */
 	for (f = cfg->rx_flow, i = 0; f < (cfg->rx_flow + cfg->n_rx_flows); f++, i++)  {
@@ -233,35 +204,7 @@ int pktdma_rx_config(struct pktdma_rx_cfg *cfg)
  */
 int pktdma_tx_config(struct pktdma_tx_cfg *cfg)
 {
-	struct qm_acc_cmd_config acc_cmd_cfg;
 	u32                      c;
-	int                      ret;
-
-	if (cfg->use_acc) {
-		/*
-		 * Setup Tx accumulator configuration for transmit
-		 */
-		acc_cmd_cfg.channel          = cfg->acc_channel;
-		acc_cmd_cfg.command          = QM_ACC_CMD_ENABLE;
-		acc_cmd_cfg.queue_mask       = 0;  /* none */
-		acc_cmd_cfg.list_addr        = cfg->acc_list_phys_addr;
-		acc_cmd_cfg.queue_index      = cfg->queue_tx;
-		acc_cmd_cfg.max_entries      = cfg->acc_threshold + 1;
-		/* In the future these parameters should be given in config too */
-		acc_cmd_cfg.timer_count      = 40;
-		acc_cmd_cfg.pacing_mode      = 1;  /* last interrupt mode */
-		acc_cmd_cfg.list_entry_size  = 0;  /* D registers */
-		acc_cmd_cfg.list_count_mode  = 0;  /* NULL terminate mode */
-		acc_cmd_cfg.multi_queue_mode = 0;  /* single queue */
-	
-		ret = hw_qm_program_accumulator(0, &acc_cmd_cfg);
-		
-		if (ret != 0) {
-			printk(KERN_ERR "%s: PKTDMA accumulator config failed (%d)\n",
-			       __FUNCTION__, ret);
-			return ret;
-		}
-	}
 
 	/* Disable loopback in the tx direction */
 	pktdma_write_reg(PKTDMA_REG_VAL_EMU_CTL_NO_LOOPBACK,

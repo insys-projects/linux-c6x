@@ -1612,7 +1612,6 @@ static int keystone_rio_mp_init(u32 max_mbox,
 	rio->rx_cfg->qmnum_rx            = 0;
 	rio->rx_cfg->queue_rx            = &rio->rx_queues[0];
 	rio->rx_cfg->tdown_poll_count    = KEYSTONE_RIO_CDMA_RX_TIMEOUT_COUNT;
-	rio->rx_cfg->use_acc             = 0;
 
 	if (pktdma_rx_config(rio->rx_cfg)) {
 		DPRINTK("Setup of PktDMA Rx failed\n");
@@ -1626,7 +1625,6 @@ static int keystone_rio_mp_init(u32 max_mbox,
 	rio->tx_cfg->tx_base_offset      = KEYSTONE_RIO_CDMA_TX_CHAN_CFG_OFFSET;
 	rio->tx_cfg->tx_chan             = rio->tx_channel;
 	rio->tx_cfg->n_tx_chans	         = 1;
-	rio->tx_cfg->use_acc		 = 0;
 
 	if (pktdma_tx_config(rio->tx_cfg)) {
 		DPRINTK("Setup of PktDMA Tx failed\n");
