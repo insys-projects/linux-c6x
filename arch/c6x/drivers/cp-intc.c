@@ -3,7 +3,7 @@
  *
  *  Support for C66x Communication Port Interrupt Controller (CP_INTC)
  *
- *  Copyright (C) 2011 Texas Instruments Incorporated
+ *  Copyright (C) 2011, 2012 Texas Instruments Incorporated
  *  Contributed by: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/hardirq.h>
 #include <linux/interrupt.h>
+#include <linux/kernel_stat.h>
 #include <linux/module.h>
 #include <linux/io.h>
 
@@ -25,25 +26,48 @@
 #include <asm/cp-intc.h>
 
 #ifdef DEBUG
-#define DPRINTK(fmt, args...) printk(KERN_CRIT "INTC: [%s] " fmt, __FUNCTION__ , ## args)
+#define DPRINTK(fmt, args...) printk(KERN_CRIT "CP_INTC: [%s] " fmt, __FUNCTION__ , ## args)
 #else
 #define DPRINTK(fmt, args...) 
 #endif
 
+#define MAX_CPINTC_PER_COMBINER 32
+
 struct c6x_irq_chip {
-	struct irq_chip	chip;
+	struct irq_chip	           chip;
 	struct combiner_mask_info *minfo;
 };
 
-static struct combiner_mask_info     cpintc_mask_info[NR_CPINTC0_COMBINERS];
-static struct combiner_handler_info  cpintc_handler_info[NR_CPINTC0_COMBINERS];
-static uint8_t                       cpintc_evt_to_output[NR_CPINTC0_IRQS];
+struct __cpintc_irq_info {
+	volatile uint32_t *mevtflag;
+	volatile uint32_t *evtclr;
+	uint32_t           mask;
+	uint16_t           irq;
+	uint16_t           level;
+};
+
+struct cpintc_handler_info {
+	uint16_t                 nb_irq;
+	uint16_t                 combiner;
+	struct __cpintc_irq_info irq_i[MAX_CPINTC_PER_COMBINER];
+};
+
+static struct combiner_mask_info     cpintc_mask_info[NR_CPINTC_COMBINERS];
+static struct cpintc_handler_info    cpintc_handler_info[NR_CPINTC_COMBINERS];
+static uint8_t                       cpintc_evt_to_output[NR_CPINTC_IRQS];
 static struct c6x_irq_chip           cpintc_mapped_chips[NR_CPINTC0_OUTPUTS];
+
+static char                          combiner_actions_name[NR_CPINTC_COMBINERS][20];
+
 static struct c6x_irq_chip          *megamod_chips;
 static struct combiner_handler_info *megamod_handler_info;
+static void (*megamod_handler)(unsigned int irq, struct irq_desc *desc);
+struct irqaction                    *megamod_actions;
 
 #define __host_irq_to_idx(irq) IRQ_SOC_HOST_IRQ_TO_IDX(irq)
 #define __idx_to_chan(i)       IRQ_SOC_IDX_TO_CHAN(i)
+#define __irq_to_evt(irq)      (irq - IRQ_CPINTC0_START)
+#define __evt_to_irq(evt)      (evt + IRQ_CPINTC0_START)
 
 /*
  * There is one CP_INTC for 4 cores on C66x
@@ -54,16 +78,35 @@ static struct combiner_handler_info *megamod_handler_info;
 #define __get_cpintc_id()      (get_coreid() >> 2)
 #endif
 
+/* Default chip operations for CP_INTC interrupts */
+static void cpintc_mask(unsigned int irq);
+static void cpintc_unmask(unsigned int irq);
+static unsigned int cpintc_startup(unsigned int irq);
+static void cpintc_disable(unsigned int irq);
+
+/* Default CP_INTC chip mapped to CP_INTC events */
+static struct irq_chip cpintc_default_chip = {
+	.name     = "default_cpintc_chip",
+	.startup  = cpintc_startup,
+	.disable  = cpintc_disable,
+	.mask     = cpintc_mask,
+	.unmask   = cpintc_unmask,
+};
+
 /* Mapping from host int to INTC mapping */
 static uint8_t cpintc_host_irq_map[] = { 
-	IRQ_INTC0OUT,
-	IRQ_INTC0OUT + 1,
-	IRQ_INTC0OUT + 2,
-	IRQ_INTC0OUT + 3,
-	IRQ_INTC0OUT + 4,
-	IRQ_INTC0OUT + 5,
-	IRQ_INTC0OUT + 6,
-	IRQ_INTC0OUT + 7,
+	IRQ_CPINTC0_COMBINER,
+	IRQ_CPINTC0_COMBINER + 1,
+	IRQ_CPINTC0_COMBINER + 2,
+	IRQ_CPINTC0_COMBINER + 3,
+	IRQ_CPINTC0_COMBINER + 4,
+	IRQ_CPINTC0_COMBINER + 5,
+	IRQ_CPINTC0_COMBINER + 6,
+	IRQ_CPINTC0_COMBINER + 7,
+	IRQ_CPINTC0_COMBINER + 8,
+	IRQ_CPINTC0_COMBINER + 9,
+	IRQ_CPINTC0_COMBINER + 10,
+	IRQ_CPINTC0_COMBINER + 11,
 };
 
 /* Interrupts that are level instead of pulse */
@@ -71,6 +114,9 @@ u32 cpintc_level_irqs[] = IRQ_CPINTC_LEVEL_IRQS;
 
 /* Lock protecting irq mappings */
 static spinlock_t map_lock;
+
+/* free CP_INTC combiner to allocate */
+static unsigned int cpintc_free_combiner = 0;
 
 /*
  *  Return 1 if the INTC IRQ number is a CP_INTC interrupt
@@ -96,7 +142,7 @@ int cpintc_combined_irq(unsigned int irq)
 	int i;
 
 	/* The combined interrupt are hardcoded at the beginning */
-	for (i = 0; i < NR_CPINTC0_COMBINERS; i++) {
+	for (i = 0; i < NR_CPINTC_COMBINERS; i++) {
 		if (irq == cpintc_host_irq_map[i])
 			return 1;
 	}
@@ -112,11 +158,8 @@ static inline void __cpintc_map_irq(int n, unsigned int src, unsigned int channe
 	uint32_t val;
 	int      offset;
 
-	BUG_ON(src >= NR_CPINTC0_COMBINERS * 32);
+	BUG_ON(src >= NR_CPINTC0_IRQS);
 	BUG_ON(channel >= NR_CPINTC0_CHANNELS);
-
-	if (src >= NR_CPINTC0_IRQS)
-	    return;
 
 	offset = (src & 3) << 3;
 
@@ -229,12 +272,12 @@ void cpintc_map(unsigned int irq_src, unsigned int irq_dst)
 	if (output < 0)
 		return;
 	
-	/* Only map CIC event sources */
+	/* Only map CP_INTC event sources */
 	if (!((irq_src >= IRQ_CPINTC0_START)
 	      && (irq_src < IRQ_CPINTC0_START + NR_CPINTC0_IRQS)))
 		return;
 	
-	src = irq_src - IRQ_CPINTC0_START;
+	src = __irq_to_evt(irq_src);
 
 	spin_lock_irqsave(&map_lock, flags);
 
@@ -266,29 +309,10 @@ EXPORT_SYMBOL(cpintc_map);
 /*
  * Retrieve the corresponding mapped INTC IRQ for a given CP_INTC IRQ 
  * (combined or not)
- * 
- * CP_INTC IRQs mapped directly to megamodule use chip data from the megamodule
- * combiner since the megamodule combiner will controlling masking. All other
- * CP_INTC IRQs use CP_INTC combiner chip data.
  */
 int irq_soc_mapped_irq(uint16_t irq)
 {
-#if 0
-	uint8_t output;
-
-	/* Not a CP_INTC irq */
-	if (irq < IRQ_CPINTC0_START || irq >= (IRQ_CPINTC0_START + NR_CPINTC_IRQS))
-		return irq;
-
-	output = cpintc_evt_to_output[irq - IRQ_CPINTC0_START];
-
-	DPRINTK("retrieve irq mapping for irq = %d, output = %d\n", irq, output);
-
-	return (cpintc_host_irq_map[output]);
-#else
-	/* No combiner, use mapping n->1 instead */
 	return irq;
-#endif
 }
 
 EXPORT_SYMBOL(irq_soc_mapped_irq);
@@ -298,7 +322,6 @@ EXPORT_SYMBOL(irq_soc_mapped_irq);
  */
 int irq_soc_get(uint16_t irq_src, uint16_t *soc_irq)
 {
-	/* No combiner, use mapping n->1 instead */
 	*soc_irq = irq_src;
 
 	/* Always considered like combined */
@@ -306,24 +329,27 @@ int irq_soc_get(uint16_t irq_src, uint16_t *soc_irq)
 }
 EXPORT_SYMBOL(irq_soc_get);
 
-static void cpintc_mask_combined(unsigned int irq)
+/*
+ * Mask/Unmask a CP_INTC interrupt
+ */
+static void cpintc_mask(unsigned int irq)
 {
-	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
-
-	*chip->minfo->evtclr = (1 << (irq - chip->minfo->irq_base));
-	DPRINTK("masking irq %d\n", irq);
+	struct c6x_irq_chip *chip  = c6x_irq_to_chip(irq);
+	unsigned int         evt   = __irq_to_evt(irq);
+	
+	*chip->minfo->evtclr = evt;
 }
 
-static void cpintc_unmask_combined(unsigned int irq)
+static void cpintc_unmask(unsigned int irq)
 {
-	struct c6x_irq_chip *chip = c6x_irq_to_chip(irq);
+	struct c6x_irq_chip *chip  = c6x_irq_to_chip(irq);
+	unsigned int         evt   = __irq_to_evt(irq);
 
-	*chip->minfo->evtset = (1 << (irq - chip->minfo->irq_base));
-	DPRINTK("unmasking irq %d\n", irq);
+	*chip->minfo->evtset = evt;
 }
 
 #define CPINTC_CHIP(i)	\
-	__CHIP("cp-combiner-", i, cpintc_mask_combined, cpintc_unmask_combined)
+	__CHIP("cp-combiner-", i, cpintc_mask, cpintc_unmask)
 
 static struct c6x_irq_chip cpintc_chips[] = {
 	CPINTC_CHIP(0),
@@ -334,7 +360,6 @@ static struct c6x_irq_chip cpintc_chips[] = {
 	CPINTC_CHIP(5),
 	CPINTC_CHIP(6),
 	CPINTC_CHIP(7),
-#if NR_CPINTC_COMBINERS > 8
 	CPINTC_CHIP(8),
 	CPINTC_CHIP(9),
 	CPINTC_CHIP(10),
@@ -343,7 +368,6 @@ static struct c6x_irq_chip cpintc_chips[] = {
 	CPINTC_CHIP(13),
 	CPINTC_CHIP(14),
 	CPINTC_CHIP(15),
-#endif
 };
 
 /*
@@ -351,22 +375,20 @@ static struct c6x_irq_chip cpintc_chips[] = {
  */
 int irq_soc_init(void)
 {
-	int i, j;
-	struct combiner_mask_info    *minfo;
-	struct combiner_handler_info *hinfo;
+	int i;
+	struct combiner_mask_info  *minfo;
+	struct cpintc_handler_info *hinfo;
 
 	minfo = &cpintc_mask_info[0];
 	hinfo = &cpintc_handler_info[0];
-	for (i = 0; i < NR_CPINTC0_COMBINERS; i++) {
-		minfo->irq_base = IRQ_CPINTC0_START + (i * 32);
+
+	for (i = 0; i < NR_CPINTC_COMBINERS; i++) {
+		minfo->irq_base = 0;
 		minfo->evtmask  = 0; 
-		minfo->evtset	= &CPINTC_ENABLE(__get_cpintc_id())[i];
-		minfo->evtclr	= &CPINTC_ENABLECLR(__get_cpintc_id())[i];
-		hinfo->mevtflag = &CPINTC_ENASTATUS(__get_cpintc_id())[i]; /* status*/
-		hinfo->evtclr   = &CPINTC_ENASTATUS(__get_cpintc_id())[i]; /* write 1 clean irq */
-		for (j = 0; j < 32; j++)
-			/* Define the default mapping */
-			hinfo->irqmap[j] = minfo->irq_base + j;
+		minfo->evtset	= CPINTC_ENABLEIDXSET(__get_cpintc_id());
+		minfo->evtclr	= CPINTC_ENABLEIDXCLR(__get_cpintc_id());
+		hinfo->nb_irq   = 0;
+		hinfo->combiner = 0xffff;
 		minfo++;
 		hinfo++;
 	}
@@ -378,122 +400,263 @@ int irq_soc_init(void)
 EXPORT_SYMBOL(irq_soc_init);
 
 /*
+ * Handler for combined CP_INTC interrupts
+ */
+static void handle_cpintc_combined_irq(unsigned int irq, struct irq_desc *desc)
+{
+	struct cpintc_handler_info *hinfo = get_irq_desc_data(desc);
+	unsigned int i;
+
+	raw_spin_lock(&desc->lock);
+
+	if (unlikely(desc->status & IRQ_INPROGRESS))
+		goto out_unlock;
+	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+	kstat_incr_irqs_this_cpu(irq, desc);
+
+	desc->status |= IRQ_INPROGRESS;
+	raw_spin_unlock(&desc->lock);
+
+	/* Check all pending CP_INTC interrupts combined here, call handlers and ack */
+	for (i = 0; i < hinfo->nb_irq; i++) {
+		if (*hinfo->irq_i[i].mevtflag & hinfo->irq_i[i].mask) {
+			unsigned int c_irq = hinfo->irq_i[i].irq; /* child IRQ to handle */
+			
+			/* Mask level interrupt */
+			if (hinfo->irq_i[i].level)
+				cpintc_mask(c_irq);
+
+			/* Acknowledge interrupt */
+			*hinfo->irq_i[i].evtclr = __irq_to_evt(c_irq);
+
+			/* Call handler */
+			generic_handle_irq(c_irq);
+
+			/* Unmask level interrupt */
+			if (hinfo->irq_i[i].level)
+				cpintc_unmask(c_irq);
+		}
+	}
+
+	raw_spin_lock(&desc->lock);
+	desc->status &= ~IRQ_INPROGRESS;
+out_unlock:
+	raw_spin_unlock(&desc->lock);
+}
+
+/*
+ * Disable a given CP_INTC interrupt: remove evt mapping to INTC combiner
+ */
+static void cpintc_disable(unsigned int irq)
+{
+	struct cpintc_handler_info *hinfo;
+	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned int c;
+
+	hinfo = get_irq_desc_data(desc);
+	if (!hinfo)
+		goto exit;
+
+	c = hinfo-> combiner;
+
+	DPRINTK("Disable CP_INTC interrupt %d (attached to combiner %d)\n", irq, c);
+
+	raw_spin_lock(&desc->lock);
+
+	if (hinfo->nb_irq > 0) {
+		unsigned i;
+		for (i = 0; i < hinfo->nb_irq; i++) {
+			if (hinfo->irq_i[i].irq == irq) {
+				if (i < hinfo->nb_irq - 1)
+					/* If needed, shift remaining irq struct */
+					memcpy(&hinfo->irq_i[i],
+					       &hinfo->irq_i[i+1],
+					       sizeof(struct __cpintc_irq_info)
+					       * (hinfo->nb_irq - i - 2));
+				hinfo->nb_irq--;
+			}
+		}
+	}
+exit:
+	raw_spin_unlock(&desc->lock);
+}
+
+/*
+ * Check if a given interrupt is level or edge/pulse
+ */
+static unsigned int cpintc_irq_is_level(unsigned int irq)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(cpintc_level_irqs); i++) {
+		if (irq == cpintc_level_irqs[i]) {
+			DPRINTK("Set irq %d as level signaled\n", irq);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Startup a given CP_INTC interrupt: do dynamic mapping of the CP_INTC event
+ * with the INTC combiner.
+ */
+static unsigned int cpintc_startup(unsigned int irq)
+{
+	struct c6x_irq_chip *chip;
+	struct cpintc_handler_info *hinfo;
+	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned int evt      = __irq_to_evt(irq);
+	unsigned int c        = cpintc_free_combiner;
+	unsigned int chan     = __idx_to_chan(c);
+	unsigned int hirq;
+	unsigned int parent_irq;
+
+	DPRINTK("Starting up CP_INTC interrupt %d\n", irq);
+
+	raw_spin_lock(&desc->lock);
+
+	/* Map incoming CP_INTC events to a free host interrupt */
+	cpintc_free_combiner += 1;
+	if (cpintc_free_combiner >= NR_CPINTC0_COMBINERS) {
+		cpintc_free_combiner = 0;
+	}
+
+	/* Check that evt IRQ is a real CP_INTC IRQ */
+	if (evt >= NR_CPINTC0_IRQS) {
+		DPRINTK("irq %d, bad CP_INTC interrupt (evt = %d)\n", irq, evt);
+		raw_spin_unlock(&desc->lock);
+		return 1;
+	}
+		
+	/* Map the event (system interrupt) to the combined channel */
+	__cpintc_map_irq(__get_cpintc_id(), evt, chan);
+
+	/* Record the mapping */
+	cpintc_evt_to_output[evt] = chan;
+			
+	/* Set the individiual CP_INTC IRQs to use combiner */
+	set_irq_chip(irq, (struct irq_chip *)&cpintc_chips[c]);
+	set_irq_handler(irq, handle_edge_irq);
+
+	/* Retrieve the mapping channel -> host irq */
+	hirq = __cpintc_get_host_irq(__get_cpintc_id(), chan);
+	if (hirq == -1) {
+		/* Map the corresponding channel to the host interrupt */
+		__cpintc_map_channel(__get_cpintc_id(), chan, c);
+		hirq = c;
+	}
+
+	/* Enable the corresponding output host interrupt */
+	*CPINTC_HINTIDXSET(__get_cpintc_id()) = hirq;
+
+	/* Mapping of irq in the parent int controller (INTC) */
+	parent_irq = cpintc_host_irq_map[__host_irq_to_idx(hirq)];
+	DPRINTK("host irq = %d, channel = %d, cpintc combiner = %d, parent_irq = %d\n",
+		hirq, chan , c, parent_irq);
+
+	/* Rename combiner used for CP_INTC */
+	megamod_actions[NR_MEGAMOD_COMBINERS + c].name
+		= &combiner_actions_name[c][0];
+	sprintf((char *) megamod_actions[NR_MEGAMOD_COMBINERS + c].name,
+		"cp-combiner-%d", c);
+
+	cpintc_chips[c].minfo           = &cpintc_mask_info[__host_irq_to_idx(hirq)];
+	cpintc_chips[c].minfo->irq_base = irq;
+
+	hinfo = &cpintc_handler_info[c];
+
+	BUG_ON(hinfo->nb_irq > MAX_CPINTC_PER_COMBINER);
+
+	/* Set the CP_INTC registers to check status and clear interrupts and its info */
+	hinfo->irq_i[hinfo->nb_irq].mevtflag = &CPINTC_ENASTATUS(__get_cpintc_id())[evt/32];
+	hinfo->irq_i[hinfo->nb_irq].evtclr   = CPINTC_STATUSIDXCLR(__get_cpintc_id());
+	hinfo->irq_i[hinfo->nb_irq].mask     = 1 << (evt & 31);
+	hinfo->irq_i[hinfo->nb_irq].irq      = irq;
+	hinfo->irq_i[hinfo->nb_irq].level    = cpintc_irq_is_level(irq);
+
+       	hinfo->nb_irq++;
+       	hinfo->combiner = c;
+
+	desc->handler_data = hinfo;
+
+	/* Chip info for parent int controller we are wired through (INTC) */
+	chip = &megamod_chips[parent_irq / 32];
+	
+	set_irq_chip(parent_irq, (struct irq_chip *)chip);
+
+	DPRINTK("parent_irq = %d, chip = 0x%x\n", parent_irq, chip);
+
+	set_irq_handler(parent_irq, handle_cpintc_combined_irq);
+	set_irq_data(parent_irq, hinfo);
+
+	desc = irq_to_desc(parent_irq);
+		
+	/* Set parent (megamod) action to combiner but new handler info for CP_INTC */
+	desc->action       = &megamod_actions[NR_MEGAMOD_COMBINERS + c];
+	desc->handler_data = hinfo;
+
+	chip->chip.startup(parent_irq);
+
+	/* Unmask the interrupt */
+	desc->chip->enable(irq);
+
+	raw_spin_unlock(&desc->lock);
+
+	return 0;
+}
+
+/*
  * Setup the CP_INTC controller
  */
 int irq_soc_setup(struct c6x_irq_chip          *parent_chips,
 		  struct combiner_handler_info *parent_handler_info,
 		  void (*handler)(unsigned int irq, struct irq_desc *desc),
-		  struct irqaction             *combiner_actions)
+		  struct irqaction             *actions)
 {
 	int i;
-	struct irq_desc *desc;
-	struct combiner_handler_info *hinfo;
+	unsigned int evt;
 
-	/* Disable all host interrupts */
-	*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 0;
+	if (get_coreid() == get_master_coreid()) {
+		/* Disable all host interrupts */
+		*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 0;
 
-	/* Configure CP_INTC with no nesting support */
-	*CPINTC_CTRL(__get_cpintc_id()) = CPINTC_NO_NESTING;
+		/* Configure CP_INTC with no nesting support */
+		*CPINTC_CTRL(__get_cpintc_id()) = CPINTC_NO_NESTING;
+	}
 
 	/* Default settings for CP-INTC host interrupt */
 	for (i = 0; i < IRQ_CPINTC0_MAPLEN; i++) {
-		unsigned int irq = cpintc_host_irq_map[i];
-
-		desc = irq_to_desc(irq);
+		unsigned int irq      = cpintc_host_irq_map[i];
+		struct irq_desc *desc = irq_to_desc(irq);
 
 		desc->status |= (IRQ_NOREQUEST | IRQ_NOPROBE);
 		set_irq_chip(irq, &dummy_irq_chip);
 		set_irq_handler(irq, handle_bad_irq);
 	}
 
-	/* 
-	 * Configure CP_INTC combined IRQs to INTC INTCn IRQs.
-	 */
-	for (i = 0; i < NR_CPINTC0_COMBINERS; i++) {
-		int irq, parent_irq;
-		int j;
-		unsigned int chan = __idx_to_chan(i);
-		struct c6x_irq_chip *chip;
+	/* Initialize CP_INTC IRQs */
+	for (evt = 0; evt < NR_CPINTC_IRQS; evt++) {
+		unsigned int irq = __evt_to_irq(evt);
 
-		CPINTC_ENABLECLR(__get_cpintc_id())[i] = ~0; /* mask all events */
-		CPINTC_ENASTATUS(__get_cpintc_id())[i] = ~0; /* clear all events */
-
-		/*
-		 * CP_INTC has no default combiner, so we need to map all incoming
-		 * events to host interrupt:
-		 * evt 0 - 31    -> channel 0
-		 * evt 32 - 63   -> channel 1
-		 * ...
-		 * evt 224 - 155 -> channel 7
-		 */
-		for (j = 0; j < 32; j++) {
-			unsigned int evt = j + (i << 5);
-
-			/* Check that evt IRQ is a real CP_INTC IRQ */
-			if (evt >= NR_CPINTC0_IRQS)
-			    continue;
-	
-			/* Map the event (system interrupt) to the combined channel */
-			__cpintc_map_irq(__get_cpintc_id(), evt, chan);
-
-			/* Record the mapping */
-			cpintc_evt_to_output[evt] = chan;
-			
-			/* Set the individiual CP_INTC IRQs to use combiner */
-			set_irq_chip(evt + IRQ_CPINTC0_START, (struct irq_chip *)&cpintc_chips[i]);
-
-			/* 
-			 * Use edge interrupt handler, CP_INTC is using pulse inputs
-			 * signals for interrupts.
-			 */
-			set_irq_handler(evt + IRQ_CPINTC0_START, handle_edge_irq);
+		if (get_coreid() == get_master_coreid()) {
+			*CPINTC_ENABLEIDXCLR(__get_cpintc_id()) = evt; /* mask event */
+			*CPINTC_STATUSIDXCLR(__get_cpintc_id()) = evt; /* clear event */
 		}
 
-		/* Retrieve the mapping channel -> host irq */
-		irq = __cpintc_get_host_irq(__get_cpintc_id(), chan);
-		if (irq == -1) {
-			/* Map the corresponding channel to the host interrupt */
-			__cpintc_map_channel(__get_cpintc_id(), chan, i);
-			irq = i;
-		}
-
-		/* Enable the corresponding output host interrupt */
-		*CPINTC_HINTIDXSET(__get_cpintc_id()) = irq;
-
-		cpintc_chips[i].minfo = &cpintc_mask_info[__host_irq_to_idx(irq)];
-
-		/* Mapping of irq in the parent int controller (INTC) */
-		parent_irq = cpintc_host_irq_map[__host_irq_to_idx(irq)];
-		DPRINTK("irq = %d, channel = %d, combiner = %d, parent_irq = %d\n",
-			irq, chan , i, parent_irq);
-
-		/* Chip info for parent int controller we are wired through (INTC) */
-		chip  = &parent_chips[parent_irq / 32];
-		hinfo = &parent_handler_info[parent_irq / 32];
-
-		set_irq_chip(parent_irq, (struct irq_chip *)chip);
-		DPRINTK("parent_irq = %d, chip = 0x%x\n",
-			parent_irq, chip);
-
-		set_irq_handler(parent_irq, handler);
-		set_irq_data(parent_irq, &cpintc_handler_info[i]);
-
-		desc         = irq_to_desc(parent_irq);
-		desc->action = &combiner_actions[NR_MEGAMOD_COMBINERS + i];
-		chip->chip.startup(parent_irq);
+		/* Set the individiual CP_INTC IRQs to do dynamical mapping */
+		set_irq_chip(irq, &cpintc_default_chip);
 	}
 
-	/* Some CP_INTC interrupts are level driven, change their handler here */
-	for (i = 0; i < ARRAY_SIZE(cpintc_level_irqs); i++) {
-		DPRINTK("Set irq %d as level signaled\n", cpintc_level_irqs[i]);
-		set_irq_handler(cpintc_level_irqs[i], handle_level_irq);
+	if (get_coreid() == get_master_coreid()) {
+		/* Enable all host interrupts */
+		*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 1;
 	}
-
-	/* Enable all host interrupts */
-	*CPINTC_GLOBALHINTEN(__get_cpintc_id()) = 1;
 
 	megamod_chips        = parent_chips;
 	megamod_handler_info = parent_handler_info;
+	megamod_actions      = actions;
+	megamod_handler      = handler;
 
 	spin_lock_init(&map_lock);
 

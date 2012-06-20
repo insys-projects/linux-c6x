@@ -275,10 +275,11 @@
 #define IRQ_QMPEND24         (IRQ_CPINTC0_START + 158)
 #define IRQ_QMPEND25         (IRQ_CPINTC0_START + 159)
 
-#define IRQ_CPINTC0_MAPLEN   8              /* number of (usable) events from CP_INTC0 */
+#define IRQ_CPINTC0_MAPLEN   11             /* number of combined IRQs from CP_INTC0 */
+#define IRQ_CPINTC0_COMBINER IRQ_INTC0OUT   /* start of combined CP_INTC0 IRQs */
 
 #define NR_CPINTC0_IRQS      160            /* number of source events */
-#define NR_CPINTC0_COMBINERS 8              /* number of combiners */
+#define NR_CPINTC0_COMBINERS 11             /* number of combiners */
 #define NR_CPINTC0_CHANNELS  152            /* number of output channels */
 #define NR_CPINTC0_OUTPUTS   17             /* number of output host interrupts */
 
@@ -301,10 +302,8 @@ extern int cpintc_combined_irq(unsigned int irq);
 
 /*
  * This macros return 1 if ack must be performed before handling irq.
- * When handling IRQs through the CP INTC0, ack after the handler runs.
  */
-#define IRQ_SOC_COMBINER_PRE_ACK(irq) \
-       ((irq) < IRQ_CPINTC0_START || (irq) >= (IRQ_CPINTC0_START + NR_CPINTC0_IRQS))
+#define IRQ_SOC_COMBINER_PRE_ACK(irq)  1
 
 /*
  * This macro returns 1 if the irq number is a CP_INTC interrupt at the GEM INTC level
