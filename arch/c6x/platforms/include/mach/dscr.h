@@ -180,6 +180,7 @@
 #define DSCR_MACID                   0x02620110
 #define DSCR_TINPSEL                 0x02620300
 #define DSCR_TOUTPSEL                0x02620304
+#define DSCR_RSTMUX0                 0x02620308
 #define DSCR_MAINPLLCTL0             0x02620328
 #define DSCR_MAINPLLCTL1             0x0262032c
 #define DSCR_DDR3PLLCTL0	     0x02620330
