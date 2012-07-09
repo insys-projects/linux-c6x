@@ -40,6 +40,7 @@
 #include <asm/pm.h>
 #include <asm/string.h>
 #include <asm/leds.h>
+#include <asm/timer.h>
 
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
@@ -134,17 +135,29 @@ asmlinkage int sys_idle(void)
 
 void machine_restart(char * __unused)
 {
+#ifdef MACH_RESTART
+	MACH_RESTART();
+#else
 	for (;;);
+#endif
 }
 
 void machine_halt(void)
 {
+#ifdef MACH_HALT
+	MACH_HALT();
+#else
 	for (;;);
+#endif
 }
 
 void machine_power_off(void)
 {
+#ifdef MACH_POWER_OFF
+	MACH_POWER_OFF();
+#else
 	for (;;);
+#endif
 }
 
 void show_regs(struct pt_regs * regs)
