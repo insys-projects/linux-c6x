@@ -80,6 +80,12 @@
 #define TIMER_B_TGCR_PSCHI_MASK      (0x00f << 8)
 #define TIMER_B_TGCR_TDDRHI_MASK     (0x00f << 12)
 
+#define TIMER_B_WDTCR_WDEN_ENABLE    (0x01 << 14)
+
+#define TIMER_WDTCR_WDKEY_SEQ0       0xa5c6
+#define TIMER_WDTCR_WDKEY_SEQ1       0xda7e
+#define TIMER_WDTCR_WDKEY_SHIFT      16
+
 #define TIMER_0                      0
 #define TIMER_1                      1
 #if defined(CONFIG_SOC_TMS320C6472) || defined(CONFIG_SOC_TMS320C6474)
