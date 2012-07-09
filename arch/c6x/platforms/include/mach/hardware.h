@@ -293,6 +293,11 @@
 #define ARCH_HAS_XMC_PREFETCHW       /* Use prefetch buffers */
 #define ARCH_HAS_XMC_MPAX            /* Use XMC address extension  */
 #define ARCH_HAS_MSM                 /* Architecture has MSM */
+
+#ifndef __ASSEMBLY__
+extern void keystone_watchdog_reset(int chan);
+#endif  /* __ASSEMBLY__ */
+
 #endif /* CONFIG_TI_KEYSTONE */
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

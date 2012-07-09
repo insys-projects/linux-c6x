@@ -62,3 +62,10 @@
 
 #define EVM_LED_IDLE_NUM         3
 #define EVM_LED_TIMER_NUM        2
+
+/*
+ * Platform halt/reset methods
+ */
+#define MACH_RESTART()           keystone_watchdog_reset(LINUX_TIMER_SRC);
+#define MACH_HALT()              __dint(); asm volatile(" idle");
+#define MACH_POWER_OFF()         __dint(); asm volatile(" idle");

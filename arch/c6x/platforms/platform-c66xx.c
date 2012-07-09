@@ -26,6 +26,7 @@
 #include <linux/i2c.h>
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/plat-ram.h>
@@ -35,6 +36,7 @@
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/dscr.h>
+#include <asm/timer.h>
 
 #include <mach/board.h>
 
@@ -241,6 +243,73 @@ static void init_power(void)
 #endif
 }
 
+/*
+ * Configure the RSTMUXn register so that a watchdog output will trigger a
+ * device reset
+ */
+#define RSTMUX_OMODE_DEVICE_RESET              5
+#define RSTMUX_OMODE_DEVICE_RESET_SHIFT        1
+#define RSTMUX_OMODE_DEVICE_RESET_MASK         (BIT(1) | BIT(2) | BIT(3))
+#define RSTMUX_LOCK_MASK                       BIT(0)
+
+static inline void keystone_watchdog_setup(void)
+{
+	u32 rstmux = DSCR_RSTMUX0 + (get_coreid() << 2);
+	u32 val;
+
+	val = __raw_readl(rstmux) & ~RSTMUX_OMODE_DEVICE_RESET_MASK;
+	if (!(val & RSTMUX_LOCK_MASK)) {
+		val |= (RSTMUX_OMODE_DEVICE_RESET <<
+			RSTMUX_OMODE_DEVICE_RESET_SHIFT);
+		__raw_writel(val, rstmux);
+	} 
+}
+
+void keystone_watchdog_reset(int chan)
+{
+        u32 tgcr, wdtcr;
+	u32 timer_TCR	   = TIMER_TCR_REG(chan);
+	u32 timer_TGCR	   = TIMER_TGCR_REG(chan);
+	u32 timer_WDTCR	   = TIMER_WDTCR_REG(chan);
+
+	/* Only master core is allowed to reboot the board */
+	if (get_coreid() == get_master_coreid()) {
+
+		/* set watchdog to hard reset */
+		keystone_watchdog_setup();
+
+		/* disable internal clock source */
+		__raw_writel(0, timer_TCR);
+		
+		/* reset timer, set mode to 64-bit watchdog, and unreset */
+		tgcr = 0;
+		__raw_writel(tgcr, timer_TGCR);
+		tgcr = TIMER_B_TGCR_TIMMODE_WDT64 | TIMER_B_TGCR_TIMLORS | TIMER_B_TGCR_TIMHIRS;
+		__raw_writel(tgcr, timer_TGCR);
+		
+		/* clear counter and period regs */
+		__raw_writel(0, TIMER_CNTLO_REG(chan));
+		__raw_writel(0, TIMER_CNTHI_REG(chan));
+		__raw_writel(0, TIMER_PRDLO_REG(chan));
+		__raw_writel(0, TIMER_PRDHI_REG(chan));
+		
+		/* put watchdog in pre-active state */
+		wdtcr = __raw_readl(timer_WDTCR);
+		wdtcr = (TIMER_WDTCR_WDKEY_SEQ0 << TIMER_WDTCR_WDKEY_SHIFT) | TIMER_B_WDTCR_WDEN_ENABLE;
+		__raw_writel(wdtcr, timer_WDTCR);
+		
+		/* put watchdog in active state */
+		wdtcr = (TIMER_WDTCR_WDKEY_SEQ1 << TIMER_WDTCR_WDKEY_SHIFT) |  TIMER_B_WDTCR_WDEN_ENABLE;
+		__raw_writel(wdtcr, timer_WDTCR);
+		
+		/* write an invalid value to the WDKEY field to trigger a watchdog reset */
+		wdtcr = 0x00004000;
+		__raw_writel(wdtcr, timer_WDTCR);
+	}
+
+	machine_halt();
+}
+
 #ifdef CONFIG_TI_KEYSTONE_QM
 /*
  * Enable and configure QMSS
@@ -353,7 +422,7 @@ static int __init setup_netcp(void)
 core_initcall(setup_netcp);
 #endif /* CONFIG_TI_KEYSTONE_NETCP */
 
-#if defined(CONFIG_PCI)
+#if defined(CONFIG_PCI) || defined(CONFIG_PCI_MODULE)
 /*
  * Configure PCIe
  */
@@ -421,7 +490,7 @@ static struct platform_device c6x_pcie_device = {
 	.resource	= c6x_pcie_resources,
 };
 
-__init int c6x_init_pcie(void)
+static __init int c6x_init_pcie(void)
 {
 	/* Set PCIe as RC */
 	dscr_set_reg(DSCR_DEVSTAT, 
