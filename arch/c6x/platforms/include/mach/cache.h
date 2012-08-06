@@ -18,6 +18,8 @@
 #define L1P_CACHE_BYTES   32
 #define L2_CACHE_BYTES    128
 
+#define L1_CACHE_SHIFT    6
+
 /*
  * L2 used as cache
  */
