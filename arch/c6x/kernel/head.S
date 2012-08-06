@@ -22,8 +22,10 @@
 	.ref	c6x_mtd_early_init
 
 	.include	"c6x_config.inc"
+	.align 1024
 #else
 #include "tags.h"
+	.align 10
 #endif
 
 	.global	_c_int00
