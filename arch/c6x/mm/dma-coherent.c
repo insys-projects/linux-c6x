@@ -41,6 +41,7 @@
  */
 unsigned long dma_memory_start = 0; /* by default at the end of the Linux physical memory */
 unsigned long dma_memory_size  = 0; /* none by default */
+unsigned long dma_memory_end   = 0; /* none by default */
 
 static u32    dma_page_heap = 0;
 static u32    dma_page_top  = 0;
@@ -328,11 +329,9 @@ int coherent_mem_init(void)
 			 */
 			dma_memory_start =
 				CACHE_REGION_START(memory_end - dma_memory_size);
-			
+
 			/* Then remove the coherent memory from the paged one */
 			memory_end = dma_memory_start;
-			
-
 		} else {
 			/* Align it on MAR */
 			dma_memory_start = CACHE_REGION_START(dma_memory_start);
@@ -345,30 +344,30 @@ int coherent_mem_init(void)
 				memory_end = dma_memory_start;
 		}
 
-		printk(KERN_INFO "Coherent memory (DMA) region start=0x%lx size=0x%lx\n",
+		dma_memory_end = dma_memory_start + dma_memory_size;
+		printk(KERN_INFO "Coherent memory (DMA) region start=0x%lx end=0x%lx (size=0x%lx)\n",
 		       dma_memory_start,
+		       dma_memory_end,
 		       dma_memory_size);
 		
 		/*
 		 * We need to ensure that there are no cachelines in use, or
 		 * worse dirty in this area.
 		 */
-		L2_cache_block_writeback(dma_memory_start,
-					 dma_memory_start + dma_memory_size - 1);
+		L2_cache_block_writeback(dma_memory_start, dma_memory_end - 1);
 
 		/* Make this memory coherent (so non-cacheable) */
 		disable_caching((unsigned int *) dma_memory_start,
-				(unsigned int *) (dma_memory_start + dma_memory_size - 1));
+				(unsigned int *) (dma_memory_end - 1));
 
 		printk(KERN_INFO "disabling caching for 0x%lx to 0x%lx\n",
-		       dma_memory_start,
-		       dma_memory_start + dma_memory_size - 1);
+		       dma_memory_start, dma_memory_end - 1);
 
 		/* The allocator starts here */
 		dma_page_heap = dma_memory_start;
 
 		/* And finish here */
-		dma_page_top = PAGE_ALIGN(dma_memory_start + dma_memory_size);
+		dma_page_top = PAGE_ALIGN(dma_memory_end);
 	}
 
 	return 0;

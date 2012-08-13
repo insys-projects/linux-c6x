@@ -55,8 +55,6 @@ struct ram_private_data {
 	u32 size;
 };
 
-extern unsigned int memory_end;
-
 /*
  * display a single region to a sequenced file
  */
@@ -447,6 +445,9 @@ static ssize_t ram_proc_write(struct file* file,
 	struct proc_dir_entry * dp;
 	struct inode * inode = file->f_dentry->d_inode;
 	struct ram_private_data * data;
+	unsigned long phys_memory_end = max_t(unsigned long,
+					      memory_end,
+					      dma_memory_end);
 
 	dp   = PDE(inode);
 	data = (struct ram_private_data *) dp->data;
@@ -456,7 +457,7 @@ static ssize_t ram_proc_write(struct file* file,
 
 	/* For the DDR case, avoid to write in the Linux space */
 	if ((data->start == RAM_MEMORY_START) && 
-	    ((*ppos + count) < (memory_end - RAM_MEMORY_START)))
+	    ((*ppos + count) < (phys_memory_end - RAM_MEMORY_START)))
 		return -EACCES;
 
 #ifdef ARCH_HAS_MSM
@@ -572,8 +573,10 @@ static int mcore_init(void)
 {
 	struct proc_dir_entry *mcore;
 	struct proc_dir_entry *file;
-	unsigned int           n = 0;
-
+	unsigned int n = 0;
+	unsigned long phys_memory_end = max_t(unsigned long,
+					      memory_end,
+					      dma_memory_end);
 	mcore = proc_mkdir("mcore", NULL);
 	if (!mcore) {
 		printk(KERN_ERR "MCORE: error -- proc_mkdir(/proc/nk) failed\n");
@@ -661,10 +664,10 @@ static int mcore_init(void)
 
 			/* Register DDR used by Linux and free DDR */
 			register_mcore_region("DDR", data->start,
-					      memory_end - data->start, 1);
-			if (memory_end < (data->start + data->size - 1))
-				register_mcore_region("DDR", memory_end, 
-						      data->size - (memory_end - data->start),
+					      phys_memory_end - data->start, 1);
+			if (phys_memory_end < (data->start + data->size - 1))
+				register_mcore_region("DDR", phys_memory_end, 
+						      data->size - (phys_memory_end - data->start),
 						      0);
 
 			DPRINTK("create DDR, core=%d, start=0x%x size=0x%x\n",

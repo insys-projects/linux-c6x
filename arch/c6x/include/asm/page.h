@@ -91,6 +91,8 @@ static inline int get_order(unsigned long size)
 
 extern unsigned int memory_start;
 extern unsigned int memory_end;
+extern unsigned long dma_memory_start;
+extern unsigned long dma_memory_end;
 
 typedef struct page *pgtable_t;
 
@@ -116,7 +118,9 @@ typedef struct page *pgtable_t;
 #define page_to_pfn(page)	virt_to_pfn(page_to_virt(page))
 
 #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
-				((void *)(kaddr) < (void *)memory_end))
+				 ((void *)(kaddr) < (void *) \
+				  max_t(unsigned long, memory_end, dma_memory_end)))
+
 #define pfn_valid(pfn)		virt_addr_valid(pfn_to_virt(pfn))
 
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
