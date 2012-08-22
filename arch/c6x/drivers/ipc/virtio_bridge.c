@@ -20,11 +20,15 @@
 
 #include <asm/ipc-core.h>
 
+#ifdef CONFIG_TI_KEYSTONE
+#include <mach/keystone_hwspinlock.h>
+#endif
+
 #include "virtio_ipc.h"
 
 /*
  * Maximal number of interfaces in a SoC
- * (must be norammly equal to max number of cores)
+ * (must be normaly equal to max number of cores)
  */
 #define VIRTIO_BRIDGE_MAX_IF CORE_NUM
 
@@ -33,6 +37,9 @@ struct bridge_if_desc {
 	__u16        last_added;
 	__u16        core_id;
 	__u16        __pad;
+#ifdef CONFIG_TI_KEYSTONE
+	struct hwspinlock *hwlock;
+#endif
 	struct vring vring;
 };
 
@@ -117,25 +124,24 @@ static int get_next_head_desc(struct bridge_if_desc *bdesc,
 	unsigned int       max = bdesc->vring.num;
 
 	/* 
-	 * Check if there are available buffers
+	 * Check if we run out of buffers
 	 */
-	if (*last_avail == bdesc->vring.avail->idx) {
-		DPRINTK("no available buffer %u %u\n",
-			*last_avail, bdesc->vring.avail->idx);
+	if (unlikely(*last_avail == bdesc->vring.avail->idx)) {
+		DPRINTK("no available buffer in output %u %u\n",
+		       *last_avail, bdesc->vring.avail->idx);
 		return max;
 	}
-
+#if 0
 	/* 
 	 * Check it isn't doing very strange things with descriptor numbers.
 	 */
-	if ((u16)(bdesc->vring.avail->idx - *last_avail) > max) {
-		EPRINTK("bridge moved used index from %u to %u\n",
+	if (unlikely((u16)(bdesc->vring.avail->idx - *last_avail) > max)) {
+		EPRINTK("bridge moved avail index from %u to %u\n",
 			*last_avail, bdesc->vring.avail->idx);
-		return -1;
 	}
-
+#endif	
 	mutex_lock(&bridge_lock);
-
+	
 	/*
 	 * Grab the next descriptor number they're advertising
 	 */
@@ -145,9 +151,9 @@ static int get_next_head_desc(struct bridge_if_desc *bdesc,
 	 * Go to the next available head
 	 */
 	(*last_avail)++;
-	
+
 	/* If their number is silly, that's a fatal mistake. */
-	if (head >= max) {
+	if (unlikely(head >= max)) {
 		EPRINTK("bridge says index %u is available\n", head);
 		mutex_unlock(&bridge_lock);
 		return -1;
@@ -304,10 +310,12 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 			continue;
 		}
 
-		/* Invalidate the destination input remote ring content from our caches */
-		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_DESC);
+#ifdef CONFIG_TI_KEYSTONE
+		keystone_hwspinlock_lock(dst_bdesc->hwlock);
+#endif
 
-#if 1 /* Workaround to allow multiple interfaces without multi-queue support */
+		/* Invalidate the destination input remote ring content from our caches */
+		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_ALL);
 		
 		/*
 		 * Check if the last_avail index has moved behind our back due to
@@ -316,26 +324,26 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 		 * but this does not protect us against concurrent accesses.
 		 */
 		virtio_ipc_invalidate_ring(&dst_bdesc->vring, CACHE_SYNC_RING_USED_IDX);
-		if (dst_bdesc->vring.used->idx > dst_bdesc->last_avail) {
-			DPRINTK("moving last_avail from %d to %d for if %d\n",
-				dst_bdesc->last_avail, dst_bdesc->vring.used->idx, k);
-			dst_bdesc->last_avail = dst_bdesc->vring.used->idx;
-		}
-#endif
+
+		DPRINTK("last_avail = %d, used->idx = %d, avail->idx = %d\n",
+			dst_bdesc->last_avail, dst_bdesc->vring.used->idx,
+			dst_bdesc->vring.avail->idx);
+
+		dst_bdesc->last_avail = dst_bdesc->vring.used->idx;
 
 		/* Retrieve an available destination incomming buffer */
 		dst_head = get_next_head_desc(dst_bdesc, 0);
 	
 		/* No more space in destination ring? */
-		if (dst_head == max) {
-			DPRINTK("destination ring full for %d\n", k);
-			/* Skip this interface */
-			continue;
+		if (dst_head == dst_bdesc->vring.num) {
+			DPRINTK("destination ring full for %d (dst_head=%d)\n", k, dst_head);
+			goto skip;
 		} 
 
 		/* Error case */ 
 		if (dst_head == -1) {
-			return -1;
+			ret = -1;
+			goto error;	
 		}
 
 		/* Number of total treated buffers */
@@ -356,8 +364,7 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 				 */
 				if (j == max) {
 					/* No more desc */
-					ret = -1;
-					goto error;
+					goto skip;
 				}
 
 				free = dst_desc[j].len;
@@ -366,7 +373,7 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 				j =  next_desc(dst_desc, j, max);
 			}
 			
-			/* Length of the descriptor to transfer*/
+			/* Length of the descriptor to transfer */
 			len = src_desc[i].len;
 		
 			if ((index > 0) && (free >= len) && (len)) {
@@ -393,6 +400,10 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 
 		/* Finished with the destination */
 		add_used(&dst_bdesc->vring, dst_head, tlen);
+skip:
+#ifdef CONFIG_TI_KEYSTONE
+		keystone_hwspinlock_unlock(dst_bdesc->hwlock);
+#endif
 
 		/* Signal the destination core for this packet */
 		ipc_core->ipc_send(dst_bdesc->core_id, IPC_INT_NET);
@@ -403,6 +414,9 @@ static int virtio_bridge_transfer(struct vring_virtqueue *vq,
 
 	return 0;
 error:
+#ifdef CONFIG_TI_KEYSTONE
+	keystone_hwspinlock_unlock(dst_bdesc->hwlock);
+#endif
 	return ret;
 }
 
@@ -421,7 +435,7 @@ static int virtio_sync_buffers(struct vring_virtqueue *vq,
 	 * Check if there are available buffers
 	 */
 	if (*last_added == vq->vring.avail->idx) {
-		DPRINTK("no available buffer %u %u\n",
+		DPRINTK("no available buffer in sync %u %u\n", 
 			*last_added, vq->vring.avail->idx);
 		return 0;
 	}
@@ -562,6 +576,20 @@ EXPORT_SYMBOL(virtio_bridge_notify);
 int virtio_bridge_register_if(struct ipc_device_desc *desc)
 {
 	struct bridge_if_desc *bdesc = &bridge_if[desc->id];
+
+#ifdef CONFIG_TI_KEYSTONE
+	DPRINTK("Requesting hwspinlock %d\n", desc->id);
+	bdesc->hwlock = keystone_hwspinlock_init(desc->id);
+	if (!bdesc->hwlock)
+		return -1;
+
+	if ((desc->owner == get_master_coreid())
+	    && (get_coreid() == get_master_coreid())) {
+		DPRINTK("resetting hwspinlock = 0x%x\n", bdesc->hwlock->priv);
+		keystone_hwspinlock_reset(bdesc->hwlock);
+	}
+	DPRINTK("hwspinlock addr = 0x%x\n", bdesc->hwlock->priv);
+#endif
 
 	if (desc->id == get_local_if_id()) {
 		/* The output vq is the second one */
