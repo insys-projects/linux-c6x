@@ -252,6 +252,7 @@ again:
 
 	page = compound_head(page);
 	lock_page(page);
+#ifdef CONFIG_MMU
 	if (!page->mapping) {
 		unlock_page(page);
 		put_page(page);
@@ -274,6 +275,17 @@ again:
 		key->shared.inode = page->mapping->host;
 		key->shared.pgoff = page->index;
 	}
+#else
+	if (page->mapping) {
+		key->both.offset |= FUT_OFF_INODE; /* inode-based key */
+		key->shared.inode = page->mapping->host;
+		key->shared.pgoff = page->index;
+	} else {
+		key->both.offset |= FUT_OFF_MMSHARED; /* ref taken on mm */
+		key->private.mm = mm;
+		key->private.address = address;
+	}
+#endif
 
 	get_futex_key_refs(key);
 
