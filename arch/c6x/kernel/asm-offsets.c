@@ -79,6 +79,7 @@ void foo(void)
 
 	OFFSET(THREAD_KSP,	thread_struct, ksp);
 	OFFSET(THREAD_CSR,	thread_struct, csr);
+	OFFSET(THREAD_TLS,      thread_struct, tls);
 	BLANK();
 
 	OFFSET(TASK_STATE,	task_struct, state);

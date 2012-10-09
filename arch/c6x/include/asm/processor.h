@@ -66,6 +66,7 @@ struct thread_struct {
 	unsigned long  usp;		/* user stack pointer */
 	unsigned long  csr;		/* saved control status register */
 	unsigned long  fs;	        /* saved fs (sfc, dfc) */
+	unsigned long  tls;             /* thread-local storage */
 };
 
 #define INIT_THREAD					\
@@ -73,7 +74,8 @@ struct thread_struct {
 	.ksp = sizeof(init_stack) + (long) init_stack,	\
 	.usp = 0,					\
 	.csr = DEFAULT_CSR,				\
-	.fs = __KERNEL_DS,				\
+	.fs  = __KERNEL_DS,				\
+	.tls = 0,				        \
 }
 
 #define INIT_MMAP \

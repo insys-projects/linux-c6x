@@ -357,6 +357,9 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 		/* Otherwise use the given stack */
 		childregs->sp = usp;
 
+	if (clone_flags & CLONE_SETTLS)
+		p->thread.tls = regs->a8;
+
 	/* Set usp/ksp */
 	p->thread.usp = childregs->sp;
 	p->thread.ksp = (unsigned long)childstack - 8;

@@ -3,8 +3,8 @@
 ;
 ;  Port on Texas Instruments TMS320C6x architecture
 ;
-;  Copyright (C) 2004, 2005, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
-;  Author: Aurelien Jacquiot (aurelien.jacquiot@virtuallogix.com)
+;  Copyright (C) 2004, 2005, 2006, 2009, 2010, 2011, 2012 Texas Instruments Incorporated
+;  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
 ;  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
 ;
 ;  This program is free software; you can redistribute it and/or modify
@@ -987,30 +987,45 @@ resume:
  ||	MVC	.S2	CSR,B2
 	STW	.D1T2	B2,*+A0(THREAD_CSR)	; save CSR
 
+	;; Load user-helper addr
+ ||	MVKL	.S2	__user_helper_addr,B8
+	MVKH	.S2	__user_helper_addr,B8
+	LDW	.D2T2	*B8,B0
+	
 	;; Save non-scratch registers on stack
 	SAVE_SWITCH_STACK
 
-	;; Save current kernel stack pointer
-	MV	.D1X	SP,A2
-	STW	.D1T1	A2,*+A0(THREAD_KSP)
-	;; Get pointer to thread struct (B4 contains the new task)
- ||	ADD	.D2X	B4,A6,B4
+	;; load current TLS value
+ [B0]	LDW	.D2T1	*B0, A8
 
+	;; Get pointer to thread struct (B4 contains the new task)
+ ||	ADD	.S2X	B4,A6,B4
+	MV	.D1X	SP,A2
+ ||	LDW	.D2T2	*+B4(THREAD_TLS),B9 ; Load new TLS
+	;; Save current kernel stack pointer
+	STW	.D1T1	A2,*+A0(THREAD_KSP)
+	
 	;; Restore the kernel stack pointer
-	LDW	.D2T2	*+B4(THREAD_KSP),B2
+ ||	LDW	.D2T2	*+B4(THREAD_KSP),B2
 	MVKL	.S2	current_ksp,B1
 	MVKH	.S2	current_ksp,B1
 	NOP	2
 	MV	.S2	B2,SP
  ||	STW	.D2T2	B2,*B1
+	
+	;; Save old TLS in thread
+ ||[B0]	STW	.D1T1   A8, *+A0(THREAD_TLS)
 
 	;; Restore non-scratch registers
 	RESTORE_SWITCH_STACK
 
 	;; Restore status register
 	LDW	.D2T2	*+B4(THREAD_CSR),B2
-	BNOP	.S2	B3,4		; return in next E1
+	BNOP	.S2	B3,3		; return in next E1
 	MVC	.S2	B2,CSR
+	
+	;; Save new TLS value in user helper		
+ [B0]	STW	.D2T2	B9, *B0	
 
 #ifdef CONFIG_TI_C6X_COMPILER
 	;;
@@ -1389,5 +1404,6 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_rt_tgsigqueueinfo
 	SYSCALL_ENTRY	sys_perf_event_open
 	SYSCALL_ENTRY	sys_recvmmsg
-	SYSCALL_ENTRY	sys_cache_sync	; 330
-
+	SYSCALL_ENTRY	sys_cache_sync		; 330
+	SYSCALL_ENTRY	sys_get_user_helper
+	SYSCALL_ENTRY	sys_set_tls

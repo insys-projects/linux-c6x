@@ -298,11 +298,6 @@
 #define __NR_add_key		279
 #define __NR_request_key	280
 #define __NR_keyctl		281
-
-/* C6x special syscalls */		
-/* #define __NR_exec_memobj	282 */
-/* #define __NR_dp_alloc	283 */
-
 #define __NR_sched_setaffinity	284
 #define __NR_sched_getaffinity	285
 #define __NR_kexec_load		286
@@ -349,9 +344,12 @@
 #define __NR_rt_tgsigqueueinfo	327
 #define __NR_perf_event_open	328
 #define __NR_recvmmsg		329
+/* C6x special syscalls */
 #define __NR_cache_sync		330
- 
-#define NR_SYSCALLS		331
+#define __NR_get_user_helper	331
+#define __NR_set_tls		332
+
+#define NR_SYSCALLS		333
 
 #ifdef _TMS320C64_PLUS
 /* use a software exception for syscall trap */

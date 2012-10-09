@@ -3,8 +3,8 @@
  *
  *  Port on Texas Instruments TMS320C6x architecture
  *
- *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
- *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
+ *  Copyright (C) 2004, 2009, 2010, 2011, 2012 Texas Instruments Incorporated
+ *  Author: Aurelien Jacquiot <a-jacquiot@ti.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -88,11 +88,36 @@ sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
 asmlinkage int
 sys_cache_sync (unsigned long s, unsigned long e)
 {
-	/* FIXME. Add range checks */
+	if (s >= e)
+		return -1;
 
 	L1D_cache_block_writeback_invalidate(s, e);
 	L1P_cache_block_invalidate(s, e);
 
+	return 0;
+}
+
+/*
+ * TLS syscalls for getting user helper address and set TLS for current thread
+ */
+unsigned long __user_helper_addr = 0;
+
+asmlinkage unsigned long
+sys_get_user_helper (void)
+{
+	if (!__user_helper_addr) {
+		/* Allocate user_helper */
+		__user_helper_addr = (unsigned long) kmalloc(PAGE_SIZE, GFP_KERNEL);
+	}
+	return __user_helper_addr;
+}
+
+asmlinkage int
+sys_set_tls (unsigned long tls_value)
+{
+	if (unlikely(!__user_helper_addr))
+		return -ENOMEM;
+	*((unsigned long *) __user_helper_addr) = tls_value;
 	return 0;
 }
 
@@ -109,7 +134,6 @@ asmlinkage long old_mmap(unsigned long addr, unsigned long len,
 		return -EINVAL;
 	return sys_mmap_pgoff(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
 }
-
 
 struct sel_arg_struct {
 	unsigned long n;
