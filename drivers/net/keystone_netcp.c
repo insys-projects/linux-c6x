@@ -83,10 +83,9 @@
 #define MDIO_B_ENABLE                   (1 << 30)
 #define MDIO_B_IDLE                     (1 << 31)
 
-#define rx_free_q()                     (DEVICE_QM_ETH_RX_FREE_Q + netcp_instance())
-/* Accumulator queues are already indexed on instances */
-#define rx_q()                          (DEVICE_QM_ETH_RX_Q)
-#define tx_cp_q()                       (DEVICE_QM_ETH_TX_CP_Q)
+#define rx_free_q(id)                   (DEVICE_QM_ETH_RX_FREE_Q + netcp_instance(id))
+#define rx_q(id)                        (DEVICE_QM_ETH_RX_Q(id))
+#define tx_cp_q(id)                     (DEVICE_QM_ETH_TX_CP_Q(id))
 
 static int rx_packet_max = NETCP_MAX_PACKET_SIZE;
 module_param(rx_packet_max, int, 0);
@@ -112,15 +111,15 @@ struct netcp_priv {
 	int				rx_packet_max;
 	int				host_port;
 	struct clk		       *clk;
+	u32                            *acc_list_addr_rx;
+	u32                            *acc_list_addr_tx;
+	u32                            *acc_list_phys_addr_rx;
+	u32                            *acc_list_phys_addr_tx;
+	u32                             netcp_irq_enabled;
 };
 
 /* The QM accumulator RAM */
 static u32 *acc_list_addr_top;
-static u32 *acc_list_addr_rx;
-static u32 *acc_list_addr_tx;
-static u32 *acc_list_phys_addr_rx;
-static u32 *acc_list_phys_addr_tx;
-static u32 netcp_irq_enabled = 0;
 
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
 
@@ -223,7 +222,7 @@ static void netcp_cleanup_qs(struct net_device *ndev)
 {
 	struct qm_host_desc *hd = NULL;
 
-	while ((hd = hw_qm_queue_pop(rx_q())) && (hd != NULL))
+	while ((hd = hw_qm_queue_pop(rx_q(ndev->dev_id))) && (hd != NULL))
 		hw_qm_queue_push(hd, DEVICE_QM_ETH_FREE_Q, DEVICE_QM_DESC_SIZE_BYTES);
 }
 
@@ -235,6 +234,9 @@ static int netcp_init_qs(struct net_device *ndev)
 	u32 i;
 	struct qm_host_desc *hd;
 	struct sk_buff      *skb;
+
+	DPRINTK("filling Rx descriptors for if=%d, queue=%d\n",
+		ndev->dev_id, rx_free_q(ndev->dev_id));
 
 	for (i = 0; i < DEVICE_NUM_RX_DESCS; i++) {
 		skb = netdev_alloc_skb_ip_align(ndev, NETCP_MAX_PACKET_SIZE);
@@ -255,7 +257,7 @@ static int netcp_init_qs(struct net_device *ndev)
 		L2_cache_block_writeback_invalidate((u32) skb->data,
 						    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 
-		hw_qm_queue_push(hd, rx_free_q(), DEVICE_QM_DESC_SIZE_BYTES);
+		hw_qm_queue_push(hd, rx_free_q(ndev->dev_id), DEVICE_QM_DESC_SIZE_BYTES);
 	}
 	return 0;
 }
@@ -357,7 +359,7 @@ static int cpmac_drv_start(void)
 	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL |
 		GMACSL_ENABLE_FULL_DUPLEX | 
 		GMACSL_ENABLE_GIG_MODE;
-       
+
 	/* Enable port 0 with max pkt size to 9504 */
 	cpsw_config(CPSW_CTL_P0_ENABLE, 9504);
 
@@ -389,29 +391,37 @@ static int cpmac_drv_stop(void)
  */
 static inline void netcp_irq_disable(struct net_device *ndev)
 {
-	netcp_irq_enabled = 0;
+	struct netcp_priv *p = netdev_priv(ndev);
+
+	p->netcp_irq_enabled = 0;
 }
 
 static inline void netcp_irq_enable(struct net_device *ndev)
 {
-	netcp_irq_enabled = 1;
+	struct netcp_priv *p = netdev_priv(ndev);
+
+	p->netcp_irq_enabled = 1;
 }
 
 static inline void netcp_rx_irq_ack(struct net_device *ndev)
 {
-	if (netcp_irq_enabled) {
+	struct netcp_priv *p = netdev_priv(ndev);
+
+	if (p->netcp_irq_enabled) {
 		/* Ack Rx interrupt */
 		hw_qm_ack_interrupt(DEVICE_QM_ETH_INTD_EOI_INDEX ,
-				    DEVICE_QM_ETH_ACC_RX_CHANNEL);
+				    DEVICE_QM_ETH_ACC_RX_CHANNEL(ndev->dev_id));
 	}
 }
 
 static inline void netcp_tx_irq_ack(struct net_device *ndev)
 {
-	if (netcp_irq_enabled) {
+	struct netcp_priv *p = netdev_priv(ndev);
+
+	if (p->netcp_irq_enabled) {
 		/* Ack Tx interrupt */
 		hw_qm_ack_interrupt(DEVICE_QM_ETH_INTD_EOI_INDEX ,
-				    DEVICE_QM_ETH_ACC_TX_CHANNEL);
+				    DEVICE_QM_ETH_ACC_TX_CHANNEL(ndev->dev_id));
 	}
 }
 
@@ -421,20 +431,21 @@ static inline void netcp_tx_irq_ack(struct net_device *ndev)
 static int netcp_tx(struct net_device *ndev)
 {
 	struct qm_host_desc *hd       = NULL;
-	int qm_tx_int_status = 0;
+	struct netcp_priv   *p        = netdev_priv(ndev);
 	int                  released = 0;
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
+	int                  qm_tx_int_status = 0;
 
-	qm_tx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_TX_CHANNEL);
+	qm_tx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_TX_CHANNEL(ndev->dev_id));
 	if (qm_tx_int_status == 0)
 		return qm_tx_int_status;
 
 	/* Accumulator ping pong buffer management */
-	if (acc_list == acc_list_addr_tx)
-		acc_list = acc_list_addr_tx + (DEVICE_TX_INT_THRESHOLD + 1);
+	if (acc_list == p->acc_list_addr_tx)
+		acc_list = p->acc_list_addr_tx + (DEVICE_TX_INT_THRESHOLD + 1);
 	else
-		acc_list = acc_list_addr_tx;
+		acc_list = p->acc_list_addr_tx;
 
 	acc_list_p = acc_list;
 
@@ -478,22 +489,23 @@ static int netcp_rx(struct net_device *ndev,
 		     unsigned int work_to_do)
 {
 	int                  pkt_size = 0;
-	int qm_rx_int_status = 0;
+	struct netcp_priv   *p        = netdev_priv(ndev);
 	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
 	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
+	int                  qm_rx_int_status = 0;
 
-	qm_rx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_RX_CHANNEL);
+	qm_rx_int_status = hw_qm_interrupt_status(DEVICE_QM_ETH_ACC_RX_CHANNEL(ndev->dev_id));
 	if (qm_rx_int_status == 0)
 		return qm_rx_int_status;
 
 	/* Accumulator ping pong buffer management */
-	if (acc_list == acc_list_addr_rx)
-		acc_list = acc_list_addr_rx + (DEVICE_RX_INT_THRESHOLD + 1);
+	if (acc_list == p->acc_list_addr_rx)
+		acc_list = p->acc_list_addr_rx + (DEVICE_RX_INT_THRESHOLD + 1);
 	else
-		acc_list = acc_list_addr_rx;
+		acc_list = p->acc_list_addr_rx;
 
 	acc_list_p = acc_list;
 
@@ -537,7 +549,7 @@ static int netcp_rx(struct net_device *ndev,
 			L2_cache_block_writeback_invalidate((u32) skb->data,
 							    (u32) skb->data + NETCP_MAX_PACKET_SIZE);
 
-			hw_qm_queue_push(hd, rx_free_q(), DEVICE_QM_DESC_SIZE_BYTES);
+			hw_qm_queue_push(hd, rx_free_q(ndev->dev_id), DEVICE_QM_DESC_SIZE_BYTES);
 		}
 		
 		/* Fill statistic */
@@ -558,7 +570,7 @@ static int netcp_rx(struct net_device *ndev,
  */
 static irqreturn_t netcp_rx_interrupt(int irq, void *netdev_id)
 {
-	struct net_device         *ndev = (struct net_device *) netdev_id;
+	struct net_device *ndev = (struct net_device *) netdev_id;
 	struct netcp_priv *p    = netdev_priv(ndev);
 
 	if (likely(napi_schedule_prep(&p->napi))) {
@@ -620,7 +632,7 @@ static void netcp_ndo_poll_controller(struct net_device *ndev)
  * Push an outcoming packet
  */
 static int netcp_ndo_start_xmit(struct sk_buff *skb,
-				   struct net_device *ndev)
+				struct net_device *ndev)
 {
 	int                  ret;
 	unsigned             pkt_len = skb->len;
@@ -674,11 +686,11 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	ndev->trans_start     = jiffies;
 
 	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x), return queue=%d\n",
-		skb->len, skb, hd, tx_cp_q());
+		skb->len, skb, hd, tx_cp_q(ndev->dev_id));
 
 	/* Return the descriptor back to the tx completion queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
-	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, tx_cp_q());
+	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, tx_cp_q(ndev->dev_id));
 
 	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, DEVICE_QM_DESC_SIZE_BYTES);
 	
@@ -705,7 +717,7 @@ static int netcp_ndo_open(struct net_device *ndev)
 	struct netcp_priv *p = netdev_priv(ndev);
 	
 	/* Start EMAC */
-	if (netcp_master())
+	if (netcp_master() && (!ndev->dev_id))
 		cpmac_drv_start();
 
 	netif_wake_queue(ndev);
@@ -739,7 +751,7 @@ static int netcp_ndo_stop(struct net_device *ndev)
 	napi_disable(&p->napi);
 	netif_stop_queue(ndev);
 	
-	if (netcp_master())
+	if (netcp_master() && (!ndev->dev_id))
 		cpmac_drv_stop();
 
 	return 0;
@@ -1155,6 +1167,24 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->msg_enable = netif_msg_init(debug_level, NETCP_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
 
+#ifdef EMAC_ARCH_HAS_MAC_ADDR
+	/* SoC or board hw has MAC address */
+	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
+	    config.enetaddr[2] == 0 && config.enetaddr[3] == 0 &&
+	    config.enetaddr[4] == 0 && config.enetaddr[5] == 0) {
+		if (!emac_arch_get_mac_addr(hw_emac_addr)) {
+			for (i = 0; i <= 5; i++)
+				config.enetaddr[i] = hw_emac_addr[i] & 0xff;
+		}
+	}
+#endif
+	if (is_valid_ether_addr(config.enetaddr)) {
+		emac_arch_adjust_mac_addr(config.enetaddr, netcp_instance(pdev->id));
+		memcpy(ndev->dev_addr, config.enetaddr, ETH_ALEN);
+	}
+	else
+		random_ether_addr(ndev->dev_addr);
+
 	/* MII/MDIO init */
 	priv->msg_enable        = NETIF_MSG_LINK;
 	priv->mii.phy_id        = data->phy_id;
@@ -1167,51 +1197,36 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->mii.mdio_read     = netcp_mdio_read;
 	priv->mii.mdio_write    = netcp_mdio_write;
 
-	netcp_mdio_init();
+	if (!pdev->id) {
 
-	pktdma_region_init(DEVICE_PA_CDMA_BASE,
-			   DEVICE_PA_CDMA_SIZE,
-			   &pa_cdma_base_addr);
+		netcp_mdio_init();
 
-#ifdef EMAC_ARCH_HAS_MAC_ADDR
-	/* SoC or board hw has MAC address */
-	if (config.enetaddr[0] == 0 && config.enetaddr[1] == 0 &&
-	    config.enetaddr[2] == 0 && config.enetaddr[3] == 0 &&
-	    config.enetaddr[4] == 0 && config.enetaddr[5] == 0) {
-		if (!emac_arch_get_mac_addr(hw_emac_addr)) {
-			for (i = 0; i <= 5; i++)
-				config.enetaddr[i] = hw_emac_addr[i] & 0xff;
-			emac_arch_adjust_mac_addr(config.enetaddr, netcp_instance());
+		pktdma_region_init(DEVICE_PA_CDMA_BASE,
+				   DEVICE_PA_CDMA_SIZE,
+				   &pa_cdma_base_addr);
+
+		/* Allocate the accumulator list memory in the descriptor memory */
+		acc_list_off_rx = (DEVICE_RX_INT_THRESHOLD + 1) * 2;
+		acc_list_off_tx = (DEVICE_TX_INT_THRESHOLD + 1) * 2;
+		acc_list_num_rx = acc_list_off_rx * DEVICE_NETCP_NUM_INSTANCES;
+		acc_list_num_tx = acc_list_off_tx * DEVICE_NETCP_NUM_INSTANCES;
+		acc_list_size   = (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
+		
+		acc_list_addr_top = (u32*) qm_mem_alloc(acc_list_size,
+							(u32*)&priv->acc_list_phys_addr_rx);
+		if (acc_list_addr_top == NULL) {
+			printk(KERN_ERR "%s: accumulator memory allocation failed\n",
+			       __FUNCTION__);
+			return -ENOMEM;
 		}
 	}
-#endif
 
-	if (is_valid_ether_addr(config.enetaddr))
-		memcpy(ndev->dev_addr, config.enetaddr, ETH_ALEN);
-	else
-		random_ether_addr(ndev->dev_addr);
-
-	/* Allocate the accumulator list memory in the descriptor memory */
-	acc_list_off_rx = (DEVICE_RX_INT_THRESHOLD + 1) * 2;
-	acc_list_off_tx = (DEVICE_TX_INT_THRESHOLD + 1) * 2;
-	acc_list_num_rx = acc_list_off_rx * DEVICE_NETCP_NUM_INSTANCES;
-	acc_list_num_tx = acc_list_off_tx * DEVICE_NETCP_NUM_INSTANCES;
-	acc_list_size   = (acc_list_num_rx + acc_list_num_tx) * sizeof(long);
-	
-	acc_list_addr_top = (u32*) qm_mem_alloc(acc_list_size,
-						(u32*)&acc_list_phys_addr_rx);
-	if (acc_list_addr_top == NULL) {
-		printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-		       __FUNCTION__);
-		return -ENOMEM;
-	}
-
-	acc_list_phys_addr_tx = acc_list_phys_addr_rx + acc_list_num_rx;
-	acc_list_addr_rx      = acc_list_addr_top + (acc_list_off_rx * netcp_instance());
-	acc_list_addr_tx      = acc_list_addr_top + acc_list_num_rx + (acc_list_off_tx * netcp_instance());
+	priv->acc_list_phys_addr_tx = priv->acc_list_phys_addr_rx + acc_list_num_rx;
+	priv->acc_list_addr_rx      = acc_list_addr_top + (acc_list_off_rx * netcp_instance(pdev->id));
+	priv->acc_list_addr_tx      = acc_list_addr_top + acc_list_num_rx + (acc_list_off_tx * netcp_instance(pdev->id));
 
 	/* Check if we are NetCP master or slave */
-	if (!netcp_master())
+	if ((!netcp_master()) || (pdev->id))
 		goto slave_only;
 	
 	DPRINTK("master core configuration\n");
@@ -1237,7 +1252,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 
 		netcp_setup_accumulator(queue_rx[i],
 					DEVICE_QM_ETH_ACC_RX_CHANNEL_I(i),
-					(u32) (acc_list_phys_addr_rx + (acc_list_off_rx * i)),
+					(u32) (priv->acc_list_phys_addr_rx + (acc_list_off_rx * i)),
 					DEVICE_RX_INT_THRESHOLD);
 	}
 
@@ -1249,7 +1264,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	for (i = 0; i < DEVICE_NETCP_NUM_INSTANCES; i++) {
 		netcp_setup_accumulator(DEVICE_QM_ETH_TX_CP_Q_I(i),
 					DEVICE_QM_ETH_ACC_TX_CHANNEL_I(i),
-					(u32) (acc_list_phys_addr_tx + (acc_list_off_tx * i)),
+					(u32) (priv->acc_list_phys_addr_tx + (acc_list_off_tx * i)),
 					DEVICE_TX_INT_THRESHOLD);
 	}
 
@@ -1301,6 +1316,10 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	}
 
 slave_only:
+	ndev->dev_id         = pdev->id;
+	ndev->watchdog_timeo = DEVICE_TX_TIMEOUT;
+	ndev->netdev_ops     = &keystone_netdev_ops;
+
 	/* Initialize QMSS/PKTDMA queues */
 	netcp_cleanup_qs(ndev);
 
@@ -1310,7 +1329,8 @@ slave_only:
 		return ret;
 	}
 
-	DPRINTK("rx_free_q = %d, rx_q = %d, tx_cp_q = %d\n", rx_free_q(), rx_q(), tx_cp_q());
+	DPRINTK("rx_free_q = %d, rx_q = %d, tx_cp_q = %d\n",
+		rx_free_q(ndev->dev_id), rx_q(ndev->dev_id), tx_cp_q(ndev->dev_id));
 
 	/* Setup Ethernet driver function */
 	ether_setup(ndev);
@@ -1333,11 +1353,6 @@ slave_only:
 		       __FUNCTION__, ret);
 		ndev->irq = -1;
 	}
-
-	/* Register the network device */
-	ndev->dev_id         = 0;
-	ndev->watchdog_timeo = DEVICE_TX_TIMEOUT;
-	ndev->netdev_ops     = &keystone_netdev_ops;
 
 	SET_ETHTOOL_OPS(ndev, &netcp_ethtool_ops);
 	SET_NETDEV_DEV(ndev, &pdev->dev);

@@ -35,12 +35,21 @@
 #define DEVICE_PSTREAM_CFG_REG_ADDR             0x02000604
 #define DEVICE_PSTREAM_CFG_REG_VAL_ROUTE_PDSP0	0
 
-/* Multiple instances support */
-#define DEVICE_NETCP_NUM_INSTANCES              (CORE_NUM)
+/* 
+ * Multiple instances support:
+ * We support 2 NetCP Ethernet devices per Linux instances (i.e. cores) and 
+ * up to 8 instances (on C6678). Thus we fund 16 instances here.
+ * The NetCP instances are allocated as following:
+ * 0 for master core eth0, 1 for 1st slave core eth0, 2 for 2nd slave core eth0, 
+ * up to 7 for 7th slave core eth0.
+ * 8 for master core eth1, 9 for 1st slave core eth1, ...
+ */
+#define DEVICE_NETCP_NUM_INSTANCES              16
 
-static inline unsigned int netcp_instance(void) { return (get_coreid() - get_master_coreid()) & (CORE_NUM - 1); }
-static inline unsigned int netcp_coreid(unsigned int i)  { return (i + get_master_coreid()) & (CORE_NUM - 1); }
-static inline int          netcp_master(void)   { return (get_coreid() == get_master_coreid()); }
+static inline unsigned int netcp_instance(unsigned int i) { return ((get_coreid() - get_master_coreid()) & (CORE_NUM - 1)) | (i << 3); }
+static inline unsigned int netcp_coreid(unsigned int i)   { return (i + get_master_coreid()) & (CORE_NUM - 1); }
+static inline int          netcp_master(void)             { return (get_coreid() == get_master_coreid()); }
+static inline unsigned int netcp_idx(unsigned int i)      { return (i >> 3) << 1; }
 
 struct netcp_platform_data {
 

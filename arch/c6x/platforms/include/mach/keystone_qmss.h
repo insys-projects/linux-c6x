@@ -160,7 +160,7 @@
 #define QM_HIGH_PRIO_CHAN_MAP(c)        (DEVICE_QM_HIGH_PRIO_Q + (c))
 #define QM_LOW_PRIO_CHAN_MAP(c)         (DEVICE_QM_LOW_PRIO_Q + ((c) << 5))
 
-/* Return the channel for a given channel idx on a givent core */
+/* Return the channel for a given channel idx on a given core */
 #define QM_HIGH_PRIO_IDX_MAP(i, c)      (((i) * CORE_NUM) + (c))
 #define QM_LOW_PRIO_IDX_MAP(i, c)       (i)
 
@@ -227,15 +227,15 @@
 
 /* Ethernet (NetCP) queues */
 #define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
-#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                              /* Ethernet Rx free desc queue */
-#define DEVICE_QM_ETH_RX_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q                               /* Ethernet Tx queue (for PA) */
-#define DEVICE_QM_ETH_TX_CP_Q		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL) /* Ethernet Tx completion queue (filled by PA) */
+#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                                 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_Q(id)		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL(id)) /* Ethernet Rx queue (filled by PA) */
+#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q                                  /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_CP_Q(id)	QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL(id)) /* Ethernet Tx completion queue (filled by PA) */
 
 #define DEVICE_QM_ETH_RX_Q_I(i)         QM_HIGH_PRIO_CHAN_MAP(		\
-		QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX, netcp_coreid(i))) /* Ethernet Rx queue per NetCP instance */
+		QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX + netcp_idx(i), netcp_coreid(i))) /* Ethernet Rx queue per NetCP instance */
 #define DEVICE_QM_ETH_TX_CP_Q_I(i)      QM_HIGH_PRIO_CHAN_MAP(\
-		QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX, netcp_coreid(i))) /* Ethernet Tx completion queue per NetCP instance */
+		QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX + netcp_idx(i), netcp_coreid(i))) /* Ethernet Tx completion queue per NetCP instance */
 
 #define DEVICE_QM_ETH_RX_FREE_Q_I(i)    (DEVICE_QM_ETH_RX_FREE_Q + (i))  /* Ethernet Rx free desc queue per NetCP instance */
 
@@ -249,15 +249,15 @@
 #define DEVICE_QM_ETH_ACC_TX_IDX        1 /* Tx Ethernet accumulator channels index */
 
 /* Accumulator channels for NetCP */
-#define DEVICE_QM_ETH_ACC_RX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(	\
-		DEVICE_QM_ETH_ACC_RX_IDX, get_coreid())
-#define DEVICE_QM_ETH_ACC_TX_CHANNEL    QM_HIGH_PRIO_IDX_MAP(	\
-		DEVICE_QM_ETH_ACC_TX_IDX, get_coreid())
+#define DEVICE_QM_ETH_ACC_RX_CHANNEL(id)    QM_HIGH_PRIO_IDX_MAP(	\
+		DEVICE_QM_ETH_ACC_RX_IDX + ((id) << 1), get_coreid())
+#define DEVICE_QM_ETH_ACC_TX_CHANNEL(id)    QM_HIGH_PRIO_IDX_MAP(	\
+		DEVICE_QM_ETH_ACC_TX_IDX + ((id) << 1), get_coreid())
 
 #define DEVICE_QM_ETH_ACC_RX_CHANNEL_I(i)				\
-	(QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX, netcp_coreid(i)) + QM_HIGH_PRIO_CHANNEL_OFFSET)
+	(QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_RX_IDX + netcp_idx(i), netcp_coreid(i)) + QM_HIGH_PRIO_CHANNEL_OFFSET)
 #define DEVICE_QM_ETH_ACC_TX_CHANNEL_I(i)				\
-	(QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX, netcp_coreid(i)) + QM_HIGH_PRIO_CHANNEL_OFFSET)
+	(QM_HIGH_PRIO_IDX_MAP(DEVICE_QM_ETH_ACC_TX_IDX + netcp_idx(i), netcp_coreid(i)) + QM_HIGH_PRIO_CHANNEL_OFFSET)
 
 #define DEVICE_QM_ETH_INTD_EOI_INDEX    QM_REG_INTD_EOI_HIGH_PRIO_INDEX
 
