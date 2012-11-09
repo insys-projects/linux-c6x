@@ -87,7 +87,8 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 #endif
 
 #ifdef __TMS320C66X__
-#define mfence()                 asm(" MFENCE")
+#define mfence()                 asm(" MFENCE\n" \
+				     " MFENCE\n")
 #else
 #define mfence()
 #endif
@@ -180,7 +181,8 @@ extern int get_master_coreid(void);
 
 #ifdef __TMS320C66X__
 /* MFENCE C66x opcode */
-#define mfence()                 asm volatile (" .word 0x10008000\n")
+#define mfence()                 asm volatile (" .word 0x10008000\n" \
+					       " .word 0x10008000\n")
 #else
 #define mfence()
 #endif
@@ -255,6 +257,7 @@ extern int get_master_coreid(void);
  */
 
 #ifdef __TMS320C6XPLUS__
+extern void unmask_eexception(int evt);
 asmlinkage void enable_exception(void);
 #define disable_exception()
 #define get_except_type()        get_creg(EFR)
