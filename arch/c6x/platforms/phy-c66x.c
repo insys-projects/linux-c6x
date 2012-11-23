@@ -78,14 +78,14 @@ static int sgmii_init(void)
 	sgmiic1.loopback  = 0;
 	sgmiic1.autoneg   = 0;
 #ifdef CONFIG_ARCH_BOARD_EVMTCI6616
-	sgmiic0.txconfig  = 0x00011f91;
-	sgmiic0.rxconfig  = 0x00460411;
+	sgmiic1.txconfig  = 0x00011f91;
+	sgmiic1.rxconfig  = 0x00460411;
 #else
 	sgmiic1.txconfig  = 0x000108a1;
 	sgmiic1.rxconfig  = 0x00700621;
 #endif
 #ifdef CONFIG_ARCH_BOARD_EVM6670
-	sgmiic0.auxconfig = 0x00000051; /* PLL multiplier */
+	sgmiic1.auxconfig = 0x00000051; /* PLL multiplier */
 #else
 	sgmiic1.auxconfig = 0x00000041; /* PLL multiplier */
 #endif
