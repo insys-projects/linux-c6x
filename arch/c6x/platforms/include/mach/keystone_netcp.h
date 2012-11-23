@@ -98,9 +98,9 @@ static int inline emac_arch_get_mac_addr_from_efuse(char *x)
  * When using multiple instances of Linux with shared NetCP, compute one different
  * MAC address per instance
  */
-static void inline emac_arch_adjust_mac_addr(char *mac, int instance)
+static void inline emac_arch_adjust_mac_addr(u8 *mac, int instance)
 {
-	mac[5] = instance << 1;
+	mac[5] += instance;
 }
 #endif
 
