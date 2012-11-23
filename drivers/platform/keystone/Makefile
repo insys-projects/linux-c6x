@@ -8,7 +8,7 @@ obj-$(CONFIG_TI_KEYSTONE_QM)     += qmss.o
 obj-$(CONFIG_TI_KEYSTONE_PKTDMA) += pktdma.o
 
 # NetCP additional drivers
-obj-$(CONFIG_TI_KEYSTONE_CPSW)   += cpsw.o
+obj-$(CONFIG_TI_KEYSTONE_CPSW)   += cpsw_ale.o
 obj-$(CONFIG_TI_KEYSTONE_SGMII)	 += sgmii.o
 
 # RapidIO drivers
