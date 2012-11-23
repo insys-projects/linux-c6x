@@ -25,9 +25,27 @@
 #define CPSW_STATSA_MODULE                      0 /* For switch port 0 */
 #define CPSW_STATSB_MODULE                      1 /* For switch port 1 and 2 */
 
+#define CPSW_ALE_AGEOUT                         10
+#define CPSW_ALE_ENTRIES                        1024
+#define CPSW_ALE_PORTS                          2
+
 /*
  * CPSW registers
  */
+#define DEVICE_CPSW_BASE		        (0x02090800)
+#define DEVICE_CPSW_REGION_SIZE			0x800
+
+/* Register offsets */
+#define CPSW_REG_CTL			        0x004
+#define CPSW_REG_STAT_PORT_EN		        0x00c
+#define CPSW_REG_FLOW_CTL		        0x024
+#define CPSW_REG_P0_MAXLEN		        0x040
+#define CPSW_REG_MAC_SA_LO(s)                   (0x70 + (s)*0x30)
+#define CPSW_REG_MAC_SA_HI(s)                   (0x74 + (s)*0x30)
+#define CPSW_REG_STATS(x)                       (0x300 + (x)*0x100)
+#define CPSW_REG_ALE_BASE		        0x600
+
+/* Register values */
 #define CPSW_CTL_P2_PASS_PRI_TAGGED	        (1 << 5)
 #define CPSW_CTL_P1_PASS_PRI_TAGGED	        (1 << 4)
 #define CPSW_CTL_P0_PASS_PRI_TAGGED	        (1 << 3)
@@ -35,21 +53,13 @@
 #define CPSW_CTL_VLAN_AWARE		        (1 << 1)
 #define CPSW_CTL_FIFO_LOOPBACK		        (1 << 0)
 
-#define DEVICE_CPSW_BASE		        (0x02090800)
-#define DEVICE_CPSW_REGION_SIZE			0x800
-
-/* Register offsets */
-#define CPSW_REG_CTL			        0x004
-#define CPSW_REG_STAT_PORT_EN		        0x00c
-#define CPSW_REG_MAXLEN			        0x040
-#define CPSW_REG_ALE_CONTROL		        0x608
-#define CPSW_REG_STATS(x)                       (0x300 + (x)*0x100)
-#define CPSW_REG_ALE_PORTCTL(x)		        (0x640 + (x)*4)
-
-/* Register values */
 #define CPSW_REG_VAL_STAT_ENABLE_ALL		0xf
-#define CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE	((u32)0xc0000000)
-#define CPSW_REG_VAL_PORTCTL_FORWARD_MODE	0x3
+
+#define CPSW_MASK_ALL_PORTS			7
+#define CPSW_MASK_PHYS_PORTS			6
+#define CPSW_MASK_NO_PORTS			0
+
+#define CPSW_NON_VLAN_ADDR			-1
 
 struct keystone_cpsw_stats {
 	u32 rx_good_frames;
@@ -88,6 +98,30 @@ struct keystone_cpsw_stats {
 	u32 rx_mof_overruns;
 	u32 rx_dma_overruns;
 };
+
+/*
+ * CPSW ports are 0 for host port, 1 for SGMII0 and 2 for SGMII1
+ *
+ *
+ *                     +-----------------------+
+ *                     |                       |
+ *                     |         CPSW          |
+ *                     |    3 port Ethernet    |
+ *                     |        switch         |
+ *                     |                       |
+ *                     |                     1 |<----> SGMII0 port 
+ *                     |                       |
+ *  Host port <------->| 0                     |
+ *  (to NetCP)         |                       |
+ *                     |                     2 |<----> SGMII1 port
+ *                     |                       |
+ *                     |                       |
+ *                     |                       |
+ *                     +-----------------------+
+ *
+ */
+#define cpsw_get_slave(cpsw_port) ((cpsw_port) - 1)
+#define cpsw_get_port(sgmii_port) ((sgmii_port) + 1)
 
 static inline struct keystone_cpsw_stats* cpsw_get_stats(int module)
 {

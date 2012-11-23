@@ -91,6 +91,10 @@
 #define QM_DESC_TINFO_SET_S_TAG_LO(x,v) (x) = SET_BITFIELD((x), (v), 23, 16)
 #define QM_DESC_TINFO_SET_D_TAG_HI(x,v) (x) = SET_BITFIELD((x), (v), 15, 8)
 #define QM_DESC_TINFO_SET_D_TAG_LO(x,v) (x) = SET_BITFIELD((x), (v), 15, 0)
+#define QM_DESC_TINFO_GET_S_TAG_HI(x)   READ_BITFIELD((x), 31, 24)
+#define QM_DESC_TINFO_GET_S_TAG_LO(x)   READ_BITFIELD((x), 23, 16)
+#define QM_DESC_TINFO_GET_D_TAG_HI(x)   READ_BITFIELD((x), 15, 8)
+#define QM_DESC_TINFO_GET_D_TAG_LO(x)   READ_BITFIELD((x), 15, 0)
 
 /* Packet info */
 #define QM_DESC_PINFO_EPIB		1
@@ -101,6 +105,7 @@
 #define QM_DESC_PINFO_SET_QUEUE(x,v)    (x) = SET_BITFIELD((x), (v), 11,  0)
 #define QM_DESC_PINFO_GET_EPIB(x)	READ_BITFIELD((x), 31, 31)
 #define QM_DESC_PINFO_SET_SIZE(x,v)     (x) = SET_BITFIELD((x), (v), 29, 24)
+#define QM_DESC_PINFO_SET_PSFLAGS(x,v)  (x) = SET_BITFIELD((x), (v), 19, 16)
 
 #define QM_REG_REVISION			0x00
 #define QM_REG_DIVERSION		0x08
@@ -227,9 +232,9 @@
 
 /* Ethernet (NetCP) queues */
 #define DEVICE_QM_ETH_FREE_Q            DEVICE_QM_FREE_Q
-#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                                 /* Ethernet Rx free desc queue */
+#define DEVICE_QM_ETH_RX_FREE_Q         (DEVICE_QM_FREE_Q + 1)                                  /* Ethernet Rx free desc queue */
 #define DEVICE_QM_ETH_RX_Q(id)		QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_RX_CHANNEL(id)) /* Ethernet Rx queue (filled by PA) */
-#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q                                  /* Ethernet Tx queue (for PA) */
+#define DEVICE_QM_ETH_TX_Q		DEVICE_QM_PA_TX_ETH_Q                                   /* Ethernet Tx queue (for PA) */
 #define DEVICE_QM_ETH_TX_CP_Q(id)	QM_HIGH_PRIO_CHAN_MAP(DEVICE_QM_ETH_ACC_TX_CHANNEL(id)) /* Ethernet Tx completion queue (filled by PA) */
 
 #define DEVICE_QM_ETH_RX_Q_I(i)         QM_HIGH_PRIO_CHAN_MAP(		\

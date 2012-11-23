@@ -39,10 +39,10 @@
 #include <linux/keystone/qmss.h>
 #include <linux/keystone/pa.h>
 #include <linux/keystone/pktdma.h>
-#include <linux/keystone/cpsw.h>
+#include <linux/keystone/cpsw_ale.h>
 
 #define NETCP_DRIVER_NAME    "TI KeyStone NetCP Driver"
-#define NETCP_DRIVER_VERSION "v1.3"
+#define NETCP_DRIVER_VERSION "v1.4"
 #undef NETCP_DEBUG_TRACES
 #ifdef NETCP_DEBUG_TRACES
 #define DPRINTK(fmt, args...) printk(KERN_CRIT "NETCP: [%s] " fmt, __FUNCTION__, ## args)
@@ -116,15 +116,18 @@ struct netcp_priv {
 	u32                            *acc_list_phys_addr_rx;
 	u32                            *acc_list_phys_addr_tx;
 	u32                             netcp_irq_enabled;
+	struct cpsw_ale		       *ale;
+	u32                             sgmii_port;
 };
 
 /* The QM accumulator RAM */
 static u32 *acc_list_addr_top;
-
 static struct emac_config config = { 0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 }};
 
 static void __iomem *mdio_base;
 static void __iomem *mac_sl_base;
+
+static struct cpsw_ale *netcp_ale;
 
 static inline void mdio_set_reg(int reg, u32 val)
 {
@@ -272,7 +275,7 @@ int mac_sl_reset(u16 port)
 
 	/* Set the soft reset bit */
 	mac_sl_write_reg(CPGMAC_REG_RESET_VAL_RESET,
-		     DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_RESET);
+			 DEVICE_EMACSL_PORT(port) + CPGMACSL_REG_RESET);
 
 	/* Wait for the bit to clear */
 	for (i = 0; i < DEVICE_EMACSL_RESET_POLL_COUNT; i++) {
@@ -280,7 +283,7 @@ int mac_sl_reset(u16 port)
 		if ((v & CPGMAC_REG_RESET_VAL_RESET_MASK) != CPGMAC_REG_RESET_VAL_RESET)
 			return 0;
 	}
-
+	
 	/* Timeout on the reset */
 	return GMACSL_RET_WARN_RESET_INCOMPLETE;
 }
@@ -317,28 +320,56 @@ int mac_sl_port_config(u16 port, struct mac_sliver *cfg)
 /* 
  * Integrated Ethernet switch configuration
  */
-static int cpsw_config(u32 ctl, u32 max_pkt_size)
-{
-	u32 i;
+#define mac_hi(mac)	(((mac)[0] << 0) | ((mac)[1] << 8) |	\
+			 ((mac)[2] << 16) | ((mac)[3] << 24))
+#define mac_lo(mac)	(((mac)[4] << 0) | ((mac)[5] << 8))
 
+static void cpsw_set_slave_mac(struct netcp_priv *p, u32 slave)
+{
+	__raw_writel(mac_hi(p->ndev->dev_addr), (DEVICE_CPSW_BASE + CPSW_REG_MAC_SA_HI(slave)));
+	__raw_writel(mac_lo(p->ndev->dev_addr), (DEVICE_CPSW_BASE + CPSW_REG_MAC_SA_LO(slave)));
+}
+
+static int cpsw_config(struct netcp_priv *p, u32 max_pkt_size)
+{
 	/* Max length register */
-	__raw_writel(max_pkt_size, (DEVICE_CPSW_BASE + CPSW_REG_MAXLEN));
+	__raw_writel(max_pkt_size, (DEVICE_CPSW_BASE + CPSW_REG_P0_MAXLEN));
 	
 	/* Control register */
-	__raw_writel(ctl, (DEVICE_CPSW_BASE + CPSW_REG_CTL));
+	__raw_writel(CPSW_CTL_P0_ENABLE, (DEVICE_CPSW_BASE + CPSW_REG_CTL));
 	
 	/* All statistics enabled by default */
 	__raw_writel(CPSW_REG_VAL_STAT_ENABLE_ALL, (DEVICE_CPSW_BASE +
 						    CPSW_REG_STAT_PORT_EN));
 	
-	/* Reset and enable the ALE */
-	__raw_writel(CPSW_REG_VAL_ALE_CTL_RESET_AND_ENABLE, (DEVICE_CPSW_BASE
-							     + CPSW_REG_ALE_CONTROL));
+	/* Do not use flow control */
+	__raw_writel(0, (DEVICE_CPSW_BASE + CPSW_REG_FLOW_CTL));
 
-	/* All ports put into forward mode */
-	for (i = 0; i < CPSW_NUM_PORTS; i++)
-		__raw_writel(CPSW_REG_VAL_PORTCTL_FORWARD_MODE,
-			     (DEVICE_CPSW_BASE + CPSW_REG_ALE_PORTCTL(i)));
+	dev_dbg(&p->ndev->dev, "configuring CPSW host port %d\n",  CPSW_CPPI_PORT_NUM);
+	
+	/* Start ALE engine */
+	cpsw_ale_start(p->ale);
+	
+	/* Switch to bypass and forward mode */
+	cpsw_ale_control_set(p->ale, CPSW_CPPI_PORT_NUM, ALE_BYPASS, 1);
+	cpsw_ale_control_set(p->ale, CPSW_CPPI_PORT_NUM, ALE_NO_PORT_VLAN, 1);
+	cpsw_ale_control_set(p->ale, CPSW_CPPI_PORT_NUM, ALE_VLAN_AWARE, 1);
+	cpsw_ale_control_set(p->ale, CPSW_CPPI_PORT_NUM, ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
+
+	return 0;
+}
+
+static int cpsw_config_port(struct netcp_priv *p)
+{
+	u32 port = cpsw_get_port(p->sgmii_port);
+
+	dev_dbg(&p->ndev->dev, "configuring CPSW port %d\n",  port);
+		
+	cpsw_set_slave_mac(p, cpsw_get_slave(port));
+
+	/* Switch to forward mode */
+	cpsw_ale_control_set(p->ale, port, ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
+	cpsw_ale_control_set(p->ale, port, ALE_PORT_NOLEARN, 0);
 
 	return 0;
 }
@@ -356,12 +387,7 @@ static int cpmac_drv_start(void)
 	int i;
 	
 	cfg.max_rx_len	= MAX_SIZE_STREAM_BUFFER;
-	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL |
-		GMACSL_ENABLE_FULL_DUPLEX | 
-		GMACSL_ENABLE_GIG_MODE;
-
-	/* Enable port 0 with max pkt size to 9504 */
-	cpsw_config(CPSW_CTL_P0_ENABLE, 9504);
+	cfg.ctl		= GMACSL_ENABLE | GMACSL_RX_ENABLE_EXT_CTL;
 
 	for (i = 0; i < DEVICE_N_GMACSL_PORTS; i++)  {
 		mac_sl_reset(i);
@@ -485,8 +511,8 @@ static int netcp_tx(struct net_device *ndev)
  * Pop an incoming packet
  */
 static int netcp_rx(struct net_device *ndev,
-		     unsigned int *work_done,
-		     unsigned int work_to_do)
+		    unsigned int *work_done,
+		    unsigned int work_to_do)
 {
 	int                  pkt_size = 0;
 	struct netcp_priv   *p        = netdev_priv(ndev);
@@ -508,6 +534,9 @@ static int netcp_rx(struct net_device *ndev,
 		acc_list = p->acc_list_addr_rx;
 
 	acc_list_p = acc_list;
+
+	DPRINTK("received accumulator Rx interrupt on channel %d, acc buffer 0x%x\n",
+		DEVICE_QM_ETH_ACC_RX_CHANNEL(ndev->dev_id), acc_list);
 
 /* Get the descriptors from the accumulator list */
 #define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
@@ -534,7 +563,7 @@ static int netcp_rx(struct net_device *ndev,
 		skb_rcv->dev = ndev;
 		skb_put(skb_rcv, pkt_size);
 		skb_rcv->protocol = eth_type_trans(skb_rcv, ndev);
-		
+
 		/* Allocate a new skb */
 		skb = netdev_alloc_skb_ip_align(ndev, NETCP_MAX_PACKET_SIZE);
 		if (skb != NULL) {
@@ -634,6 +663,7 @@ static void netcp_ndo_poll_controller(struct net_device *ndev)
 static int netcp_ndo_start_xmit(struct sk_buff *skb,
 				struct net_device *ndev)
 {
+	struct netcp_priv   *p = netdev_priv(ndev);
 	int                  ret;
 	unsigned             pkt_len = skb->len;
 	struct qm_host_desc *hd;
@@ -685,12 +715,13 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb,
 	ndev->stats.tx_bytes += pkt_len;
 	ndev->trans_start     = jiffies;
 
-	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x), return queue=%d\n",
-		skb->len, skb, hd, tx_cp_q(ndev->dev_id));
+	DPRINTK("transmitting packet of len %d (skb=0x%x, hd=0x%x), return queue=%d, to_port=%d\n",
+		skb->len, skb, hd, tx_cp_q(ndev->dev_id), cpsw_get_port(p->sgmii_port));
 
 	/* Return the descriptor back to the tx completion queue */
 	QM_DESC_PINFO_SET_QM(hd->packet_info, 0);
 	QM_DESC_PINFO_SET_QUEUE(hd->packet_info, tx_cp_q(ndev->dev_id));
+	QM_DESC_PINFO_SET_PSFLAGS(hd->packet_info, cpsw_get_port(p->sgmii_port));
 
 	hw_qm_queue_push(hd, DEVICE_QM_ETH_TX_Q, DEVICE_QM_DESC_SIZE_BYTES);
 	
@@ -717,8 +748,20 @@ static int netcp_ndo_open(struct net_device *ndev)
 	struct netcp_priv *p = netdev_priv(ndev);
 	
 	/* Start EMAC */
-	if (netcp_master() && (!ndev->dev_id))
-		cpmac_drv_start();
+	if (netcp_master()) {
+
+		if (!ndev->dev_id) {
+
+			/* Configure and start mac sliver */
+			cpmac_drv_start();
+			
+			/* Configure CPSW with max pkt size */
+			cpsw_config(p, MAX_SIZE_STREAM_BUFFER);
+		}
+
+		/* Configure our CPSW egress port */
+		cpsw_config_port(p);
+	}
 
 	netif_wake_queue(ndev);
 
@@ -1166,6 +1209,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->dev  = &ndev->dev;
 	priv->msg_enable = netif_msg_init(debug_level, NETCP_DEBUG);
 	priv->rx_packet_max = max(rx_packet_max, 128);
+	priv->sgmii_port = data->sgmii_port;
 
 #ifdef EMAC_ARCH_HAS_MAC_ADDR
 	/* SoC or board hw has MAC address */
@@ -1198,7 +1242,9 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->mii.mdio_write    = netcp_mdio_write;
 
 	if (!pdev->id) {
+		struct cpsw_ale_params ale_params;
 
+		/* MDIO initialization */
 		netcp_mdio_init();
 
 		pktdma_region_init(DEVICE_PA_CDMA_BASE,
@@ -1215,11 +1261,27 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 		acc_list_addr_top = (u32*) qm_mem_alloc(acc_list_size,
 							(u32*)&priv->acc_list_phys_addr_rx);
 		if (acc_list_addr_top == NULL) {
-			printk(KERN_ERR "%s: accumulator memory allocation failed\n",
-			       __FUNCTION__);
+			dev_err(&pdev->dev, "accumulator memory allocation failed\n");
 			return -ENOMEM;
 		}
+
+		/* Initialise CPSW ALE engine */
+		memset(&ale_params, 0, sizeof(ale_params));
+		ale_params.dev	       = priv->dev;
+		ale_params.ale_regs    = (void __iomem*)(DEVICE_CPSW_BASE + CPSW_REG_ALE_BASE);
+		ale_params.ale_ageout  = CPSW_ALE_AGEOUT;
+		ale_params.ale_entries = CPSW_ALE_ENTRIES;
+		ale_params.ale_ports   = CPSW_ALE_PORTS;
+
+		netcp_ale = cpsw_ale_create(&ale_params);
+		if (!netcp_ale) {
+			dev_err(&pdev->dev, "error initializing ale engine\n");
+			return -ENODEV;
+		} else
+			dev_info(&pdev->dev, "created a CPSW ALE engine\n");
 	}
+
+	priv->ale = netcp_ale;
 
 	priv->acc_list_phys_addr_tx = priv->acc_list_phys_addr_rx + acc_list_num_rx;
 	priv->acc_list_addr_rx      = acc_list_addr_top + (acc_list_off_rx * netcp_instance(pdev->id));
@@ -1257,8 +1319,8 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	}
 
 	/* Queues used for PA commands (at the end )*/
-	queue_free_buf[DEVICE_NETCP_NUM_INSTANCES] = DEVICE_QM_PA_CMD_FREE_Q;
-	queue_rx[DEVICE_NETCP_NUM_INSTANCES]       = DEVICE_QM_PA_CMD_CP_Q;
+	queue_free_buf[DEVICE_PA_CDMA_RX_FIRMWARE_FLOW] = DEVICE_QM_PA_CMD_FREE_Q;
+	queue_rx[DEVICE_PA_CDMA_RX_FIRMWARE_FLOW]       = DEVICE_QM_PA_CMD_CP_Q;
 
 	/* Configure Tx accumulators */
 	for (i = 0; i < DEVICE_NETCP_NUM_INSTANCES; i++) {
@@ -1311,7 +1373,7 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 				 queue_rx,
 				 DEVICE_QM_ETH_FREE_Q);
 	if (ret != 0) {
-		printk(KERN_ERR "%s: PA init failed\n", __FUNCTION__);
+		dev_err(&pdev->dev, "PA init failed\n");
 		return ret;
 	}
 
@@ -1325,7 +1387,7 @@ slave_only:
 
 	ret = netcp_init_qs(ndev);
 	if (ret != 0) {
-		printk(KERN_ERR "%s: NetCP Rx queue init failed\n", __FUNCTION__);
+		dev_err(&pdev->dev, "NetCP Rx queue init failed\n");
 		return ret;
 	}
 
@@ -1349,8 +1411,7 @@ slave_only:
 		}
 		ndev->irq = data->rx_irq;
 	} else {
-		printk(KERN_WARNING "%s: irq mode failed (%d), use polling\n", 
-		       __FUNCTION__, ret);
+		dev_warn(&pdev->dev, "irq mode failed (%d), use polling\n", ret);
 		ndev->irq = -1;
 	}
 
@@ -1359,13 +1420,13 @@ slave_only:
 
 	ret = register_netdev(ndev);
 	if (ret) {
-		printk(KERN_ERR "%s: error registering net device\n",__FUNCTION__);
+		dev_err(&pdev->dev, "error registering net device\n");
 		ret = -ENODEV;
 		goto clean_ndev_ret;
 	}
 
-	printk("%s: %s %s\n",
-	       ndev->name, NETCP_DRIVER_NAME, NETCP_DRIVER_VERSION);
+	printk("%s: %s %s on SGMII%d\n", ndev->name, NETCP_DRIVER_NAME,
+	       NETCP_DRIVER_VERSION, priv->sgmii_port);
 
 	return 0;
 

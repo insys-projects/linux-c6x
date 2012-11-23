@@ -20,7 +20,7 @@
 #include <linux/io.h>
 #include <mach/keystone_pa.h>
 
-#define MAX_SIZE_STREAM_BUFFER		        1520
+#define MAX_SIZE_STREAM_BUFFER		        9504
 
 #define DEVICE_EMACSL_BASE			0x02090900
 #define DEVICE_EMACSL_PORT(x)			((x) * 0x040)
@@ -126,7 +126,7 @@ static inline void streaming_switch_setup(void)
 #define CPGMACSL_REG_MAXLEN	                0x10
 #define CPGMACSL_REG_BOFF	                0x14
 #define CPGMACSL_REG_RX_PAUSE	                0x18
-#define CPGMACSL_REG_TX_PAURSE	                0x1c
+#define CPGMACSL_REG_TX_PAUSE	                0x1c
 #define CPGMACSL_REG_EM_CTL	                0x20
 #define CPGMACSL_REG_PRI	                0x24
 
