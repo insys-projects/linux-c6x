@@ -57,6 +57,7 @@ static int sgmii_init(void)
 {
 	struct sgmii_config sgmiic0, sgmiic1;
 
+	/* SGMII to SGMII forced (AMC) */
 	sgmiic0.master    = 1;
 	sgmiic0.loopback  = 0;
 	sgmiic0.autoneg   = 0;
@@ -74,9 +75,10 @@ static int sgmii_init(void)
 #endif
 	keystone_sgmii_config(0, &sgmiic0);
 
-	sgmiic1.master    = 1;
+	/* SGMII to PHY (RJ45) */
+	sgmiic1.master    = 0;
 	sgmiic1.loopback  = 0;
-	sgmiic1.autoneg   = 0;
+	sgmiic1.autoneg   = 1;
 #ifdef CONFIG_ARCH_BOARD_EVMTCI6616
 	sgmiic1.txconfig  = 0x00011f91;
 	sgmiic1.rxconfig  = 0x00460411;
