@@ -45,6 +45,8 @@
 #define SGMII_CTL_LOOPBACK		0x10
 #define SGMII_CTL_MASTER		0x20
 #define SGMII_REG_STATUS_FIELD_LOCK	(1<<4)
+#define SGMII_REG_STATUS_AUTONEG        (1<<2)
+#define SGMII_REG_STATUS_LINK           (1<<0)
 
 static void __iomem *sgmii_reg_base;
 
@@ -77,7 +79,7 @@ int keystone_sgmii_reset(int port)
 
 int keystone_sgmii_config(int port, struct sgmii_config *config)
 {
-	unsigned int i, status;
+	unsigned int i, status, val, mask;
 
 	sgmii_write_reg(SGMII_CTL_REG(port), 0);
 
@@ -90,14 +92,36 @@ int keystone_sgmii_config(int port, struct sgmii_config *config)
 	 * but don't trap if lock is never read
 	 */
 	for (i = 0; i < 1000; i++)  {
-        	udelay(20000);
+        	udelay(200);
         	status = sgmii_read_reg(SGMII_STATUS_REG(port));
         	if ( (status & SGMII_REG_STATUS_FIELD_LOCK) != 0 )
 			break;
 	}
 
-	sgmii_write_reg(SGMII_MRADV_REG(port), 1);
-	sgmii_write_reg(SGMII_CTL_REG(port), 1);
+	if (config->master)
+		/* Full duplex gigabit configuration */
+		sgmii_write_reg(SGMII_MRADV_REG(port), 0x9801);
+	else
+		/* No advertising */
+		sgmii_write_reg(SGMII_MRADV_REG(port), 0x1);
+
+	val = (((config->master & 1) << 5)
+	       || ((config->loopback & 1) << 4)
+	       || ((config->autoneg & 1) << 0));
+	       
+	sgmii_write_reg(SGMII_CTL_REG(port), val);
+
+	mask = SGMII_REG_STATUS_LINK;
+
+	if (config->autoneg)
+		mask |= SGMII_REG_STATUS_AUTONEG;
+
+	for (i = 0; i < 1000; i++)  {
+        	udelay(200);
+		status = sgmii_read_reg(SGMII_STATUS_REG(port));
+		if ((status & mask) == mask)
+			break;
+	}
 
 	return 0;
 }
