@@ -68,6 +68,8 @@
 #define NETCP_MIN_PACKET_SIZE	        ETH_ZLEN
 #define NETCP_MAX_PACKET_SIZE	        (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN)
 
+#define MDIO_TIMEOUT                    100   /* msecs */
+
 #define MDIO_CONTROL		        0x004 /* Module Control Register */
 #define MDIO_USERACCESS0	        0x080 /* User Access Register 0 */
 
@@ -153,19 +155,6 @@ static inline void mdio_phy_write(int regadr, int phyadr, int data)
 		     ((phyadr & 0x1f) << 16) |
 		     ((regadr & 0x1f) << 21) |
                      ((data & 0xffff)));
-}
-
-static inline int mdio_phy_wait_res_ack(int *results)
-{
-	int ack;
-
-	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
-        
-	*results = mdio_get_reg(MDIO_USERACCESS0) & 0xffff;
-        
-	ack = (mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_ACK) >> 29;
-
-	return ack;
 }
 
 static inline void mac_sl_write_reg(u32 val, int reg)
@@ -826,34 +815,87 @@ static int netcp_ndo_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 }
 
 /*
- * MDIO management
+ * Wait until hardware is ready for another user access
  */
-static int netcp_mdio_read(struct net_device *dev, int phy_id, int reg)
-{	
-	int val;
-	int ack = 0;
+static inline int netcp_mdio_wait_for_user_access(struct net_device *ndev)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(MDIO_TIMEOUT/10);
 
-	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+	while (time_after(timeout, jiffies)) {
+		if ((mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO) == 0)
+			return 0;
 
-	mdio_phy_read(reg, phy_id);
+		if ((mdio_get_reg(MDIO_CONTROL) & MDIO_B_IDLE) == 0)
+			continue;
 
-	ack = mdio_phy_wait_res_ack(&val);
+		dev_warn(&ndev->dev,"MDIO controller is idle\n");
+		return -EAGAIN;
+	}
 
-	if (!ack)
-		val = -1;
+	if ((mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO) == 0)
+		return 0;
 
-	return val;
+	dev_warn(&ndev->dev, "MDIO timeout\n");
+	return -ETIMEDOUT;
 }
 
-static void netcp_mdio_write(struct net_device *dev, int phy_id, int reg, int value)
+/*
+ * MDIO management
+ */
+static int netcp_mdio_read(struct net_device *ndev, int phy_id, int reg)
 {
-	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
+	u32 val;
+	int ret = -1;
+	unsigned long timeout = jiffies + msecs_to_jiffies(MDIO_TIMEOUT);
 
-	mdio_phy_write(reg, phy_id, value);
+	while ((time_after(timeout, jiffies)) && (ret < 0)) {
+		ret = netcp_mdio_wait_for_user_access(ndev);
+		if (ret == -EAGAIN)
+			continue;
+		if (ret < 0)
+			break;
 
-	while(mdio_get_reg(MDIO_USERACCESS0) & MDIO_B_GO);
-	
-	return;
+		mdio_phy_read(reg, phy_id);
+		
+		ret = netcp_mdio_wait_for_user_access(ndev);
+		if (ret == -EAGAIN)
+			continue;
+		if (ret < 0)
+			break;
+
+		val = mdio_get_reg(MDIO_USERACCESS0);
+		ret = (val & MDIO_B_ACK) ? (val & 0xffff) : -EIO;
+	}
+
+	if (ret < 0)
+		dev_warn(&ndev->dev,"MDIO read failed\n");
+
+	return ret;
+}
+
+static void netcp_mdio_write(struct net_device *ndev, int phy_id, int reg, int value)
+{
+	int ret = -1;
+	unsigned long timeout = jiffies + msecs_to_jiffies(MDIO_TIMEOUT);
+
+	while ((time_after(timeout, jiffies)) && (ret < 0)) {
+		ret = netcp_mdio_wait_for_user_access(ndev);
+		if (ret == -EAGAIN)
+			continue;
+		if (ret < 0)
+			break;
+
+		mdio_phy_write(reg, phy_id, value);
+		
+		ret = netcp_mdio_wait_for_user_access(ndev);
+		if (ret == -EAGAIN)
+			continue;
+		if (ret < 0)
+			break;
+	}
+
+	if (ret < 0)
+		dev_warn(&ndev->dev,"MDIO write failed\n");
 }
 
 static void netcp_mdio_init(void)
@@ -1234,8 +1276,8 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->mii.phy_id        = data->phy_id;
 	priv->mii.phy_id_mask   = 0x1f;
 	priv->mii.reg_num_mask  = 0x1f;
-	priv->mii.force_media   = 0;
-	priv->mii.full_duplex   = 0;
+	priv->mii.force_media   = 1;
+	priv->mii.full_duplex   = 1;
 	priv->mii.supports_gmii = 1;
 	priv->mii.dev	        = ndev;
 	priv->mii.mdio_read     = netcp_mdio_read;
