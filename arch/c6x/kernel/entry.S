@@ -662,8 +662,7 @@ ret_from_fork_2:
 	BNOP	.S2	B1,5
 
 	;;
-	;; These are the interrupt handlers, responsible for calling __do_IRQ()
-	;; int6 is used for syscalls (see _system_call entry)
+	;; These are the interrupt handlers, responsible for calling c6x_do_IRQ()
 	;;
 _int4_handler:
 	SAVE_ALL_INT
