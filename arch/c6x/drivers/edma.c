@@ -308,7 +308,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
 static void __init map_dmach_param(unsigned ctlr)
 {
 	int i;
-	for (i = 0; i < EDMA_MAX_DMACH; i++)
+	for (i = 0; i < edma_cc[ctlr]->num_channels; i++)
 		edma_write_array(ctlr, EDMA_DCHMAP , i , (i << 5));
 }
 
@@ -379,8 +379,9 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
 		if (edma_shadow_read_array(ctlr, SH_IPR, 0) &
 				edma_shadow_read_array(ctlr, SH_IER, 0))
 			j = 0;
-		else if (edma_shadow_read_array(ctlr, SH_IPR, 1) &
-				edma_shadow_read_array(ctlr, SH_IER, 1))
+		else if ((edma_cc[j]->num_channels > 31)
+			 && ((edma_shadow_read_array(ctlr, SH_IPR, 1) &
+			      edma_shadow_read_array(ctlr, SH_IER, 1))))
 			j = 1;
 		else
 			break;
@@ -1633,7 +1634,8 @@ static int __init edma_probe(struct platform_device *pdev)
 
 		for (i = 0; i < info[j]->n_region; i++) {
 			edma_write_array2(j, EDMA_DRAE, i, 0, 0x0);
-			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+			if (edma_cc[j]->num_channels > 31)
+				edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
 			edma_write_array(j, EDMA_QRAE, i, 0x0);
 		}
 		arch_num_cc++;

@@ -106,29 +106,29 @@ queue_priority_mapping2[][2] = {
 
 static struct edma_soc_info edma_cc0_info = {
 	.n_channel		= EDMA0_NUM_DMACH,
-	.n_region		= EDMA_NUM_REGIONS,
+	.n_region		= EDMA0_NUM_REGIONS,
 	.n_slot			= EDMA0_NUM_PARAMENTRY,
-	.n_tc			= EDMA0_NUM_EVQUE,
+	.n_tc			= EDMA0_NUM_TC,
 	.n_cc			= 3,
 	.queue_tc_mapping	= queue_tc_mapping0,
 	.queue_priority_mapping	= queue_priority_mapping0,
 };
 
 static struct edma_soc_info edma_cc1_info = {
-	.n_channel		= EDMA_NUM_DMACH,
-	.n_region		= EDMA_NUM_REGIONS,
+	.n_channel		= EDMA1_NUM_DMACH,
+	.n_region		= EDMA1_NUM_REGIONS,
 	.n_slot			= EDMA1_NUM_PARAMENTRY,
-	.n_tc			= EDMA1_NUM_EVQUE,
+	.n_tc			= EDMA1_NUM_TC,
 	.n_cc			= 3,
 	.queue_tc_mapping	= queue_tc_mapping1,
 	.queue_priority_mapping	= queue_priority_mapping1,
 };
 
 static struct edma_soc_info edma_cc2_info = {
-	.n_channel		= EDMA_NUM_DMACH,
-	.n_region		= EDMA_NUM_REGIONS,
+	.n_channel		= EDMA2_NUM_DMACH,
+	.n_region		= EDMA2_NUM_REGIONS,
 	.n_slot			= EDMA2_NUM_PARAMENTRY,
-	.n_tc			= EDMA2_NUM_EVQUE,
+	.n_tc			= EDMA2_NUM_TC,
 	.n_cc			= 3,
 	.queue_tc_mapping	= queue_tc_mapping2,
 	.queue_priority_mapping	= queue_priority_mapping2,

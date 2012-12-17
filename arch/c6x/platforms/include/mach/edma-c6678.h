@@ -168,6 +168,7 @@
 #define EDMA0_NUM_TC	             2
 #define EDMA0_NUM_PARAMENTRY         128
 #define EDMA0_NUM_DMACH              16
+#define EDMA0_NUM_REGIONS            8
 
 /*
  * TPCC1 and TPCC2 have 4 TC, 4 event queues and 512 params entries
@@ -175,9 +176,14 @@
 #define EDMA1_NUM_EVQUE	             4
 #define EDMA1_NUM_TC	             4
 #define EDMA1_NUM_PARAMENTRY         512
+#define EDMA1_NUM_DMACH              64
+#define EDMA1_NUM_REGIONS            8
+
 #define EDMA2_NUM_EVQUE	             4
 #define EDMA2_NUM_TC	             4
 #define EDMA2_NUM_PARAMENTRY         512
+#define EDMA2_NUM_DMACH              64
+#define EDMA2_NUM_REGIONS            8
 
 /*
  * IRQ mapping
