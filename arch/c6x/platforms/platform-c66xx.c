@@ -551,6 +551,17 @@ static int __init platform_arch_init(void)
 {
 	int status = 0;
 
+	/* Enable external exceptions */
+	unmask_eexception(IRQ_SYSCMPA);
+	unmask_eexception(IRQ_L1PCMPA);
+	unmask_eexception(IRQ_L1PDMPA);
+	unmask_eexception(IRQ_L1DCMPA);
+	unmask_eexception(IRQ_L1DDMPA);
+	unmask_eexception(IRQ_L2CMPA);
+	unmask_eexception(IRQ_L2CDMPA);
+	unmask_eexception(IRQ_EMCCMPA);
+	unmask_eexception(IRQ_EMCBUSERR);
+
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
 
