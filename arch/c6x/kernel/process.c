@@ -187,6 +187,18 @@ void show_regs(struct pt_regs * regs)
 	       regs->a8, regs->b8);
 	printk("A9: %08lx  B9: %08lx\n",
 	       regs->a9, regs->b9);
+	printk("A10: %08lx  B10: %08lx\n",
+	       regs->a10, regs->b10);
+	printk("A11: %08lx  B11: %08lx\n",
+	       regs->a11, regs->b11);
+	printk("A12: %08lx  B12: %08lx\n",
+	       regs->a12, regs->b12);
+	printk("A13: %08lx  B13: %08lx\n",
+	       regs->a13, regs->b13);
+	printk("A14: %08lx  B14: %08lx\n",
+	       regs->a14, regs->dp);
+	printk("A15: %08lx  B15: %08lx\n",
+	       regs->a15, regs->sp);
 #if defined(CONFIG_TMS320C64X) || defined(_TMS320C6400)
 	printk("A16: %08lx  B16: %08lx\n",
 	       regs->a0, regs->b0);
@@ -251,7 +263,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	local_save_flags(regs.r.csr);
 	regs.r.csr |= 1;
 #if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
-	regs.r.tsr = 5; /* Set GEE and GIE in TSR */
+	regs.r.tsr = 0xd; /* Set GEE, XEN and GIE in TSR */
 #endif
 
 	/* Ok, create the new process.. */

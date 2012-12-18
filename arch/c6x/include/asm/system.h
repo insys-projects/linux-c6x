@@ -255,9 +255,9 @@ extern int get_master_coreid(void);
 /* 
  * Exception management
  */
-
 #ifdef __TMS320C6XPLUS__
 extern void unmask_eexception(int evt);
+extern void mask_eexception(int evt);
 asmlinkage void enable_exception(void);
 #define disable_exception()
 #define get_except_type()        get_creg(EFR)

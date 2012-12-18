@@ -198,6 +198,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 	STW	.D2T2	A4,*SP--[2]		; orig A4
 #else
 	STDW	.D2T2	B11:B10,*SP--[1]	; save RILC and ILC
+ ||     OR	.S1     0xc,A5,A5 		; set GEE and XEN in TSR		
 	STDW	.D2T1	A5:A4,*SP--[1]		; save TSR and orig A4
 #endif
 
@@ -823,9 +824,8 @@ enable_exception:
 	DINT
 	MVC	.S2	TSR,B0
 	MVC	.S2	B3,NRP
-	MVK	.L2	0xc,B1
-	OR	.D2	B0,B1,B0
-	MVC	.S2	B0,TSR			;  Set GEE and XEN in TSR
+	OR	.S2	0xc,B0,B0
+	MVC	.S2	B0,TSR			; set GEE and XEN in TSR
 	B	.S2	NRP
 	NOP	5
 #endif

@@ -38,21 +38,23 @@
 
 void die_if_kernel(char *str, struct pt_regs *fp, int nr);
 
-void __init unmask_eexception(void)
-{
 #if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
-	/* Unmask events number 119 to 127 */
+void unmask_eexception(int evt)
+{
 	__dint();
-	INTC_EXPMASK[3] &= 0x00ffffff;
+	INTC_EVTCLR[evt >> 5] = (1 << (evt & 0x1f));
+	INTC_EXPMASK[evt >> 5] &= ~(1 << (evt & 0x1f));
+	__rint();
+}
+
+void mask_eexception(int evt)
+{
+	__dint();
+	INTC_EXPMASK[evt >> 5] |= (1 << (evt & 0x1f));
 	__rint();
 
-	/* 
-	 * Exceptions work with NMI, so activate NMI interrupt to enable them.
-	 * When GEE is enabled, NMI are treated as exceptions instead of interrupts.
-	 */
-	enable_irq_mask(INT1);
-#endif
 }
+#endif
 
 void __init trap_init (void)
 {
@@ -61,7 +63,14 @@ void __init trap_init (void)
 	ack_exception(EXCEPT_TYPE_EXC);
 	ack_exception(EXCEPT_TYPE_IXF);
 	ack_exception(EXCEPT_TYPE_SXF);
+
 	enable_exception();
+
+	/* 
+	 * External exceptions work with NMI, so activate NMI interrupt to enable them.
+	 * When GEE is enabled, NMI are treated as exceptions instead of interrupts.
+	 */
+	enable_irq_mask(INT1);
 #endif
 }
 
@@ -324,20 +333,27 @@ static int process_iexcept(struct pt_regs *regs)
 static void process_eexcept(struct pt_regs *regs)
 {
 	unsigned int eexcept_num;
-	unsigned int bank = 0;
 	int i;
 
-	for (i = 0; i <= 3; i++) {
+	ack_exception(EXCEPT_TYPE_EXC);
+
+	for (i = 0; i < NR_MEGAMOD_COMBINERS; i++) {
 		while (INTC_MEXPMASK[i]) {
+
 			__dint();
 			eexcept_num = __ffs(INTC_MEXPMASK[i]);
-			INTC_MEXPMASK[i] &= ~(1 << eexcept_num); /* ack the external exception */
+			INTC_EVTCLR[i] = (1 << eexcept_num); /* ack the external exception */
 			__rint();
-			do_trap(&eexcept_table[eexcept_num + (bank << 5)], regs);
-		}
-		bank++;
-	}
 
+			/* When IB or SPLX is set, exceptions cannot be resumed correctly */
+			if (regs->tsr & 0xc000) {
+				printk(KERN_CRIT "External exception not recoverable (NTSR=0x%x)!!!\n",
+				       regs->tsr);
+			}
+
+			do_trap(&eexcept_table[eexcept_num + (i << 5)], regs);
+		}
+	}
 	ack_exception(EXCEPT_TYPE_EXC);
 }
 
