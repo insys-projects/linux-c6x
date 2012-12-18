@@ -295,7 +295,7 @@
 #define ARCH_HAS_MSM                 /* Architecture has MSM */
 
 #ifndef __ASSEMBLY__
-extern void keystone_watchdog_reset(int chan);
+extern void keystone_reset(void);
 #endif  /* __ASSEMBLY__ */
 
 #endif /* CONFIG_TI_KEYSTONE */

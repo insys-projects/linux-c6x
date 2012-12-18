@@ -32,6 +32,10 @@
 #endif
 
 /* PLL/Reset register offsets */
+#define RSTYPE          0x0e4
+#define RSTCTRL         0x0e8
+#define RSTCFG          0x0ec
+#define RSISO           0x0f0
 #define PLLCTL          0x100
 #define SECCTL          0x108
 #define PLLM		0x110

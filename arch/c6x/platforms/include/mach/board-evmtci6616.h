@@ -56,3 +56,10 @@
 #define EVM_LED_IDLE_NUM  0  /* idle is using LED1 */
 #define EVM_LED_TIMER_NUM 1  /* timer is using LED2 */
 
+/*
+ * Platform halt/reset methods
+ */
+#define MACH_RESTART()           keystone_reset();
+#define MACH_HALT()              __dint(); asm volatile(" idle");
+#define MACH_POWER_OFF()         __dint(); asm volatile(" idle");
+

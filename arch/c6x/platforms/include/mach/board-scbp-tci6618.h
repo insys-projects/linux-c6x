@@ -36,3 +36,11 @@
  */
 #define LINUX_TIMER_SRC (TIMER_0 + get_coreid())
 #define LINUX_TIMER_IRQ IRQ_TINT
+
+/*
+ * Platform halt/reset methods
+ */
+#define MACH_RESTART()           keystone_reset();
+#define MACH_HALT()              __dint(); asm volatile(" idle");
+#define MACH_POWER_OFF()         __dint(); asm volatile(" idle");
+
