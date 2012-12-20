@@ -147,6 +147,15 @@ static void init_pll(void)
 	pll1_setbit_reg(PLLCTL, PLLCTL_PLLEN);
 }
 
+static unsigned int get_psc_state(unsigned int id)
+{
+	volatile unsigned int *mdstat;
+	
+	mdstat = (volatile unsigned int *) (PSC_MDSTAT0 + (id << 2));
+	
+	return (*mdstat & 0x1f);
+}
+
 static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
 {
 	volatile unsigned int *mdctl;
@@ -160,11 +169,11 @@ static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
 	
 	if (state == PSC_SYNCRESET)
 		return 0; /* not yet supported */
-	
-	/* If state is already set, do nothing */
-	if ((*mdstat & 0x1f) == state)
+
+	/* If state is already set or not module is not ready, do nothing */
+	if (((*mdstat & 0x1f) == state) || ((*mdstat & 0xa00) != 0xa00))
 		return 1;
-	
+
 	/* Assert local reset */
 	if (state == PSC_DISABLE)
 		*mdctl = (*mdctl & ~(1 << 8));
@@ -222,16 +231,15 @@ static void init_power(void)
 #endif
 		/* MSMC RAM */
 		set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
+
 #ifdef CONFIG_TI_KEYSTONE_NETCP
-		if (!(pll1_get_reg(RSTYPE) & 0x4)) {
-			/* NetCP, PA and SA */
-			set_psc_state(2, PSC_SA,     PSC_DISABLE);
+		/* NetCP, PA and SA */
+		if (get_psc_state(PSC_PA) == 0x03) {
+			/* If PA is enabled, disable both PA and SGMII for resetting it */
 			set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
-/*                      set_psc_state(2, PSC_PA,     PSC_DISABLE); */
+			set_psc_state(2, PSC_PA,     PSC_DISABLE);
 			mdelay(100);
-		} else
-			printk("Resuming from software reset\n");
-		
+		}
 		set_psc_state(2, PSC_PA,     PSC_ENABLE);
 		set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
 /*              set_psc_state(2, PSC_SA,     PSC_ENABLE); */
