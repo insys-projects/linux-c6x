@@ -165,6 +165,10 @@ static int set_psc_state(unsigned int pd, unsigned int id, unsigned int state)
 	if ((*mdstat & 0x1f) == state)
 		return 1;
 	
+	/* Assert local reset */
+	if (state == PSC_DISABLE)
+		*mdctl = (*mdctl & ~(1 << 8));
+
 	/* Wait transition and check if we got timeout error while waiting */
 	timeout = 0;
 	while ((*(volatile unsigned int *) (PSC_PTSTAT)) & (0x1 << pd)) {
@@ -219,10 +223,15 @@ static void init_power(void)
 		/* MSMC RAM */
 		set_psc_state(7, PSC_MSMCSRAM,  PSC_ENABLE);
 #ifdef CONFIG_TI_KEYSTONE_NETCP
-		/* NetCP, PA and SA */
-		set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
-		set_psc_state(2, PSC_PA,     PSC_DISABLE);
-		mdelay(100);
+		if (!(pll1_get_reg(RSTYPE) & 0x4)) {
+			/* NetCP, PA and SA */
+			set_psc_state(2, PSC_SA,     PSC_DISABLE);
+			set_psc_state(2, PSC_CPGMAC, PSC_DISABLE);
+/*                      set_psc_state(2, PSC_PA,     PSC_DISABLE); */
+			mdelay(100);
+		} else
+			printk("Resuming from software reset\n");
+		
 		set_psc_state(2, PSC_PA,     PSC_ENABLE);
 		set_psc_state(2, PSC_CPGMAC, PSC_ENABLE);
 /*              set_psc_state(2, PSC_SA,     PSC_ENABLE); */
