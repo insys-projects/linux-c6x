@@ -18,11 +18,12 @@
 #include <asm/percpu.h>
 
 #include <mach/irq.h>
+#include <mach/pci.h>
 
 #define irq_canonicalize(irq)  (irq)
 
 #ifdef CONFIG_INTC_C64XPLUS
-#define NR_IRQS (NR_SOC_IRQS + NR_BOARD_IRQS)
+#define NR_IRQS (NR_SOC_IRQS + MSI_NR_IRQS + NR_BOARD_IRQS)
 #else
 #define NR_IRQS (NR_SYS_IRQS + NR_BOARD_IRQS)
 #endif

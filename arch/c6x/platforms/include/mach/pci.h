@@ -19,6 +19,7 @@
 struct keystone_pcie_data {
 	int msi_irq_base;
 	int msi_irq_num;
+	int (*msi_irq_map)(int slot);
 	int force_x1;
 };
 
@@ -50,10 +51,11 @@ struct keystone_pcie_data {
 #define C6X_PCIE_DEVTYPE_MASK	(0x3 << C6X_PCIE_DEVTYPE_SHIFT)
 #define C6X_PCIE_DEVTYPE_RC	(0x2 << C6X_PCIE_DEVTYPE_SHIFT)
 
-/* MSI IRQs may get added for TI81XX */
-#define MSI_IRQ_BASE		IRQ_PCIEMSI0
+/* MSI IRQs may get added for C667x */
+#define MSI_IRQ_BASE		(IRQ_CPINTC0_START + NR_CPINTC0_IRQS)
 #ifdef CONFIG_PCI_MSI
-#define MSI_NR_IRQS		32
+/* On C667x MSI interrupts are grouped by 4: n,n+8,n+16,n+24 */
+#define MSI_NR_IRQS		4
 #else
 #define MSI_NR_IRQS		0
 #endif

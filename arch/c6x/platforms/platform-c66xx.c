@@ -397,9 +397,19 @@ core_initcall(setup_netcp);
  */
 #include <mach/pci.h>
 
+/* On C667x, MSI interrupts are grouped by 4 and dispatched indexed on core id */
+static int c6x_msi_irq_map(int slot) {
+#if defined(CONFIG_SOC_TMS320C6678)
+	return (get_coreid() + (slot << 3));
+#else
+	return ((get_coreid() << 1) + (slot << 3));
+#endif
+}
+
 static struct keystone_pcie_data c6x_pcie_data = {
 	.msi_irq_base	= MSI_IRQ_BASE,
 	.msi_irq_num	= MSI_NR_IRQS,
+	.msi_irq_map    = c6x_msi_irq_map,
 };
 
 static struct resource c6x_pcie_resources[] = {
@@ -426,7 +436,7 @@ static struct resource c6x_pcie_resources[] = {
 	},
 	{
 		/* Inbound memory window */
-	    .name		= "pcie-inbound0",
+		.name		= "pcie-inbound0",
 		.start		= PLAT_PHYS_OFFSET,
 		.end		= PLAT_PHYS_OFFSET + SZ_512M - 1,
 		.flags		= IORESOURCE_MEM,
