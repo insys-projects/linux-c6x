@@ -45,6 +45,7 @@
 static struct platform_device *pcie_pdev;
 static int msi_irq_base;
 static int msi_irq_num;
+static int (*msi_irq_map)(int slot);
 static int force_x1;
 
 /* Details for inbound access to RAM, passed from platform data */
@@ -92,6 +93,8 @@ static DEFINE_SPINLOCK(keystone_pci_io_lock);
 #define MSI0_IRQ_ENABLE_CLR		0x10c
 #define IRQ_ENABLE_SET			0x188
 #define IRQ_ENABLE_CLR			0x18c
+
+#define MSI_IRQ_OFFSET_SHIFT            4
 
 /*
  * PCIe Config Register Offsets (capabilities)
@@ -348,7 +351,10 @@ static DECLARE_BITMAP(msi_irq_bits, CFG_MAX_MSI_NUM);
  */
 static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 {
-	int bit = 0;
+	struct msi_desc *entry = get_irq_desc_msi(desc);
+       	int bit = 0;
+	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
+	u32 reg = reg_virt + MSI0_IRQ_STATUS + msi_reg_offset;
 	u32 status;
 	
 	pr_debug(DRIVER_NAME ": Handling MSI irq %d\n", irq);
@@ -361,36 +367,48 @@ static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 	desc->chip->mask(irq);
 	if (desc->chip->ack)
 		desc->chip->ack(irq);
-	
-	status = __raw_readl(reg_virt + MSI0_IRQ_STATUS);
+
+	status = __raw_readl(reg);
 	
 	/* FIXME: Use max loops count? */
-	while (status) {
-		bit = find_first_bit((unsigned long *)&status, 32);
+	while ((status = __raw_readl(reg))) {
+		bit = find_first_bit((unsigned long *)&status, msi_irq_num);
+		__raw_writel(1 << bit, reg);
 		generic_handle_irq(msi_irq_base + bit);
-		status = __raw_readl(reg_virt + MSI0_IRQ_STATUS);
 	}
-	__raw_writel(IRQ_MSI0_NUM, reg_virt + IRQ_EOI);
-
+	__raw_writel(IRQ_MSI0_NUM, reg_virt + IRQ_EOI + msi_reg_offset);
+	
 	desc->chip->unmask(irq);
 }
 
 static void ack_msi(unsigned int irq)
 {
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct msi_desc *entry = get_irq_desc_msi(desc);
+	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
 	unsigned int msi_num = irq - msi_irq_base;
-	__raw_writel(~(1 << (msi_num & 0x1f)), reg_virt + MSI0_IRQ_STATUS);
+
+	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_STATUS + msi_reg_offset);
 }
 
 static void mask_msi(unsigned int irq)
 {
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct msi_desc *entry = get_irq_desc_msi(desc);
+	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
 	unsigned int msi_num = irq - msi_irq_base;
-	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_CLR);
+
+	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_CLR + msi_reg_offset);
 }
 
 static void unmask_msi(unsigned int irq)
 {
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct msi_desc *entry = get_irq_desc_msi(desc);
+	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
 	unsigned int msi_num = irq - msi_irq_base;
-	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_SET);
+
+	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_SET + msi_reg_offset);
 }
 
 /*
@@ -402,6 +420,8 @@ static void unmask_msi(unsigned int irq)
 static struct irq_chip keystone_msi_chip = {
 	.name = "PCIe-MSI",
 	.ack = ack_msi,
+	.enable = unmask_msi,
+	.disable = mask_msi,
 	.mask = mask_msi,
 	.unmask = unmask_msi,
 };
@@ -424,7 +444,7 @@ static int get_free_msi(void)
 	} while (test_and_set_bit(bit, msi_irq_bits));
 	
 	pr_debug(DRIVER_NAME ": MSI %d available\n", bit);
-	
+
 	return bit;
 }
 
@@ -439,7 +459,7 @@ void write_msi_msg(unsigned int irq, struct msi_msg *msg) {}
  * @desc: Pointer to MSI descriptor data
  *
  * Assigns an MSI to endpoint and sets up corresponding irq. Also passes the MSI
- * information to the endpont.
+ * information to the endpoint.
  *
  * TODO: Add 64-bit addressing support
  */
@@ -458,7 +478,10 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
 		pr_err(DRIVER_NAME ": Failed to get free MSI\n");
 	} else {
 		irq = msi_irq_base + ret;
-		msg.data = ret;
+		if (msi_irq_map)
+			msg.data = msi_irq_map(ret);
+		else
+			msg.data = ret;
 		
 		dynamic_irq_init(irq);
 		ret = set_irq_msi(irq, desc);
@@ -470,24 +493,23 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
 			pr_debug(DRIVER_NAME ": MSI %d @%#x:%#x, irq = %d\n",
 				 msg.data, msg.address_hi,
 				 msg.address_lo, irq);
-			
+
 			write_msi_msg(irq, &msg);
-			
+
 			set_irq_chip_and_handler(irq, &keystone_msi_chip,
 						 handle_level_irq);
 			set_irq_flags(irq, IRQF_VALID);
 		}
 	}
-
 	return ret;
 }
 
 void arch_teardown_msi_irq(unsigned int irq)
 {
 	int pos = irq - msi_irq_base;
-
+	
 	dynamic_irq_cleanup(irq);
-
+	
 	clear_bit(pos, msi_irq_bits);
 }
 
@@ -990,6 +1012,7 @@ static int keystone_pcie_probe(struct platform_device *pdev)
 	
 	msi_irq_base = pdata->msi_irq_base;
 	msi_irq_num = pdata->msi_irq_num;
+	msi_irq_map = pdata->msi_irq_map;
 	force_x1 = pdata->force_x1;
 	
 	pr_info(DRIVER_NAME ": Invoking PCI BIOS ...\n");
