@@ -299,6 +299,8 @@ config PCI
 	help
 	  Support for PCI bus.
 
+source "drivers/pci/pcie/Kconfig"
+
 source "drivers/pci/Kconfig"
 
 endmenu
