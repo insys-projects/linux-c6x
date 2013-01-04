@@ -24,14 +24,17 @@
 static inline unsigned char __readb(volatile unsigned char *addr) { return (*addr); }
 static inline unsigned short __readw(volatile unsigned short *addr) { return (*addr); }
 static inline unsigned long __readl(volatile unsigned int *addr) { return (*addr); }
+static inline u64 __readq(volatile u64 *addr) { return (*addr); }
 
 #define readb(addr) __readb((volatile unsigned char *) (addr))
 #define readw(addr) __readw((volatile unsigned short *) (addr))
 #define readl(addr) __readl((volatile unsigned int *) (addr))
+#define readq(addr) __readq((volatile u64 *) (addr))
 
 #define writeb(b,addr) ((*(volatile unsigned char *) (addr)) = (b))
 #define writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
 #define writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
+#define writeq(b,addr) ((*(volatile u64 *) (addr)) = (b))
 
 /*
  * traditional input/output functions (got from include/asm-generic/io.h)
