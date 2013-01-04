@@ -14,6 +14,8 @@
 #ifndef __ASM_C6X_UNALIGNED_H
 #define __ASM_C6X_UNALIGNED_H
 
+#include <linux/types.h>
+
 /*
  * The C64x+ can do unaligned word and dword accesses in hardware
  * using special load/store instructions. This should be rewritten
