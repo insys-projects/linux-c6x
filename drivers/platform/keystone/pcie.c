@@ -513,6 +513,20 @@ void arch_teardown_msi_irq(unsigned int irq)
 	clear_bit(pos, msi_irq_bits);
 }
 
+static void mask_legacy_irq(void)
+{
+	unsigned int offset;
+	for (offset = 0; offset < 0x40; offset += 0x10)
+		__raw_writel(0xf, reg_virt + IRQ_ENABLE_CLR + offset);
+}
+
+static void unmask_legacy_irq(void)
+{
+	unsigned int offset;
+	for (offset = 0; offset < 0x40; offset += 0x10)
+		__raw_writel(0xf, reg_virt + IRQ_ENABLE_SET + offset);
+}
+
 /**
  * keystone_pcie_setup() - Perform PCIe system setup.
  * @nr: PCI controller index
@@ -638,9 +652,9 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	__raw_writel(LTSSM_EN_VAL | __raw_readl(reg_virt + CMD_STATUS),
 		     reg_virt + CMD_STATUS);
 	
-	 /* 100ms */
-	 msleep(100);
-	 
+	/* 100ms */
+	msleep(100);
+	
 	/*
 	 * Identify ourselves as 'Bridge' for enumeration purpose. This also
 	 * avoids "Invalid class 0000 for header type 01" warnings from "lspci".
@@ -648,10 +662,10 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	 * If at all we want to restore the default class-subclass values, the
 	 * best place would be after returning from pci_common_init ().
 	 */
-	 __raw_writew(PCI_CLASS_BRIDGE_PCI,
-		      reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_CLASS_DEVICE);
-	 
-	 /*
+	__raw_writew(PCI_CLASS_BRIDGE_PCI,
+		     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_CLASS_DEVICE);
+	
+	/*
 	 * Prevent the enumeration code from assigning resources to our BARs. We
 	 * will set up them after the scan is complete.
 	 */
@@ -678,9 +692,9 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	legacy_irq = platform_get_irq_byname(pcie_pdev, "legacy_int");
 
 	if (legacy_irq >= 0) {
-		__raw_writel(0xf, reg_virt + IRQ_ENABLE_SET);
+		unmask_legacy_irq();
 	} else {
-		__raw_writel(0xf, reg_virt + IRQ_ENABLE_CLR);
+		mask_legacy_irq();
 		pr_warning(DRIVER_NAME ": INTx disabled since no legacy IRQ\n");
 	}
 
@@ -971,13 +985,12 @@ static struct pci_bus *keystone_pcie_scan(int nr, struct pci_sys_data *sys)
  * @slot: Device slot
  * @pin: Pin number for the function
  *
- * Note: Currently ignores all the parameters and only supports mapping to
- * single IRQ.
+ * Note: Assumption is that legacy interrupts (INTA/B/C/D) are contiguous
  */
 static int keystone_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-{
-	pr_debug(DRIVER_NAME "Returning Legacy irq = %d\n", legacy_irq);
-	return (legacy_irq >= 0) ? legacy_irq : -1;
+{	
+	pr_debug(DRIVER_NAME "returning legacy irq = %d\n", legacy_irq + pin - 1);
+	return (legacy_irq >= 0) ? legacy_irq + pin - 1 : -1;
 }
 
 /* PCI controller setup and configuration data */
