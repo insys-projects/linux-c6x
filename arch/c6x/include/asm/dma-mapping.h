@@ -63,29 +63,6 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
 	return 0;
 }
 
-static inline int dma_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
-			     enum dma_data_direction direction)
-{
-	struct scatterlist *sg;
-        int i;
-
-        BUG_ON(direction == DMA_NONE);
-
-	for_each_sg(sglist, sg, nents, i) {
-		BUG_ON(!sg_page(sg));
-
-		sg->dma_address = sg_phys(sg);
-	}
-
-        return nents;
-}
-
-static inline void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
-				enum dma_data_direction direction)
-{
-        BUG_ON(direction == DMA_NONE);
-}
-
 static inline int dma_get_cache_alignment(void)
 {
 	return L2_CACHE_BYTES;
@@ -289,19 +266,55 @@ static inline void dma_sync_single_for_device(struct device *dev,
 {
 	dma_sync_single_range_for_device(dev, handle, 0, size, dir);
 }
+static inline int dma_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
+			     enum dma_data_direction direction)
+{
+	struct scatterlist *sg;
+        int i;
+
+	for_each_sg(sglist, sg, nents, i) {
+		BUG_ON(!sg_page(sg));
+		sg->dma_address = dma_map_page(dev, sg_page(sg), sg->offset,
+					       sg->length, direction);
+	}
+
+        return nents;
+}
+
+static inline void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
+				enum dma_data_direction direction)
+{
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nhwentries, i)
+		dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), direction);
+}
 
 static inline void
 dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nents,
 		    enum dma_data_direction dir)
 {
-	BUG_ON(!valid_dma_direction(dir));
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i) {
+		__dma_page_dev_to_cpu(sg_page(s), s->offset,
+				      s->length, dir);
+	}
 }
 
 static inline void
 dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nents,
-		    enum dma_data_direction dir)
+		       enum dma_data_direction dir)
 {
-	BUG_ON(!valid_dma_direction(dir));
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i) {
+		__dma_page_cpu_to_dev(sg_page(s), s->offset,
+				      s->length, dir);
+	}
 }
 
 extern int coherent_mem_init(void);
