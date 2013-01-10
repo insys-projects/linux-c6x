@@ -421,6 +421,7 @@ static void handle_cpintc_combined_irq(unsigned int irq, struct irq_desc *desc)
 	for (i = 0; i < hinfo->nb_irq; i++) {
 		if (*hinfo->irq_i[i].mevtflag & hinfo->irq_i[i].mask) {
 			unsigned int c_irq = hinfo->irq_i[i].irq; /* child IRQ to handle */
+			void (*ack_handler)(unsigned int irq) = get_irq_chip_data(c_irq);
 			
 			/* Mask level interrupt */
 			if (hinfo->irq_i[i].level)
@@ -435,6 +436,10 @@ static void handle_cpintc_combined_irq(unsigned int irq, struct irq_desc *desc)
 			/* Unmask level interrupt */
 			if (hinfo->irq_i[i].level)
 				cpintc_unmask(c_irq);
+
+			/* We may have special acknowledge callbacks per irq (e.g. PCI INTx) */
+			if (ack_handler)
+				ack_handler(c_irq);
 		}
 	}
 
