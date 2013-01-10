@@ -513,6 +513,14 @@ void arch_teardown_msi_irq(unsigned int irq)
 	clear_bit(pos, msi_irq_bits);
 }
 
+static void ack_legacy_irq(unsigned int irq)
+{
+	if (legacy_irq >=  0) {
+		u32 intx = irq - legacy_irq;
+		__raw_writel(IRQ_INTA_NUM + intx, reg_virt + IRQ_EOI);
+	}
+}
+
 static void mask_legacy_irq(void)
 {
 	unsigned int offset;
@@ -692,6 +700,18 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	legacy_irq = platform_get_irq_byname(pcie_pdev, "legacy_int");
 
 	if (legacy_irq >= 0) {
+#ifdef CONFIG_TMS320C66X
+		/* 
+		 * For each of the four legacy INTx set the acknowledgement
+		 * handler in the irq_chip private data. The interrupt controller
+		 * to which the INTx are attached must manage the call to this
+		 * callback.
+		 */
+		set_irq_chip_data(legacy_irq,     (void *) ack_legacy_irq);
+		set_irq_chip_data(legacy_irq + 1, (void *) ack_legacy_irq);
+		set_irq_chip_data(legacy_irq + 2, (void *) ack_legacy_irq);
+		set_irq_chip_data(legacy_irq + 3, (void *) ack_legacy_irq);
+#endif
 		unmask_legacy_irq();
 	} else {
 		mask_legacy_irq();
