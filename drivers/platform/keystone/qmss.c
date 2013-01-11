@@ -274,8 +274,9 @@ static int hw_qm_setup (struct qm_config *cfg)
 
 	/* Reset the QM PDSP */
 	for (i = 0; i < QM_MAX_PDSP; i++)
-		qm_write_reg(QM_REG_VAL_PDSP_CTL_DISABLE,
-			     DEVICE_QM_PDSP_CTRL_OFFSET(cfg->pdsp_firmware[i].id));
+		if (cfg->pdsp_firmware[i].firmware != NULL)
+			qm_write_reg(QM_REG_VAL_PDSP_CTL_DISABLE,
+				     DEVICE_QM_PDSP_CTRL_OFFSET(cfg->pdsp_firmware[i].id));
 
 	/* Verify that alignment requirements */
 	if ((cfg->link_ram_base & (QM_LINKRAM_ALIGN - 1)) != 0)
