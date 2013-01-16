@@ -319,26 +319,27 @@ static void set_inbound_trans(void)
 		set_dbi_mode();
 
 		__raw_writel(1,
-			reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
-		
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
+
 		__raw_writel(ram_end - ram_base,
-			reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
 		
 		clear_dbi_mode();
 		
 		/* Set BAR1 attributes and value in config space */
-		__raw_writel(ram_base | PCI_BASE_ADDRESS_MEM_PREFETCH, 
-			reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
+		__raw_writel(ram_base | PCI_BASE_ADDRESS_MEM_PREFETCH,
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PCI_BASE_ADDRESS_1);
 
 		/*
 		 * Enable IB translation only if BAR1 is set. BAR0 doesn't
 		 * require enabling IB translation as it is set up in h/w
 		 */
 		__raw_writel(IB_XLAT_EN_VAL | __raw_readl(reg_virt + CMD_STATUS),
-			reg_virt + CMD_STATUS);
+			     reg_virt + CMD_STATUS);
 	}
 }
 
+#ifdef CONFIG_PCI_MSI
 static DECLARE_BITMAP(msi_irq_bits, CFG_MAX_MSI_NUM);
 
 /**
@@ -351,12 +352,13 @@ static DECLARE_BITMAP(msi_irq_bits, CFG_MAX_MSI_NUM);
  */
 static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 {
-	struct msi_desc *entry = get_irq_desc_msi(desc);
-       	int bit = 0;
-	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
+	int bit = 0;
+	u32 msi_offset = msi_irq_map(0);
+	u32 msi_reg_offset =  msi_offset << MSI_IRQ_OFFSET_SHIFT;
 	u32 reg = reg_virt + MSI0_IRQ_STATUS + msi_reg_offset;
 	u32 status;
-	
+	u32 do_ack;
+
 	pr_debug(DRIVER_NAME ": Handling MSI irq %d\n", irq);
 	
 	/*
@@ -367,8 +369,9 @@ static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 	desc->chip->mask(irq);
 	if (desc->chip->ack)
 		desc->chip->ack(irq);
-
+	
 	status = __raw_readl(reg);
+	do_ack = status;
 	
 	/* FIXME: Use max loops count? */
 	while ((status = __raw_readl(reg))) {
@@ -376,7 +379,8 @@ static void keystone_msi_handler(unsigned int irq, struct irq_desc *desc)
 		__raw_writel(1 << bit, reg);
 		generic_handle_irq(msi_irq_base + bit);
 	}
-	__raw_writel(IRQ_MSI0_NUM, reg_virt + IRQ_EOI + msi_reg_offset);
+	if (do_ack)
+		__raw_writel(IRQ_MSI0_NUM + msi_offset, reg_virt + IRQ_EOI);
 	
 	desc->chip->unmask(irq);
 }
@@ -398,6 +402,7 @@ static void mask_msi(unsigned int irq)
 	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
 	unsigned int msi_num = irq - msi_irq_base;
 
+	mask_msi_irq(entry->msg.data);
 	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_CLR + msi_reg_offset);
 }
 
@@ -408,14 +413,9 @@ static void unmask_msi(unsigned int irq)
 	u32 msi_reg_offset = (entry->msg.data & 0x7) << MSI_IRQ_OFFSET_SHIFT;
 	unsigned int msi_num = irq - msi_irq_base;
 
+	unmask_msi_irq(entry->msg.data);
 	__raw_writel(1 << (msi_num & 0x1f), reg_virt + MSI0_IRQ_ENABLE_SET + msi_reg_offset);
 }
-
-/*
- * TODO: Add support for mask/unmask on remote devices (mask_msi_irq and
- * unmask_msi_irq). Note that, this may not work always - requires endpoints to
- * support mask bits capability.
- */
 
 static struct irq_chip keystone_msi_chip = {
 	.name = "PCIe-MSI",
@@ -447,11 +447,6 @@ static int get_free_msi(void)
 
 	return bit;
 }
-
-/* Stub for legacy-interrupts-only mode. */
-#ifndef CONFIG_PCI_MSI
-void write_msi_msg(unsigned int irq, struct msi_msg *msg) {}
-#endif
 
 /**
  * arch_setup_msi_irq() - Set up an MSI for Endpoint
@@ -512,6 +507,7 @@ void arch_teardown_msi_irq(unsigned int irq)
 	
 	clear_bit(pos, msi_irq_bits);
 }
+#endif
 
 static void ack_legacy_irq(unsigned int irq)
 {
@@ -718,6 +714,7 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 		pr_warning(DRIVER_NAME ": INTx disabled since no legacy IRQ\n");
 	}
 
+#ifdef CONFIG_PCI_MSI
 	msi_irq = platform_get_irq_byname(pcie_pdev, "msi_int");
 	
 	if ((msi_irq >= 0) && msi_irq_num) {
@@ -733,7 +730,7 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 		pr_warning(DRIVER_NAME ": MSI info not available, disabled\n");
 		msi_irq_num = 0;
 	}
-	
+#endif	
 	get_and_clear_err();
 	
 	return 1;
