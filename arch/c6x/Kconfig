@@ -296,6 +296,7 @@ config PCI
 	bool "PCI support"
 	depends on TI_KEYSTONE_PCIE
 	default y
+	select PCI_QUIRKS
 	help
 	  Support for PCI bus.
 
