@@ -2824,3 +2824,15 @@ int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 
 	return -ENOTTY;
 }
+
+#ifdef CONFIG_TI_KEYSTONE_PCIE
+/*
+ * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+ * Force this configuration for all EP including bridges.
+ */
+static void __devinit quirk_limit_readrequest(struct pci_dev *dev)
+{
+	pcie_set_readrq(dev, 256);
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_readrequest);
+#endif /* CONFIG_TI_KEYSTONE_PCIE */
