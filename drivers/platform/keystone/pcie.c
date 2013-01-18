@@ -746,35 +746,6 @@ err_memres:
 }
 
 /**
- * check_device() - Checks device availability
- * @bus: Pointer to bus to check the device availability on
- * @dev: Device number
- *
- * Checks for the possibility of device being present. Relies on following
- * logic to indicate success:
- * - downstream link must be established to traverse PCIe fabric
- * - treating RC as virtual PCI bridge, first (and only) device on bus 1 will be
- *   numbered as 0
- * - don't check device number beyond bus 1 as device on our secondary side may
- *   as well be a PCIe-PCI bridge
- */
-static int check_device(struct pci_bus *bus, int dev)
-{
-	if ((__raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + DEBUG0) &
-	     LTSSM_STATE_MASK) != LTSSM_STATE_L0)
-		return 0;
-	
-	if (bus->number <= 1) {
-		if (dev == 0)
-			return 1;
-		else
-			return 0;
-	}
-	
-	return 1;
-}
-
-/**
  * setup_config_addr() - Set up configuration space address for a device
  * @bus: Bus number the device is residing on
  * @device: Device number
@@ -817,6 +788,64 @@ static inline u32 setup_config_addr(u8 bus, u8 device, u8 function)
 	}
 
 	return addr;
+}
+
+/**
+ * check_device() - Checks device availability
+ * @bus: Pointer to bus to check the device availability on
+ * @devfn: Device number and function
+ *
+ * Checks for the possibility of device being present. Relies on following
+ * logic to indicate success:
+ * - downstream link must be established to traverse PCIe fabric
+ * - treating RC as virtual PCI bridge, first (and only) device on bus 1 will be
+ *   numbered as 0
+ * - don't check device number beyond bus 1 as device on our secondary side may
+ *   as well be a PCIe-PCI bridge
+ */
+static int check_device(struct pci_bus *bus, unsigned int devfn)
+{
+	if ((__raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + DEBUG0) &
+	     LTSSM_STATE_MASK) != LTSSM_STATE_L0)
+		return 0;
+	
+	if (bus->number <= 1) {
+		if (PCI_SLOT(devfn) == 0)
+			return 1;
+		else 
+			return 0;
+	} else {
+#ifdef CONFIG_TMS320C66X
+		/*
+		 * Apparently the C66x does not manage the error response
+		 * to non-posted PCIe transactions with an explicit abort external 
+		 * exception like on ARM with its MMU.
+		 *
+		 * So in order to check if a device is present or not when 
+		 * accessing the PCIe remote configuration space, we try to
+		 * read and modify the parity enable bit of the PCI command field.
+		 * According to the PCI specification this bit is r/w and can be 
+		 * modified for all EP and bridges.
+		 *
+		 * If the bit can be modified we come to the conclusion that
+		 * device is present. Otherwise device is not present.
+		 */
+		u16 old_cmd, cmd;
+		u32 r_cmd_addr = setup_config_addr(bus->number, PCI_SLOT(devfn),
+						   PCI_FUNC(devfn)) + PCI_COMMAND;
+		
+		old_cmd =__raw_readw(r_cmd_addr);
+		__raw_writew(old_cmd ^ PCI_COMMAND_PARITY, r_cmd_addr);
+		cmd = __raw_readw(r_cmd_addr);
+		
+		if (cmd != (old_cmd ^ PCI_COMMAND_PARITY))
+			return 0;
+		
+		__raw_writew(old_cmd, r_cmd_addr);
+#endif
+	}
+
+	return 1;
 }
 
 /**
@@ -907,22 +936,22 @@ static int keystone_pci_read_config(struct pci_bus *bus, unsigned int devfn,
 	u8 bus_num = bus->number;
 
 	pr_debug(DRIVER_NAME ": Reading config[%x] for device %04x:%02x:%02x..",
-			where, bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
+		 where, bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-	if (!check_device(bus, PCI_SLOT(devfn))) {
+	if (!check_device(bus, devfn)) {
 		*value = ~0;
 		pr_debug("failed. No link/device.\n");
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
 	*value = __raw_readl(setup_config_addr(bus_num, PCI_SLOT(devfn),
-				PCI_FUNC(devfn)) + (where & ~3));
-
+					       PCI_FUNC(devfn)) + (where & ~3));
+	
 	if (size == 1)
 		*value = (*value >> (8 * (where & 3))) & 0xff;
 	else if (size == 2)
 		*value = (*value >> (8 * (where & 3))) & 0xffff;
-
+	
 	pr_debug("done. value = %#x\n", *value);
 
 	return PCIBIOS_SUCCESSFUL;
@@ -946,10 +975,10 @@ static int keystone_pci_write_config(struct pci_bus *bus, unsigned int devfn,
 	u32 addr;
 
 	pr_debug(DRIVER_NAME ": Writing config[%x] = %x "
-			"for device %04x:%02x:%02x ...", where, value,
-			bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
-
-	if (!check_device(bus, PCI_SLOT(devfn))) {
+		 "for device %04x:%02x:%02x ...", where, value,
+		 bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
+	
+	if (!check_device(bus, devfn)) {
 		pr_debug("failed. No link/device.\n");
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
