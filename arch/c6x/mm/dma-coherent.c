@@ -242,8 +242,6 @@ void __dma_single_cpu_to_dev(const void *kaddr, size_t size,
 {
 	unsigned long paddr;
 	
-	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
-	
 	paddr = __pa(kaddr);
 	switch(dir) {
 	case DMA_FROM_DEVICE:
@@ -264,8 +262,6 @@ EXPORT_SYMBOL(__dma_single_cpu_to_dev);
 void __dma_single_dev_to_cpu(const void *kaddr, size_t size,
 			     enum dma_data_direction dir)
 {
-	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
-
 	/* don't bother invalidating if DMA to device */
 	if (dir != DMA_TO_DEVICE) {
 		unsigned long paddr = __pa(kaddr);
