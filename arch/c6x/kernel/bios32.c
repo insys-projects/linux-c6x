@@ -134,7 +134,7 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
  * pcibios_fixup_bus - Called after each bus is probed,
  * but before its children are examined.
  */
-void __init pcibios_fixup_bus(struct pci_bus *bus)
+void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_sys_data *root = bus->sysdata;
 	struct pci_dev *dev;
@@ -296,7 +296,7 @@ static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	return irq;
 }
 
-static void __init pcibios_init_hw(struct hw_pci *hw)
+static void __devinit pcibios_init_hw(struct hw_pci *hw)
 {
 	struct pci_sys_data *sys = NULL;
 	int ret;
@@ -336,7 +336,7 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
 	}
 }
 
-void __init pci_common_init(struct hw_pci *hw)
+void __devinit pci_common_init(struct hw_pci *hw)
 {
 	struct pci_sys_data *sys;
 
@@ -382,12 +382,6 @@ char * __init pcibios_setup(char *str)
 		return NULL;
 	}
 	return str;
-}
-
-void __init
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
-{
 }
 
 /*
