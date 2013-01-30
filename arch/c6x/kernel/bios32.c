@@ -22,7 +22,6 @@
 #include <asm/uaccess.h>
 
 static int debug_pci;
-static int use_firmware;
 
 struct pci_fixup pcibios_fixups[] =
 {
@@ -338,47 +337,29 @@ static void __devinit pcibios_init_hw(struct hw_pci *hw)
 
 void __devinit pci_common_init(struct hw_pci *hw)
 {
-	struct pci_sys_data *sys;
-
 	INIT_LIST_HEAD(&hw->buses);
 
 	if (hw->preinit)
 		hw->preinit();
+
 	pcibios_init_hw(hw);
+
 	if (hw->postinit)
 		hw->postinit();
 
 	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
 
-	list_for_each_entry(sys, &hw->buses, node) {
-		struct pci_bus *bus = sys->bus;
-
-		if (!use_firmware) {
-			/*
-			 * Size the bridge windows.
-			 */
-			pci_bus_size_bridges(bus);
-
-			/*
-			 * Assign resources.
-			 */
-			pci_bus_assign_resources(bus);
-		}
-
-		/*
-		 * Tell drivers about devices found.
-		 */
-		pci_bus_add_devices(bus);
-	}
+	/*
+	 * We do not have a BIOS or a firmware that do resources initialization for 
+	 * the EP (like BAR settings, etc) so we need Linux to do it.
+	 */
+	pci_assign_unassigned_resources();
 }
 
 char * __init pcibios_setup(char *str)
 {
 	if (!strcmp(str, "debug")) {
 		debug_pci = 1;
-		return NULL;
-	} else if (!strcmp(str, "firmware")) {
-		use_firmware = 1;
 		return NULL;
 	}
 	return str;
