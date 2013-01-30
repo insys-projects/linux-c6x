@@ -1017,9 +1017,6 @@ static struct pci_bus *keystone_pcie_scan(int nr, struct pci_sys_data *sys)
 
 		/* Post enumeration fixups */
 		set_inbound_trans();
-
-		/* Bridges are not getting enabled by default! */
-		pci_assign_unassigned_resources();
 	}
 
 	return bus;
