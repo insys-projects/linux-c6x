@@ -600,7 +600,7 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	res[0].end   = plat_res->end;
 	res[0].name  = "PCI Memory";
 	res[0].flags = IORESOURCE_MEM;
-	
+
 	/* Optional: io window */
 	plat_res = platform_get_resource_byname(pcie_pdev, IORESOURCE_IO,
 						"pcie-io");
@@ -639,14 +639,14 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	}
 
 	/*
-	 * TI81xx devices do not support h/w autonomous link up-training to GEN2
+	 * KeyStone devices do not support h/w autonomous link up-training to GEN2
 	 * form GEN1 in either EP/RC modes. The software needs to initiate speed
 	 * change.
 	 */
 	__raw_writel(DIR_SPD | __raw_readl(
 			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2),
 		     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2);
-	
+
 	/*
 	 * Initiate Link Training. We will delay for L0 as specified by
 	 * standard, but will still proceed and return success irrespective of
@@ -1051,7 +1051,7 @@ static struct hw_pci keystone_pci = {
 };
 
 /**
- * keystone_pcie_probe() - Invoke PCI BIOS to perrform enumeration.
+ * keystone_pcie_probe() - Invoke PCI BIOS to perform enumeration.
  * @pdev: Contains platform data as supplied from board level code.
  *
  * Also stores reference to platform device structure for use during PCIe
