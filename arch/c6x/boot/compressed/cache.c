@@ -11,8 +11,8 @@
  *  published by the Free Software Foundation.
  */
 #ifdef __TMS320C66X__
-#define mfence() #define mfence()                 asm volatile (" .word 0x10008000\n" \
-								" .word 0x10008000\n")
+#define mfence()                 asm volatile (" .word 0x10008000\n" \
+ 					       " .word 0x10008000\n")
 #else
 #define mfence()
 #endif
