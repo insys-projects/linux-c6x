@@ -173,10 +173,13 @@ void
 msm_mem_init(void)
 {	
 	/*
-	 * If the device has KeyStone MSM, set it cacheable/prefetchable for L1
+	 * If the device has KeyStone MSM, set it cacheable but non-prefetchable for L1!
+	 * (data corruption issue)
 	 */
 	enable_caching((unsigned int *) RAM_MSM_BASE,
 		       (unsigned int *) (RAM_MSM_BASE + IMCR_MAR_SIZE - 1));
+	disable_prefetching((unsigned int *) RAM_MSM_BASE,
+			    (unsigned int *) (RAM_MSM_BASE + IMCR_MAR_SIZE - 1));
 	
 #ifdef ARCH_HAS_XMC_MPAX
 	/*

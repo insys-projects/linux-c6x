@@ -415,7 +415,7 @@ static inline void L2_cache_global_writeback(void)
 /*
  * Cacheability controls
  */
-static inline void enable_caching(unsigned int *start,	unsigned int *end)
+static inline void enable_caching(unsigned int *start, unsigned int *end)
 {
 	unsigned int *mar   = (unsigned int *) IMCR_MAR_BASE\
 		+ ((unsigned int) start >> 24);
@@ -450,6 +450,38 @@ static inline void disable_caching(unsigned int *start, unsigned int *end)
 	}
 	mfence();
 }
+
+#ifdef ARCH_HAS_XMC_PREFETCHW
+static inline void disable_prefetching(unsigned int *start, unsigned int *end)
+{
+	unsigned int *mar   = (unsigned int *) IMCR_MAR_BASE\
+		+ ((unsigned int) start >> 24);
+	unsigned int *mar_e = (unsigned int *) IMCR_MAR_BASE\
+		+ ((unsigned int) end >> 24);
+
+	xmc_prefetch_buffer_invalidate();
+	
+	for (;mar <= mar_e; mar++)
+		*mar &= ~IMCR_MAR_PFX;
+
+	mfence();
+}
+
+static inline void enable_prefetching(unsigned int *start, unsigned int *end)
+{
+	unsigned int *mar   = (unsigned int *) IMCR_MAR_BASE\
+		+ ((unsigned int) start >> 24);
+	unsigned int *mar_e = (unsigned int *) IMCR_MAR_BASE\
+		+ ((unsigned int) end >> 24);
+	
+	xmc_prefetch_buffer_invalidate();
+
+	for (;mar <= mar_e; mar++)
+		*mar |= IMCR_MAR_PFX;
+
+	mfence();
+}
+#endif /* ARCH_HAS_XMC_PREFETCHW */
 
 #else /* CONFIG_TMS320C6X_CACHES_ON */
 #define L2_cache_set_mode(mode)
