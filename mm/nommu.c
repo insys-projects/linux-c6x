@@ -1292,6 +1292,7 @@ unsigned long do_mmap_pgoff(struct file *file,
 					pregion = NULL;
 					goto error_just_free;
 				}
+				start = vma->vm_start;
 			}
 			fput(region->vm_file);
 			kmem_cache_free(vm_region_jar, region);
