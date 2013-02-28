@@ -52,8 +52,8 @@ static inline u32 __msm_alloc(int order)
 
 	paddr = __msm_memory_start + (offset << PAGE_SHIFT);
 
-	if (__msm_page_heap < paddr)
-		__msm_page_heap = paddr;
+	if (__msm_page_heap < (paddr + ((1 << order) << PAGE_SHIFT)))
+		__msm_page_heap = paddr + ((1 << order) << PAGE_SHIFT);
 	
 	spin_unlock_irqrestore(&__msmc_mem_lock, flags);
 
