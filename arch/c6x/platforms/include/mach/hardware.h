@@ -298,6 +298,27 @@
 extern void keystone_reset(void);
 #endif  /* __ASSEMBLY__ */
 
+#define MPU0_BASE_ADDRESS            0x02360000 /* Main CFG SCR */
+#define MPU1_BASE_ADDRESS            0x02368000 /* QMSS data port */
+#define MPU2_BASE_ADDRESS            0x02370000 /* QMSS cfg port */
+#define MPU3_BASE_ADDRESS            0x02378000 /* Semaphore */
+
+#define MPU0_PROG_RANGE_NUM          16
+#if defined(CONFIG_SOC_TMS320C6670)
+#define MPU1_PROG_RANGE_NUM          4
+#elif defined(CONFIG_SOC_TMS320C6678)
+#define MPU1_PROG_RANGE_NUM          5
+#endif
+#define MPU2_PROG_RANGE_NUM          16
+#define MPU3_PROG_RANGE_NUM          1
+
+#define MPU_PROG_MPSAR(n)            (0x200 + ((n) << 4))
+#define MPU_PROG_MPEAR(n)            (0x204 + ((n) << 4))
+#define MPU_PROG_MPPA(n)             (0x208 + ((n) << 4))
+#define MPU_FLT_ADDR                 0x300
+#define MPU_FLT_STAT                 0x304
+#define MPU_FLT_CLR                  0x308
+
 #endif /* CONFIG_TI_KEYSTONE */
 
 #endif  /* __ASM_C6X_MACH_HARDWARE_H */

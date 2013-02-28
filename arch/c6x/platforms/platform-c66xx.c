@@ -279,6 +279,29 @@ void keystone_reset(void)
 	machine_halt();
 }
 
+/*
+ * Initialize MPU for user-access of some devices
+ */
+static void init_mpu(void) 
+{
+	u32 val;
+	u32 range;
+	
+	/* Allowing user r/w access to MPU1 (QMSS data port) */
+	for (range = 0; range < MPU1_PROG_RANGE_NUM; range++) {
+		val  = __raw_readl(MPU1_BASE_ADDRESS + MPU_PROG_MPPA(range));
+		val |= 0x6; /* URW */
+		__raw_writel(val, MPU1_BASE_ADDRESS + MPU_PROG_MPPA(range));
+	}
+
+	/* Allowing user r/w access to MPU2 (QMSS cfg port) */
+	for (range = 0; range < MPU2_PROG_RANGE_NUM; range++) {
+		val  = __raw_readl(MPU2_BASE_ADDRESS + MPU_PROG_MPPA(range));
+		val |= 0x6; /* URW */
+		__raw_writel(val, MPU2_BASE_ADDRESS + MPU_PROG_MPPA(range));
+	}
+}
+
 #ifdef CONFIG_TI_KEYSTONE_QM
 /*
  * Enable and configure QMSS
@@ -323,6 +346,9 @@ static int __init setup_qmss(void)
 	if (get_coreid() != get_master_coreid()) {
 		qmss_data.slave = 1;
 	}
+
+	disable_caching((u32 *) DEVICE_QM_DATA_BASE,
+			(u32*) (DEVICE_QM_DATA_BASE + DEVICE_QM_DATA_SIZE - 1));
 
 	return platform_device_register(&qmss_dev);
 }
@@ -463,7 +489,7 @@ static struct platform_device c6x_pcie_device = {
 	.name		= "keystone-pcie",
 	.id		= 0,
 	.dev		= {
-	.platform_data	= &c6x_pcie_data,
+		.platform_data	= &c6x_pcie_data,
 	},
 	.num_resources	= ARRAY_SIZE(c6x_pcie_resources),
 	.resource	= c6x_pcie_resources,
@@ -540,6 +566,9 @@ static int __init platform_arch_init(void)
 	unmask_eexception(IRQ_L2CDMPA);
 	unmask_eexception(IRQ_EMCCMPA);
 	unmask_eexception(IRQ_EMCBUSERR);
+
+	/* Set up MPU */
+	init_mpu();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {
