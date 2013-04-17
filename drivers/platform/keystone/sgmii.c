@@ -106,8 +106,8 @@ int keystone_sgmii_config(int port, struct sgmii_config *config)
 		sgmii_write_reg(SGMII_MRADV_REG(port), 0x1);
 
 	val = (((config->master & 1) << 5)
-	       || ((config->loopback & 1) << 4)
-	       || ((config->autoneg & 1) << 0));
+	       | ((config->loopback & 1) << 4)
+	       | ((config->autoneg & 1) << 0));
 	       
 	sgmii_write_reg(SGMII_CTL_REG(port), val);
 
