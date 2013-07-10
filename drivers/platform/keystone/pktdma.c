@@ -229,5 +229,13 @@ int pktdma_region_init(u32 base_paddr,
 {
 	if (vaddr)
 		*vaddr = ioremap(base_paddr, size);
+
+	/* 
+	 * Set QM0 and QM1 (PktDMA cloud) for Infra PktDMA
+	 * It allows to use queues 0 - 4095 on QM0 and queues 4096 - 8191 on QM1
+	 */
+	pktdma_write_reg(0x34020000, 0x02a6c000, PKTDMA_REG_QM_BASE(0));
+	pktdma_write_reg(0x34030000, 0x02a6c000, PKTDMA_REG_QM_BASE(1));
+
 	return 0;
 }

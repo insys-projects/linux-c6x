@@ -19,6 +19,9 @@
 /* Emulation control register */
 #define PKTDMA_REG_EMU_CTL		        0x08
 
+/* QM (clouds) base address register */
+#define PKTDMA_REG_QM_BASE(x)                   (0x10 + (x) * 0x4)
+
 /* CPPI Tx DMA channel control registers */
 #define PKTDMA_REG_TCHAN_CFG_REG_A(x)	        (0x00 + (x) * 0x20)
 #define PKTDMA_REG_TCHAN_CFG_REG_B(x)	        (0x04 + (x) * 0x20)
