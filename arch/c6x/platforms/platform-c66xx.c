@@ -436,6 +436,7 @@ static struct keystone_pcie_data c6x_pcie_data = {
 	.msi_irq_base	= MSI_IRQ_BASE,
 	.msi_irq_num	= MSI_NR_IRQS,
 	.msi_irq_map    = c6x_msi_irq_map,
+	.force_x1       = 0,  /* 1 to force PCIe GEN1 in x1 mode */
 };
 
 static struct resource c6x_pcie_resources[] = {

@@ -2,7 +2,7 @@
  * PCIe RC (Host) Driver for KeyStone PCIe Module configured as Root
  * Complex.
  *
- * Copyright (C) 2010, 2012 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2010, 2012, 2013 Texas Instruments Incorporated - http://www.ti.com/
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -104,6 +104,10 @@ static DEFINE_SPINLOCK(keystone_pci_io_lock);
 /*
  * PCIe Config Register Offsets (misc)
  */
+#define LINK_CTRL2                      0x0a0
+#define SERDES_CFG0                     0x390
+#define SERDES_CFG1                     0x394
+#define PL_FORCE_LINK                   0x708
 #define PL_LINK_CTRL	                0x710
 #define DEBUG0			        0x728
 #define PL_GEN2			        0x80c
@@ -148,6 +152,12 @@ static DEFINE_SPINLOCK(keystone_pci_io_lock);
 #define IRQ_MSI0_NUM                    4
 #define IRQ_ERR_NUM                     12
 #define IRQ_PM_NUM                      13
+
+#define PCIE_BITMASK(x, y)	        (((((u32)1 << (((u32)x) - ((u32)y) + (u32)1)) \
+					   - (u32)1)) << ((u32)y))
+#define PCIE_READ_BITFIELD(z, x, y)	((((u32)z) & PCIE_BITMASK(x, y)) >> (y))
+#define PCIE_SET_BITFIELD(z, f, x, y)	((((u32)z) & ~PCIE_BITMASK(x, y)) | \
+					 ((((u32)f) << (y)) & PCIE_BITMASK(x, y)))
 
 volatile u32 *__ib_buffer = 0;
 
@@ -638,14 +648,60 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 		goto err_ioremap;
 	}
 
-	/*
-	 * KeyStone devices do not support h/w autonomous link up-training to GEN2
-	 * form GEN1 in either EP/RC modes. The software needs to initiate speed
-	 * change.
+	/* 
+	 * Check if needed to switch to PCIe GEN1 in x1 mode (1 lane at 2.5Gbps)
+	 * or stay with PCIe GEN2
 	 */
-	__raw_writel(DIR_SPD | __raw_readl(
-			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2),
-		     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2);
+	if (force_x1) {
+		u32 val;
+
+		/* Setup x1 lane mode */
+		__raw_writeb(0x1, reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2 + 1);
+		__raw_writeb(0x1, reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_LINK_CTRL + 2);
+
+		/* Set speed to 2.5Gb/s, width set to x1 (single lane) into link capabilities register */
+		val = __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + LINK_CAP);
+		val = PCIE_SET_BITFIELD(val, 0x1, 9, 4);
+		val = PCIE_SET_BITFIELD(val, 0x1, 3, 0);
+		__raw_writel(val, (reg_virt + SPACE0_LOCAL_CFG_OFFSET + LINK_CAP));
+
+		/* Set target link speed to 2.5Gb/s mode */
+		val = __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + LINK_CTRL2);
+		val = PCIE_SET_BITFIELD(val, 0x1, 3, 0);
+		__raw_writel(val, reg_virt + SPACE0_LOCAL_CFG_OFFSET + LINK_CTRL2);
+
+		/* Clear SerDes 0 Rx loss of signal detection */
+		val = __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + SERDES_CFG0);
+		val = PCIE_SET_BITFIELD(val, 0x0, 5, 3);
+		__raw_writel(val, reg_virt + SPACE0_LOCAL_CFG_OFFSET + SERDES_CFG0);
+
+		/* Clear SerDes 1 Rx loss of signal detection */
+		val = __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + SERDES_CFG1);
+		val = PCIE_SET_BITFIELD(val, 0x0, 5, 3);
+		__raw_writel(val, reg_virt + SPACE0_LOCAL_CFG_OFFSET + SERDES_CFG1);
+
+		/* Enable link initialization */
+		__raw_writel(BIT(5) | __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_LINK_CTRL),
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_LINK_CTRL);
+
+		/* Force link mode */
+		val = __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_LINK_CTRL);
+		val = PCIE_SET_BITFIELD(val, 0x2, 21, 16);
+		__raw_writel(val, __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_LINK_CTRL));
+		__raw_writel(BIT(15) | __raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_FORCE_LINK),
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_FORCE_LINK);
+
+		msleep(100);
+	} else {
+		/*
+		 * KeyStone devices do not support h/w autonomous link up-training to GEN2
+		 * form GEN1 in either EP/RC modes. The software needs to initiate speed
+		 * change.
+		 */
+		__raw_writel(DIR_SPD | __raw_readl(
+				     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2),
+			     reg_virt + SPACE0_LOCAL_CFG_OFFSET + PL_GEN2);
+	}
 
 	/*
 	 * Initiate Link Training. We will delay for L0 as specified by
@@ -655,10 +711,10 @@ static int keystone_pcie_setup(int nr, struct pci_sys_data *sys)
 	 */
 	__raw_writel(LTSSM_EN_VAL | __raw_readl(reg_virt + CMD_STATUS),
 		     reg_virt + CMD_STATUS);
-	
+
 	/* 100ms */
 	msleep(100);
-	
+
 	/*
 	 * Identify ourselves as 'Bridge' for enumeration purpose. This also
 	 * avoids "Invalid class 0000 for header type 01" warnings from "lspci".
@@ -808,7 +864,7 @@ static int check_device(struct pci_bus *bus, unsigned int devfn)
 	if ((__raw_readl(reg_virt + SPACE0_LOCAL_CFG_OFFSET + DEBUG0) &
 	     LTSSM_STATE_MASK) != LTSSM_STATE_L0)
 		return 0;
-	
+
 	if (bus->number <= 1) {
 		if (PCI_SLOT(devfn) == 0)
 			return 1;
