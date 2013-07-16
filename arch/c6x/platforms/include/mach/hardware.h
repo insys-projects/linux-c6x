@@ -23,19 +23,21 @@
  * Memory address space
  */
 #if defined(CONFIG_SOC_TMS320C6455)
-#define RAM_EMIFA_CE2     0xa0000000
-#define RAM_EMIFA_CE3     0xb0000000
-#define RAM_EMIFA_CE4     0xc0000000
-#define RAM_EMIFA_CE5     0xd0000000
+#define RAM_EMIF_CE2      0xa0000000
+#define RAM_EMIF_CE3      0xb0000000
+#define RAM_EMIF_CE4      0xc0000000
+#define RAM_EMIF_CE5      0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
+#define ARCH_HAS_EMIFA
 #elif defined(CONFIG_SOC_TMS320C6457)
-#define RAM_EMIFA_CE2     0xa0000000
-#define RAM_EMIFA_CE3     0xb0000000
-#define RAM_EMIFA_CE4     0xc0000000
-#define RAM_EMIFA_CE5     0xd0000000
+#define RAM_EMIF_CE2      0xa0000000
+#define RAM_EMIF_CE3      0xb0000000
+#define RAM_EMIF_CE4      0xc0000000
+#define RAM_EMIF_CE5      0xd0000000
 #define RAM_DDR2_CE0      0xe0000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
+#define ARCH_HAS_EMIFA
 #elif defined(CONFIG_SOC_TMS320C6472)
 #define RAM_SRAM          0x00800000
 #define RAM_SRAM_BASE     0x10800000
@@ -65,15 +67,16 @@
 #define RAM_SRAM_BASE     0x10800000
 #define RAM_SRAM_OFFSET   0x01000000
 #define RAM_SRAM_SIZE     0x00080000
-#define RAM_EMIFA_CE2     0x70000000
-#define RAM_EMIFA_CE3     0x74000000
-#define RAM_EMIFA_CE4     0x78000000
-#define RAM_EMIFA_CE5     0x7c000000
+#define RAM_EMIF_CE2      0x70000000
+#define RAM_EMIF_CE3      0x74000000
+#define RAM_EMIF_CE4      0x78000000
+#define RAM_EMIF_CE5      0x7c000000
 #define RAM_DDR2_CE0      0x80000000
 #define RAM_MSM_BASE      0x0c000000
 #define RAM_MSM_SIZE      0x00400000
 #define RAM_MSM_CO_BASE   0x2c000000
 #define RAM_MEMORY_START  RAM_DDR2_CE0
+#define ARCH_HAS_EMIF16
 #else
 #error "No SoC memory address space defines"
 #endif

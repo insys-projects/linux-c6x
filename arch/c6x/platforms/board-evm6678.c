@@ -317,13 +317,13 @@ static struct davinci_nand_pdata evmc6678_nand_data = {
 
 static struct resource evmc6678_nand_resources[] = {
 	{
-		.start		= RAM_EMIFA_CE2,
-		.end		= RAM_EMIFA_CE2 + 0x3FFFFFF,
+		.start		= RAM_EMIF_CE2,
+		.end		= RAM_EMIF_CE2 + 0x3FFFFFF,
 		.flags		= IORESOURCE_MEM,
 	},
 	{
-		.start		= EMIFA_BASE,
-		.end		= EMIFA_BASE + 0xFF,
+		.start		= EMIF_BASE,
+		.end		= EMIF_BASE + 0xFF,
 		.flags		= IORESOURCE_MEM,
 	},
 };

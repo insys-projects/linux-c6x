@@ -23,37 +23,38 @@
 #define __ARCH_C6X_PLATFORMS_MACH_NAND_H
 
 #include <linux/mtd/nand.h>
+#include <mach/emif.h>
 
-#define NRCSR_OFFSET		        0x00
-#define AWCCR_OFFSET		        0x04
-#define A1CR_OFFSET		        0x10
-#define A2CR_OFFSET		        0x14
-#define A3CR_OFFSET		        0x18
-#define A4CR_OFFSET		        0x1c
-#define IRR_OFFSET		        0x40
-#define IMR_OFFSET		        0x44
-#define IMSR_OFFSET		        0x48
-#define IMCR_OFFSET		        0x4c
-#define NANDFCR_OFFSET		        0x60
-#define NANDFSR_OFFSET		        0x64
-#define PMCR_OFFSET		        0x68
-#define NANDF1ECC_OFFSET	        0x70
-#define NANDF4BECCLR_OFFSET	        0xbc
-#define NANDFEA1R_OFFSET	        0xd0
-#define NANDFEA2R_OFFSET	        0xd4
-#define NANDFEV1R_OFFSET	        0xd8
-#define NANDFEV2R_OFFSET	        0xdc
+#define NRCSR_OFFSET		        EMIF16_RCSR
+#define AWCCR_OFFSET		        EMIF16_AWCCR
+#define A1CR_OFFSET		        EMIF16_A1CR
+#define A2CR_OFFSET		        EMIF16_A2CR
+#define A3CR_OFFSET		        EMIF16_A3CR
+#define A4CR_OFFSET		        EMIF16_A4CR
+#define IRR_OFFSET		        EMIF16_IRR
+#define IMR_OFFSET		        EMIF16_IMR
+#define IMSR_OFFSET		        EMIF16_IMSR
+#define IMCR_OFFSET		        EMIF16_IMCR
+#define NANDFCR_OFFSET		        EMIF16_NANDFCR
+#define NANDFSR_OFFSET		        EMIF16_NANDFSR
+#define PMCR_OFFSET		        EMIF16_PMCR
+#define NANDF1ECC_OFFSET	        EMIF16_NFECCCS2
+#define NANDF4BECCLR_OFFSET	        EMIF16_NANDF4BECCLR
+#define NANDFEA1R_OFFSET	        EMIF16_NANDFEA1R
+#define NANDFEA2R_OFFSET	        EMIF16_NANDFEA2R
+#define NANDFEV1R_OFFSET	        EMIF16_NANDFEV1R
+#define NANDFEV2R_OFFSET	        EMIF16_NANDFEV2R 
 
 /* 4-bit ECC syndrome registers */
-#define NAND_4BIT_ECC_LOAD_OFFSET	0xbc
-#define NAND_4BIT_ECC1_OFFSET		0xc0
-#define NAND_4BIT_ECC2_OFFSET		0xc4
-#define NAND_4BIT_ECC3_OFFSET		0xc8
-#define NAND_4BIT_ECC4_OFFSET		0xcc
-#define NAND_ERR_ADD1_OFFSET		0xd0
-#define NAND_ERR_ADD2_OFFSET		0xd4
-#define NAND_ERR_ERRVAL1_OFFSET		0xd8
-#define NAND_ERR_ERRVAL2_OFFSET		0xdc
+#define NAND_4BIT_ECC_LOAD_OFFSET	EMIF16_NANDF4BECCLR
+#define NAND_4BIT_ECC1_OFFSET		EMIF16_NANDF4BECC1R
+#define NAND_4BIT_ECC2_OFFSET		EMIF16_NANDF4BECC2R
+#define NAND_4BIT_ECC3_OFFSET		EMIF16_NANDF4BECC3R
+#define NAND_4BIT_ECC4_OFFSET		EMIF16_NANDF4BECC4R
+#define NAND_ERR_ADD1_OFFSET		EMIF16_NANDFEA1R
+#define NAND_ERR_ADD2_OFFSET		EMIF16_NANDFEA2R
+#define NAND_ERR_ERRVAL1_OFFSET         EMIF16_NANDFEV1R
+#define NAND_ERR_ERRVAL2_OFFSET         EMIF16_NANDFEV2R
 
 /* NOTE:  boards don't need to use these address bits
  * for ALE/CLE unless they support booting from NAND.
