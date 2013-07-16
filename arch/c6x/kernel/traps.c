@@ -348,7 +348,7 @@ static void process_eexcept(struct pt_regs *regs)
 			/* When IB or SPLX is set, exceptions cannot be resumed correctly */
 			if (regs->tsr & 0xc000) {
 				printk(KERN_CRIT "External exception not recoverable (NTSR=0x%x)!!!\n",
-				       regs->tsr);
+				       (unsigned int) regs->tsr);
 			}
 
 			do_trap(&eexcept_table[eexcept_num + (i << 5)], regs);
