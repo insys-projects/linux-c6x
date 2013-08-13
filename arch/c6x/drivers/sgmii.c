@@ -21,9 +21,9 @@
 
 int sgmii_reset(int port)
 {
-	sgmii_setbit_reg(SGMII_SRESET_REG(0), SGMII_SRESET_RESET); /* soft reset */
-	while(sgmii_get_reg(SGMII_SRESET_REG(0)) != 0x0);
-	sgmii_setbit_reg(SGMII_CTL_REG(0), SGMII_CTL_MASTER);
+	sgmii_setbit_reg(SGMII_SRESET_REG(port), SGMII_SRESET_RESET); /* soft reset */
+	while(sgmii_get_reg(SGMII_SRESET_REG(port)) != 0x0);
+	sgmii_setbit_reg(SGMII_CTL_REG(port), SGMII_CTL_MASTER);
 
 	return 0;
 }
@@ -51,15 +51,15 @@ int sgmii_config(int port, struct sgmii_config_s *config)
 	if (config->autoneg)
 		val1 |= SGMII_CTL_AUTONEG;
 
-	sgmii_set_reg(SGMII_SRESET_REG(0), SGMII_SRESET_RTRESET); /* RT soft reset */
-	sgmii_set_reg(SGMII_CTL_REG(0), val1);
-	sgmii_clearbit_reg(SGMII_SRESET_REG(0), SGMII_SRESET_RTRESET);
+	sgmii_set_reg(SGMII_SRESET_REG(port), SGMII_SRESET_RTRESET); /* RT soft reset */
+	sgmii_set_reg(SGMII_CTL_REG(port), val1);
+	sgmii_clearbit_reg(SGMII_SRESET_REG(port), SGMII_SRESET_RTRESET);
 
-	sgmii_set_reg(SGMII_MRADV_REG(0), val2);
+	sgmii_set_reg(SGMII_MRADV_REG(port), val2);
 #ifndef CONFIG_TMS320DM648
-	sgmii_set_reg(SGMII_TXCFG_REG(0), config->txconfig);
-	sgmii_set_reg(SGMII_RXCFG_REG(0), config->rxconfig);
-	sgmii_set_reg(SGMII_AUXCFG_REG(0), config->auxconfig);
+	sgmii_set_reg(SGMII_TXCFG_REG(port), config->txconfig);
+	sgmii_set_reg(SGMII_RXCFG_REG(port), config->rxconfig);
+	sgmii_set_reg(SGMII_AUXCFG_REG(port), config->auxconfig);
 #else
 	sgmii_set_reg(SERDES_KEY_REG, SERDES_KEY_VAL);
 	sgmii_set_reg(SERDES_PLL_REG, config->auxconfig);
@@ -74,7 +74,7 @@ int sgmii_config(int port, struct sgmii_config_s *config)
 
 		/* Wait for auto-negotiation*/
 		do {
-			stat = sgmii_get_reg(SGMII_STATUS_REG(0));
+			stat = sgmii_get_reg(SGMII_STATUS_REG(port));
 			stat &= done;
 		} while (stat != done);
 	}
