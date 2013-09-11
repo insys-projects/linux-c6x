@@ -361,7 +361,7 @@ core_initcall(setup_qmss);
  */
 #include <mach/keystone_netcp.h>
 
-struct netcp_platform_data netcp_data = {
+struct netcp_platform_data netcp_data0 = {
 	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
 	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,
         .pa_pdsp_num       = 6,
@@ -397,21 +397,55 @@ struct netcp_platform_data netcp_data = {
 			.firmware_version  = 1,
 		},
 	 },
-	.sgmii_port        = 1,
-	.phy_id            = 1,
+    .sgmii_port        = 0,
+    .phy_id            = 0,
+};
+
+struct netcp_platform_data netcp_data1 = {
+    .rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX + 2,
+    .tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX + 2,
+    .pa_pdsp_num       = 0,
+    .sgmii_port        = 1,
+    .phy_id            = 1,
 };
 
 static struct platform_device netcp_dev0 = {
-	.name           = "keystone_netcp",
-        .id             = 0,
+    .name           = "keystone_netcp",
+    .id             = 0,
 	.dev = {
-		.platform_data = &netcp_data,
+        .platform_data = &netcp_data0,
 	},
+};
+
+static struct platform_device netcp_dev1 = {
+    .name           = "keystone_netcp",
+    .id             = 1,
+    .dev = {
+        .platform_data = &netcp_data1,
+    },
 };
 
 static int __init setup_netcp(void)
 {
-        return platform_device_register(&netcp_dev0);
+    int err = 0;
+
+    err = platform_device_register(&netcp_dev0);
+    if(err != 0) {
+        goto do_exit;
+    }
+
+    err = platform_device_register(&netcp_dev1);
+    if(err != 0) {
+        goto do_unreg;
+    }
+
+    return err;
+
+do_unreg:
+    platform_device_unregister(&netcp_dev0);
+
+do_exit:
+    return err;
 }
 
 core_initcall(setup_netcp);
