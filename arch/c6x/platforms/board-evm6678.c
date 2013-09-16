@@ -740,35 +740,35 @@ core_initcall(evm_init_uart);
 #include <mach/keystone_qmss.h>
 /* 
  * SerDes and port mode configurations for different sRIO modes.
- * All configurations are based on a 312.5 MHz SerDes reference clock,
+ * All configurations are based on a 156.25 MHz SerDes reference clock,
  * mode 0 is the default sRIO boot mode of the board.
  */
 static struct keystone_serdes_config evm6678_serdes_config[4]  = {
-	/* sRIO config 0: MPY = 5x, div rate = half, link rate = 3.125 Gbps, mode 1x */
+    /* sRIO config 0: MPY = 10x, div rate = half, link rate = 3.125 Gbps, mode 1x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-	  0x0229,
-	  0x001e,
+      0x0251,
+      0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
 	  { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
-	/* sRIO config 1: MPY = 5x, div rate = half, link rate = 3.125 Gbps, mode 4x */
+    /* sRIO config 1: MPY = 10x, div rate = half, link rate = 3.125 Gbps, mode 4x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-	  0x0229,
-	  0x001e,
+      0x0251,
+      0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
 	  { 0x00000004, 0x00000004, 0x00000004, 0x00000004 } },
-	/* sRIO config 2: MPY = 4x, div rate = half, link rate = 2.5 Gbps, mode 1x */
+    /* sRIO config 2: MPY = 8x, div rate = half, link rate = 2.5 Gbps, mode 1x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-	  0x0221,
-	  0x001e,
+      0x0241,
+      0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
-	  { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
-	/* sRIO config 3: MPY = 4x, div rate = half, link rate = 2.5 Gbps, mode 4x */
+      { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
+    /* sRIO config 3: MPY = 8x, div rate = half, link rate = 2.5 Gbps, mode 4x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-	  0x0221,
-	  0x001e,
+      0x0241,
+      0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
 	  { 0x00000004, 0x00000004, 0x00000004, 0x00000004 } },
