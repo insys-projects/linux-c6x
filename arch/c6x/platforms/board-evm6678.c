@@ -814,8 +814,8 @@ static int __init evm_init_rio(void)
 core_initcall(evm_init_rio);
 #endif /* CONFIG_TI_KEYSTONE_RAPIDIO */
 
-static void dummy_print_dummy(char *s, unsigned long hex) {}
-static void dummy_progress(unsigned int step, char *s) {}
+static void dummy_print_dummy(char *s, unsigned long hex) { printk(KERN_WARNING "c6x: %s 0x%lx\n", s, hex); }
+static void dummy_progress(unsigned int step, char *s) { printk(KERN_WARNING "c6x: %s\n", s); }
 
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
