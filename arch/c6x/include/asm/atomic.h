@@ -116,5 +116,24 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 
 #include <asm-generic/atomic-long.h>
 
+#include <asm-generic/cmpxchg-local.h>
+
+#ifdef CONFIG_SMP
+#error "SMP is not supported on this platform"
+#endif
+
+/*
+ * cmpxchg_local and cmpxchg64_local are atomic wrt current CPU. Always make
+ * them available.
+ */
+#define cmpxchg_local(ptr, o, n)				  	       \
+	((__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
+			(unsigned long)(n), sizeof(*(ptr))))
+#define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+
+#ifndef CONFIG_SMP
+#include <asm-generic/cmpxchg.h>
+#endif
+
 #endif /* KERNEL */
 #endif /* __ASM_C6X_ATOMIC_H */
