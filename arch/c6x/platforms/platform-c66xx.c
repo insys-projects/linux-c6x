@@ -562,6 +562,49 @@ static __init int c6x_init_pcie(void)
 core_initcall(c6x_init_pcie);
 #endif /* CONFIG_PCI */
 
+#if defined(CONFIG_DAVINCI_WATCHDOG) || defined(CONFIG_DAVINCI_WATCHDOG_MODULE)
+/* 
+ * Configure watchdog timer
+ */
+static struct resource wdt_resources[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device davinci_wdt_device = {
+	.name           = "watchdog",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(wdt_resources),
+	.resource       = wdt_resources,
+};
+
+#define WDOG_BASE TIMER_BASE(LINUX_WATCHDOG_SRC)
+
+static void setup_wdt(void)
+{
+	/* Configure RESET MUX to reset CorePac on watchdog timeout */
+	dscr_set_reg(DSCR_RSTMUX0 + (get_coreid() << 2), 0xa);
+
+	/* Only master core can configure the watchdog timer */
+	if (get_coreid() != get_master_coreid()) {
+		
+		/* Unlock RSTCFG register */
+		pll1_set_reg(RSTCTRL, 0x00015a69);
+		
+		/* Generate hard reset when watchdog expires */
+		pll1_set_reg(RSTCFG, 0x0);
+	}
+
+	wdt_resources[0].start = WDOG_BASE;
+	wdt_resources[0].end   = WDOG_BASE + 63;
+
+	platform_device_register(&davinci_wdt_device);
+}
+#else
+#define setup_wdt()
+#endif
+
 void c6x_soc_setup_arch(void)
 {
  	/* Initialize C66x IRQs */          	
@@ -604,6 +647,9 @@ static int __init platform_arch_init(void)
 
 	/* Set up MPU */
 	init_mpu();
+
+	/* Set up watchdog timer */
+	setup_wdt();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {

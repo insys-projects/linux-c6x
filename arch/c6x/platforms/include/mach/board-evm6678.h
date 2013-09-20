@@ -34,8 +34,14 @@
 /*
  * Timer definitions
  */
+#if defined(CONFIG_DAVINCI_WATCHDOG) || defined(CONFIG_DAVINCI_WATCHDOG_MODULE)
+#define LINUX_TIMER_SRC          (TIMER_8 + get_coreid())
+#define LINUX_TIMER_IRQ          (IRQ_TINT8 + (get_coreid() << 1))
+#define LINUX_WATCHDOG_SRC       (TIMER_0 + get_coreid())
+#else
 #define LINUX_TIMER_SRC          (TIMER_0 + get_coreid())
 #define LINUX_TIMER_IRQ          IRQ_TINT
+#endif
 
 /*
  * EVM FPGA and LED definitions
