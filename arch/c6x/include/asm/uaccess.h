@@ -58,17 +58,20 @@ static inline int __generic_put_user(unsigned long x, void *y, int size)
 	if (!access_ok(VERIFY_WRITE, y, size))
 		return -EFAULT;
         switch (size) {
-                case 1:
-                        *((unsigned char *) y) = (unsigned char) x;
-                        break;
-                case 2:
-                        *((unsigned short *) y) = (unsigned short) x;
-                        break;
-                case 4:
-                        *((unsigned int *) y) = (unsigned int) x;
-                        break;
-                default:
-                        return -EFAULT;
+	case 1:
+		*((u8 *) y) = (u8) x;
+		break;
+	case 2:
+		*((u16 *) y) = (u16) x;
+		break;
+	case 4:
+		*((u32 *) y) = (u32) x;
+		break;
+	case 8:
+		*((u64 *) y) = (u64) x;
+		break;
+	default:
+		return -EFAULT;
         }
 	return 0;
 }
@@ -78,17 +81,20 @@ static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 	if (!access_ok(VERIFY_READ, y, size))
 		return -EFAULT;
         switch (size) {
-                case 1:
-                        *(unsigned char *)x = *(unsigned char *) y;
-			break;
-                case 2:
-                        *(unsigned short *)x = *(unsigned short *) y;
-			break;
-                case 4:
-                        *(unsigned int *)x = *(unsigned int *) y;
-			break;
-                default:
-                        return -EFAULT;
+	case 1:
+		*(u8 *)x = *(u8 *) y;
+		break;
+	case 2:
+		*(u16 *)x = *(u16 *) y;
+		break;
+	case 4:
+		*(u32 *)x = *(u32 *) y;
+		break;
+	case 8:
+		*(u64 *)x = *(u64 *) y;
+		break;
+	default:
+		return -EFAULT;
         }
 	return 0;
 }
