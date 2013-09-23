@@ -758,16 +758,16 @@ static struct keystone_serdes_config evm6678_serdes_config[4]  = {
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
 	  { 0x00000004, 0x00000004, 0x00000004, 0x00000004 } },
-    /* sRIO config 2: MPY = 8x, div rate = half, link rate = 2.5 Gbps, mode 1x */
+    /* sRIO config 2: MPY = 8x, div rate = half, link rate = 5 Gbps, mode 1x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-      0x0241,
+      0x0281,
       0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
       { 0x00000000, 0x00000000, 0x00000000, 0x00000000 } },
-    /* sRIO config 3: MPY = 8x, div rate = half, link rate = 2.5 Gbps, mode 4x */
+    /* sRIO config 3: MPY = 8x, div rate = half, link rate = 5 Gbps, mode 4x */
 	{ 0x0c053860, /* VBUS freq 313 - 626, promiscuous */
-      0x0241,
+      0x0281,
       0x0010,
 	  { 0x00440495, 0x00440495, 0x00440495, 0x00440495 },
 	  { 0x00180795, 0x00180795, 0x00180795, 0x00180795 },
