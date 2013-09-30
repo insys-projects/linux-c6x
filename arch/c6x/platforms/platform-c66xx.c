@@ -398,7 +398,7 @@ struct netcp_platform_data netcp_data_sgmii1 = {
 		},
 	 },
 	.sgmii_port        = 1,
-	.phy_id            = 0,
+	.phy_id            = 1,
 };
 
 struct netcp_platform_data netcp_data_sgmii0 = {
@@ -406,7 +406,7 @@ struct netcp_platform_data netcp_data_sgmii0 = {
 	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX + 2,
 	.pa_pdsp_num       = 0,
 	.sgmii_port        = 0,
-	.phy_id            = 1,
+	.phy_id            = 0,
 };
 
 static struct platform_device netcp_dev0 = {
