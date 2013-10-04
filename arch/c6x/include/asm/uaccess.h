@@ -53,22 +53,22 @@ struct exception_table_entry
  * These are the main single-value transfer routines.  They automatically
  * use the right size if we just have the right pointer type.
  */
-static inline int __generic_put_user(unsigned long x, void *y, int size)
+static inline int __generic_put_user(unsigned long *x, void *y, int size)
 {
 	if (!access_ok(VERIFY_WRITE, y, size))
 		return -EFAULT;
         switch (size) {
 	case 1:
-		*((u8 *) y) = (u8) x;
+		*(u8 *) y = *(u8 *) x;
 		break;
 	case 2:
-		*((u16 *) y) = (u16) x;
+		*(u16 *) y = *(u16 *) x;
 		break;
 	case 4:
-		*((u32 *) y) = (u32) x;
+		*(u32 *) y = *(u32 *) x;
 		break;
 	case 8:
-		*((u64 *) y) = (u64) x;
+		*(u64 *) y = *(u64 *) x;
 		break;
 	default:
 		return -EFAULT;
@@ -82,16 +82,16 @@ static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 		return -EFAULT;
         switch (size) {
 	case 1:
-		*(u8 *)x = *(u8 *) y;
+		*(u8 __force *) x = *(u8 *) y;
 		break;
 	case 2:
-		*(u16 *)x = *(u16 *) y;
+		*(u16 __force *) x = *(u16 *) y;
 		break;
 	case 4:
-		*(u32 *)x = *(u32 *) y;
+		*(u32 __force *) x = *(u32 *) y;
 		break;
 	case 8:
-		*(u64 *)x = *(u64 *) y;
+		*(u64 __force *) x = *(u64 *) y;
 		break;
 	default:
 		return -EFAULT;
@@ -99,7 +99,11 @@ static inline int __generic_get_user(unsigned long *x, const void *y, int size)
 	return 0;
 }
 
-#define put_user(x, ptr)   __generic_put_user((unsigned long) (x), (void *)(ptr), sizeof(*(ptr)))
+#define put_user(x, ptr)                                                           \
+({								                   \
+        __typeof__(*(ptr)) __x = (x);                                              \
+	__generic_put_user((unsigned long *) &__x, (void *)(ptr), sizeof(*(ptr))); \
+})
 #define __put_user(x, ptr) put_user(x, ptr)
 #define get_user(x, ptr)   __generic_get_user((unsigned long *) &(x), (void *)(ptr), sizeof(*(ptr)))
 #define __get_user(x, ptr) get_user(x, ptr)
