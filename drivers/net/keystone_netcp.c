@@ -113,6 +113,8 @@ struct netcp_priv {
 	int				rx_packet_max;
 	int				host_port;
 	struct clk		       *clk;
+	u32                            *acc_list_tx;
+	u32                            *acc_list_rx;
 	u32                            *acc_list_addr_rx;
 	u32                            *acc_list_addr_tx;
 	u32                            *acc_list_phys_addr_rx;
@@ -448,7 +450,6 @@ static int netcp_tx(struct net_device *ndev)
 	struct qm_host_desc *hd       = NULL;
 	struct netcp_priv   *p        = netdev_priv(ndev);
 	int                  released = 0;
-	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 	int                  qm_tx_int_status = 0;
 
@@ -457,12 +458,12 @@ static int netcp_tx(struct net_device *ndev)
 		return qm_tx_int_status;
 
 	/* Accumulator ping pong buffer management */
-	if (acc_list == p->acc_list_addr_tx)
-		acc_list = p->acc_list_addr_tx + (DEVICE_TX_INT_THRESHOLD + 1);
+	if (p->acc_list_tx == p->acc_list_addr_tx)
+		p->acc_list_tx = p->acc_list_addr_tx + (DEVICE_TX_INT_THRESHOLD + 1);
 	else
-		acc_list = p->acc_list_addr_tx;
+		p->acc_list_tx = p->acc_list_addr_tx;
 
-	acc_list_p = acc_list;
+	acc_list_p = p->acc_list_tx;
 
 /* Get the descriptors from the accumulator list */
 #define	NETCP_TX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
@@ -508,7 +509,6 @@ static int netcp_rx(struct net_device *ndev,
 	struct qm_host_desc *hd       = NULL;
 	struct sk_buff      *skb;
 	struct sk_buff      *skb_rcv;
-	static u32          *acc_list = 0;
 	u32                 *acc_list_p;
 	int                  qm_rx_int_status = 0;
 
@@ -517,15 +517,15 @@ static int netcp_rx(struct net_device *ndev,
 		return qm_rx_int_status;
 
 	/* Accumulator ping pong buffer management */
-	if (acc_list == p->acc_list_addr_rx)
-		acc_list = p->acc_list_addr_rx + (DEVICE_RX_INT_THRESHOLD + 1);
+	if (p->acc_list_rx == p->acc_list_addr_rx)
+		p->acc_list_rx = p->acc_list_addr_rx + (DEVICE_RX_INT_THRESHOLD + 1);
 	else
-		acc_list = p->acc_list_addr_rx;
+		p->acc_list_rx = p->acc_list_addr_rx;
 
-	acc_list_p = acc_list;
+	acc_list_p = p->acc_list_rx;
 
 	DPRINTK("received accumulator Rx interrupt on channel %d, acc buffer 0x%x\n",
-		DEVICE_QM_ETH_ACC_RX_CHANNEL(ndev->dev_id), acc_list);
+		DEVICE_QM_ETH_ACC_RX_CHANNEL(ndev->dev_id), p->acc_list_rx);
 
 /* Get the descriptors from the accumulator list */
 #define	NETCP_RX_LOOP_ITERATOR() ((struct qm_host_desc *) qm_desc_ptov((u32)(*acc_list_p++) & ~0xf))
@@ -1328,6 +1328,8 @@ static int __devinit netcp_probe(struct platform_device *pdev)
 	priv->acc_list_phys_addr_tx = priv->acc_list_phys_addr_rx + acc_list_num_rx;
 	priv->acc_list_addr_rx      = acc_list_addr_top + (acc_list_off_rx * netcp_instance(pdev->id));
 	priv->acc_list_addr_tx      = acc_list_addr_top + acc_list_num_rx + (acc_list_off_tx * netcp_instance(pdev->id));
+	priv->acc_list_rx           = 0;
+	priv->acc_list_tx           = 0;
 
 	/* Check if we are NetCP master or slave */
 	if ((!netcp_master()) || (pdev->id))

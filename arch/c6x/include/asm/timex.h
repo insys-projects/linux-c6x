@@ -53,6 +53,11 @@ static inline cycles_t get_cycles (void)
 #endif
 }
 
+static inline cycles_t get_cycles_rate(void)
+{
+        return (cycles_t) c6x_core_freq;
+}
+
 #if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
 extern int init_tsc_clocksource(void);
 extern int init_timer64_clocksource(void);
