@@ -445,7 +445,7 @@ static int __devinit qmss_probe(struct platform_device *pdev)
 	/* load QM PDSP firmware for accumulators */
 	q_cfg->pdsp_firmware[0].id       = data->qm_pdsp.pdsp; 
 	q_cfg->pdsp_firmware[0].firmware = (unsigned int *) fw->data;
-    q_cfg->pdsp_firmware[0].size     = fw->size;
+	q_cfg->pdsp_firmware[0].size     = fw->size;
 	q_cfg->pdsp_firmware[1].firmware = NULL;
 
 	/* Initialize QM */

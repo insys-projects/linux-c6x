@@ -397,55 +397,55 @@ struct netcp_platform_data netcp_data_sgmii1 = {
 			.firmware_version  = 1,
 		},
 	 },
-    .sgmii_port        = 1,
-    .phy_id            = 0,
+	.sgmii_port        = 1,
+	.phy_id            = 1,
 };
 
 struct netcp_platform_data netcp_data_sgmii0 = {
-    .rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX + 2,
-    .tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX + 2,
-    .pa_pdsp_num       = 0,
-    .sgmii_port        = 0,
-    .phy_id            = 1,
+	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX + 2,
+	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX + 2,
+	.pa_pdsp_num       = 0,
+	.sgmii_port        = 0,
+	.phy_id            = 0,
 };
 
 static struct platform_device netcp_dev0 = {
-    .name           = "keystone_netcp",
-    .id             = 0,
+	.name           = "keystone_netcp",
+	.id             = 0,
 	.dev = {
-        .platform_data = &netcp_data_sgmii1,
+		.platform_data = &netcp_data_sgmii1,
 	},
 };
 
 static struct platform_device netcp_dev1 = {
-    .name           = "keystone_netcp",
-    .id             = 1,
-    .dev = {
-        .platform_data = &netcp_data_sgmii0,
-    },
+	.name           = "keystone_netcp",
+	.id             = 1,
+	.dev = {
+		.platform_data = &netcp_data_sgmii0,
+	},
 };
 
 static int __init setup_netcp(void)
 {
-    int err = 0;
+	int err = 0;
+	
+	err = platform_device_register(&netcp_dev0);
+	if (err != 0) {
+		goto do_exit;
+	}
 
-    err = platform_device_register(&netcp_dev0);
-    if(err != 0) {
-        goto do_exit;
-    }
+	err = platform_device_register(&netcp_dev1);
+	if (err != 0) {
+		goto do_unreg;
+	}
 
-    err = platform_device_register(&netcp_dev1);
-    if(err != 0) {
-        goto do_unreg;
-    }
-
-    return err;
-
+	return err;
+	
 do_unreg:
-    platform_device_unregister(&netcp_dev0);
-
+	platform_device_unregister(&netcp_dev0);
+	
 do_exit:
-    return err;
+	return err;
 }
 
 core_initcall(setup_netcp);
@@ -562,6 +562,49 @@ static __init int c6x_init_pcie(void)
 core_initcall(c6x_init_pcie);
 #endif /* CONFIG_PCI */
 
+#if defined(CONFIG_DAVINCI_WATCHDOG) || defined(CONFIG_DAVINCI_WATCHDOG_MODULE)
+/* 
+ * Configure watchdog timer
+ */
+static struct resource wdt_resources[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+struct platform_device davinci_wdt_device = {
+	.name           = "watchdog",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(wdt_resources),
+	.resource       = wdt_resources,
+};
+
+#define WDOG_BASE TIMER_BASE(LINUX_WATCHDOG_SRC)
+
+static void setup_wdt(void)
+{
+	/* Configure RESET MUX to reset CorePac on watchdog timeout */
+	dscr_set_reg(DSCR_RSTMUX0 + (get_coreid() << 2), 0xa);
+
+	/* Only master core can configure the watchdog timer */
+	if (get_coreid() != get_master_coreid()) {
+		
+		/* Unlock RSTCFG register */
+		pll1_set_reg(RSTCTRL, 0x00015a69);
+		
+		/* Generate hard reset when watchdog expires */
+		pll1_set_reg(RSTCFG, 0x0);
+	}
+
+	wdt_resources[0].start = WDOG_BASE;
+	wdt_resources[0].end   = WDOG_BASE + 63;
+
+	platform_device_register(&davinci_wdt_device);
+}
+#else
+#define setup_wdt()
+#endif
+
 void c6x_soc_setup_arch(void)
 {
  	/* Initialize C66x IRQs */          	
@@ -604,6 +647,9 @@ static int __init platform_arch_init(void)
 
 	/* Set up MPU */
 	init_mpu();
+
+	/* Set up watchdog timer */
+	setup_wdt();
 
 #if defined(CONFIG_MTD_PLATRAM) || defined(CONFIG_MTD_PLATRAM_MODULE)
 	if (c6x_platram_size) {

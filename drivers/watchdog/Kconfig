@@ -228,7 +228,7 @@ config IOP_WATCHDOG
 
 config DAVINCI_WATCHDOG
 	tristate "DaVinci watchdog"
-	depends on ARCH_DAVINCI || TMS320C64XPLUS
+	depends on ARCH_DAVINCI || TMS320C64XPLUS || TMS320C66X
 	help
 	  Say Y here if to include support for the watchdog timer
 	  in the DaVinci DM644x/DM646x or TMS320C64XPLUS processors
