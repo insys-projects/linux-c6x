@@ -357,6 +357,9 @@ static int cpsw_config_port(struct netcp_priv *p)
 	dev_dbg(&p->ndev->dev, "configuring CPSW port %d\n",  port);
 		
 	cpsw_set_slave_mac(p, cpsw_get_slave(port));
+	
+	/* Assign eth MAC address to ALE switch -> port 0 */
+	cpsw_ale_add_ucast(p->ale, p->ndev->dev_addr, 0, 0, -1);
 
 	/* Switch to forward mode */
 	cpsw_ale_control_set(p->ale, port, ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
