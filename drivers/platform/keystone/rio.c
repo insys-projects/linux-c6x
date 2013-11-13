@@ -420,7 +420,7 @@ static int keystone_rio_init(struct platform_device *pdev)
 
 	for (i = 0; i < KEYSTONE_RIO_DBELL_VALUE_MAX; i++)
 		init_waitqueue_head(&_keystone_rio.dbell_waitq[i]);
-
+	spin_lock_init(&_keystone_rio.dbell_i_lock);
 	mutex_init(&_keystone_rio.lsu_lock);
 	init_completion(&_keystone_rio.lsu_completion);
 
@@ -885,9 +885,9 @@ static inline int dbell_get(u16* pending)
 
 static void dbell_handler(struct keystone_rio_data *p_rio)
 {
-	u16                      pending_dbell;
-	u16                      ack_dbell;
-	unsigned int             i;
+	u16 pending_dbell;
+	u16 ack_dbell;
+	unsigned int i;
  
 	for (i = 0; i < KEYSTONE_RIO_DBELL_NUMBER; i++) {
 		pending_dbell = 
@@ -944,9 +944,9 @@ static int keystone_rio_dbell_wait(struct rio_mport *mport, u16 data)
 	spin_lock_irqsave(&_keystone_rio.dbell_i_lock, flags);
 	remove_wait_queue(&_keystone_rio.dbell_waitq[dbnum], &wait);
 	current->state = TASK_RUNNING;
+	spin_unlock_irqrestore(&_keystone_rio.dbell_i_lock, flags);
 
 	if (signal_pending(current)) {
-		spin_unlock_irqrestore(&_keystone_rio.dbell_i_lock, flags);
 		return -ERESTARTSYS;
 	}	
 	
@@ -1368,6 +1368,7 @@ keystone_rio_config_write(struct rio_mport *mport, int index, u16 destid, u8 hop
 }
 
 /*------------------------------- Port-Write management --------------------------*/
+
 /**
  * keystone_rio_pw_enable - enable/disable port-write interface init
  * @mport: Master port implementing the port write unit
@@ -1382,8 +1383,8 @@ static int keystone_rio_pwenable(struct rio_mport *mport, int enable)
 static void keystone_rio_pw_dpc(struct work_struct *work)
 {
 	struct keystone_rio_data *p_rio = container_of(work, struct keystone_rio_data, pw_work);
-	unsigned long            flags;
-	u32                      msg_buffer[RIO_PW_MSG_SIZE/sizeof(u32)];
+	unsigned long flags;
+	u32 msg_buffer[RIO_PW_MSG_SIZE/sizeof(u32)];
 
 	/*
 	 * Process port-write messages
@@ -1399,18 +1400,17 @@ static void keystone_rio_pw_dpc(struct work_struct *work)
 #ifdef KEYSTONE_RIO_DEBUG_PW
 
 		{
-		u32 i;
-		printk("%s : Port-Write Message:", __func__);
-		for (i = 0; i < RIO_PW_MSG_SIZE/sizeof(u32); i++) {
-			if ((i%4) == 0)
-				printk("\n0x%02x: 0x%08x", i*4,
-					msg_buffer[i]);
-			else
-				printk(" 0x%08x", msg_buffer[i]);
+			u32 i;
+			printk("%s : Port-Write Message:", __func__);
+			for (i = 0; i < RIO_PW_MSG_SIZE/sizeof(u32); i++) {
+				if ((i % 4) == 0)
+					printk("\n0x%02x: 0x%08x", i*4,
+					       msg_buffer[i]);
+				else
+					printk(" 0x%08x", msg_buffer[i]);
+			}
+			printk("\n");
 		}
-		printk("\n");
-		}
-
 #endif /* KEYSTONE_RIO_DEBUG_PW */
 
 		/* Pass the port-write message to RIO core for processing */
@@ -1428,7 +1428,7 @@ static void keystone_rio_pw_dpc(struct work_struct *work)
  */
 static void keystone_rio_port_write_handler(struct keystone_rio_data *p_rio)
 {
-	int        pw;
+	int pw;
 
 	/* Check that we have a port-write-in case */
 	pw = DEVICE_REG32_R(KEYSTONE_RIO_REG_BASE + KEYSTONE_RIO_PW_RX_STAT) & 0x1;
@@ -1458,7 +1458,7 @@ static void keystone_rio_port_write_handler(struct keystone_rio_data *p_rio)
 		} else {
 			p_rio->port_write_msg.discard_count++;
 			printk(KERN_WARNING "RIO: ISR Discarded Port-Write Msg(s) (%d)\n",
-				 p_rio->port_write_msg.discard_count);
+			       p_rio->port_write_msg.discard_count);
 		}
 		schedule_work(&p_rio->pw_work);
 	}
