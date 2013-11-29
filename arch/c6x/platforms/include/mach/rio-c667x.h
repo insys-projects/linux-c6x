@@ -336,7 +336,6 @@
 
 #define KEYSTONE_RIO_MSG_DESC_SIZE        16
 #define KEYSTONE_RIO_MSG_MAX_BUFFER_SIZE  4096
-#define KEYSTONE_RIO_MSG_BUFFER_SIZE	  1552 /* to contain one Ethernet packet (1514) + reserve + alignement */
 #define KEYSTONE_RIO_MSG_SSIZE            0xe
 
 #define KEYSTONE_RIO_MAP_FLAG_SEGMENT     (1 << 0)

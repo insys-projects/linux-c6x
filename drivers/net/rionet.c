@@ -47,13 +47,7 @@ MODULE_LICENSE("GPL");
 
 #define RIONET_TX_RING_SIZE	CONFIG_RIONET_TX_SIZE
 #define RIONET_RX_RING_SIZE	CONFIG_RIONET_RX_SIZE
-
-#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
-#include <asm/rio.h>
-#define RIONET_MSG_SIZE         MACH_RIO_MAX_MSG_SIZE
-#else 
 #define RIONET_MSG_SIZE         RIO_MAX_MSG_SIZE
-#endif
 
 static LIST_HEAD(rionet_peers);
 static LIST_HEAD(ndev_list);
@@ -529,9 +523,9 @@ static int rionet_setup_netdev(struct rio_mport *mport)
 
 	ndev->netdev_ops = &rionet_netdev_ops;
 #if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
-	ndev->mtu = ETH_FRAME_LEN - 14;
+	ndev->mtu =  RIONET_MSG_SIZE - 52; /* need some padding for alignment */
 #else
-	ndev->mtu = RIONET_MSG_SIZE - 14;
+	ndev->mtu =  RIONET_MSG_SIZE - 14;
 #endif
 	ndev->features = NETIF_F_LLTX;
 	SET_ETHTOOL_OPS(ndev, &rionet_ethtool_ops);
