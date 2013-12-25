@@ -347,221 +347,200 @@ static int __init evm_init_nand(void)
 core_initcall(evm_init_nand);
 #endif
 
-#ifdef CONFIG_SPI
+/*
+ * LEDs management
+ */
+#define PIN_A       0
+#define PIN_B       1
+#define PIN_C       2
+#define PIN_D       3
+#define PIN_E       4
+#define PIN_F       7
+#define PIN_G       8
+#define PIN_DOT     9
+
+#define GPIO_OUT    0
+#define GPIO_IN     1
+#define GPIO_BASE_REG		0x02320000
+#define GPIO_SIZE		0x100
+#define GPIO_DIR_REG		0x10
+#define GPIO_SET_DATA_REG	0x18
+#define GPIO_CLEAR_DATA_REG	0x1C
+
+volatile static u32* gpio0 = 0;
+
+static void hwGpioSetDirection( u32 uiNumber, int direction )
+{
+    if ( direction == GPIO_OUT )
+        gpio0[GPIO_DIR_REG/4] &= ~(1 << uiNumber);  // Set to OUTPUT
+    else
+        gpio0[GPIO_DIR_REG/4] |= ~(1 << uiNumber);  // Set to INPUT
+}
+
+static void hwGpioSetOutput( u32 uiNumber)
+{
+    gpio0[GPIO_SET_DATA_REG/4] = ( 1 << (uiNumber % 32) );  // Set to 1
+}
+
+static void hwGpioClearOutput( u32 uiNumber)
+{
+    gpio0[GPIO_CLEAR_DATA_REG/4] = ( 1 << (uiNumber % 32) );   // Clear to 0
+}
+
+static void LED_init(void)
+{
+    hwGpioSetDirection(PIN_A, GPIO_OUT);
+    hwGpioSetDirection(PIN_B, GPIO_OUT);
+    hwGpioSetDirection(PIN_C, GPIO_OUT);
+    hwGpioSetDirection(PIN_D, GPIO_OUT);
+    hwGpioSetDirection(PIN_E, GPIO_OUT);
+    hwGpioSetDirection(PIN_F, GPIO_OUT);
+    hwGpioSetDirection(PIN_G, GPIO_OUT);
+    hwGpioSetDirection(PIN_DOT, GPIO_OUT);
+}
+
+static void LED_off(void)
+{
+    hwGpioSetOutput(PIN_A);
+    hwGpioSetOutput(PIN_B);
+    hwGpioSetOutput(PIN_C);
+    hwGpioSetOutput(PIN_D);
+    hwGpioSetOutput(PIN_E);
+    hwGpioSetOutput(PIN_F);
+    hwGpioSetOutput(PIN_G);
+    hwGpioSetOutput(PIN_DOT);
+}
+
+static void LED_on(void)
+{
+    hwGpioClearOutput(PIN_A);
+    hwGpioClearOutput(PIN_B);
+    hwGpioClearOutput(PIN_C);
+    hwGpioClearOutput(PIN_D);
+    hwGpioClearOutput(PIN_E);
+    hwGpioClearOutput(PIN_F);
+    hwGpioClearOutput(PIN_G);
+    hwGpioClearOutput(PIN_DOT);
+}
+
+static void LED_smart(int symbol)
+{
+    unsigned char   code = 0;
+
+    switch(symbol) {
+    case '0':	code = 0x3F; break;
+    case '1':	code = 0x06; break;
+    case '2':	code = 0x5B; break;
+    case '3':	code = 0x4F; break;
+    case '4':	code = 0x66; break;
+    case '5':	code = 0x6D; break;
+    case '6':	code = 0x7D; break;
+    case '7':	code = 0x07; break;
+    case '8':	code = 0x7F; break;
+    case '9':	code = 0x6F; break;
+    case 'A':	code = 0x77; break;
+    case 'b':	code = 0x7C; break;
+    case 'c':	code = 0x58; break;
+    case 'C':	code = 0x39; break;
+    case 'd':	code = 0x5E; break;
+    case 'E':	code = 0x79; break;
+    case 'F':	code = 0x71; break;
+    case 'h':	code = 0x74; break;
+    case 'H':	code = 0x76; break;
+    case 'L':	code = 0x38; break;
+    case 'o':	code = 0x5C; break;
+    case 'P':	code = 0x73; break;
+    case 'u':	code = 0x1C; break;
+    case 'U':	code = 0x3E; break;
+    case 'Y':	code = 0x6E; break;
+    case 'S':	code = 0xED; break;
+    }
+
+    LED_off();
+
+    if((code>>0)&1) hwGpioClearOutput(PIN_A);   // LED ON
+    if((code>>1)&1) hwGpioClearOutput(PIN_B);   // LED ON
+    if((code>>2)&1) hwGpioClearOutput(PIN_C);   // LED ON
+    if((code>>3)&1) hwGpioClearOutput(PIN_D);   // LED ON
+    if((code>>4)&1) hwGpioClearOutput(PIN_E);   // LED ON
+    if((code>>5)&1) hwGpioClearOutput(PIN_F);   // LED ON
+    if((code>>6)&1) hwGpioClearOutput(PIN_G);   // LED ON
+    if((code>>7)&1) hwGpioClearOutput(PIN_DOT); // LED ON
+}
+
+#include <linux/timer.h>
+static struct timer_list leds_timer;
+
+static void board_leds_timer(unsigned long dummy)
+{
+    u32 *cnt = (u32*)dummy;
+
+    if(cnt[0] == 0) {
+        hwGpioSetOutput(PIN_DOT);
+        cnt[0] = 1;
+    } else {
+        hwGpioClearOutput(PIN_DOT);
+        cnt[0] = 0;
+    }
+
+    mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+}
+
+static int __init board_init_leds(void)
+{
+    u32 *counter = 0;
+
+    gpio0 = (u32*)ioremap_nocache(GPIO_BASE_REG, GPIO_SIZE);
+    if(!gpio0) {
+       printk("<0>%s(): Error remap GPIO region\n", __FUNCTION__);
+       return -1;
+    }
+
+    LED_init();
+    LED_off();
+    LED_smart('L');
+
+    counter = (u32*)kmalloc(4,GFP_ATOMIC);
+
+    init_timer(&leds_timer);
+    leds_timer.function = board_leds_timer;
+    leds_timer.data = counter;
+    mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
+
+    return 0;
+}
+device_initcall(board_init_leds);
+
+/*
+ * Idle LED blink: LEDs are async due to SPI thus this feature cannot be impemented
+ */
+void c6x_arch_idle_led(int state) { }
+
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
 #include <linux/spi/eeprom.h>
 #include <mach/spi.h>
 
 /*
- * FPGA support
- */
-static struct spi_device *fpga_spi_client;
-static struct mutex	  fpga_lock;
-static struct work_struct fpga_work;
-
-static inline int spi_rw(struct spi_device *spi, u8 *tx_buf, u8 *rx_buf, size_t len)
-{
-	struct spi_transfer t = {
-		.tx_buf		= tx_buf,
-		.rx_buf		= rx_buf,
-		.len		= len,
-	};
-	struct spi_message  m;
-
-	spi_message_init(&m);
-	spi_message_add_tail(&t, &m);
-	return spi_sync(spi, &m);
-}
-
-static inline int fpga_spi_write_reg(u8 reg, u8 data)
-{
-	u16 buf;
-	u16 dummy = 0;
-
-	buf = ((EVM_FPGA_WR_CMD | reg) << 8) | data;
-
-	return spi_rw(fpga_spi_client, (u8*) &buf, (u8*) &dummy, 2);
-}
-
-static inline int fpga_spi_read_reg(u8 reg, u8 *p_data)
-{
-	u16 cmd = ((EVM_FPGA_RD_CMD | reg) << 8);
-	u16 buf = 0;
-	int res;
-
-	res = spi_rw(fpga_spi_client, (u8*) &cmd, (u8*) &buf, 2);
-
-	if (res < 0)
-		return res;
-
-	*p_data = (u8) buf & 0xff;
-
-	return res;
-}
-
-static inline void evm_fpga_set(u8 state, u8 reg, u8 shift)
-{
-	u8  val = 0;
-	int res;
-
-	mutex_lock(&fpga_lock);
-
-	res = fpga_spi_read_reg(reg, &val);
-	if (res < 0) {
-		mutex_unlock(&fpga_lock);
-		return;
-	}
-
-	val &= ~(1 << shift);
-	val |= (state & 0x1) << shift;
-
-	(void) fpga_spi_write_reg(reg, val);
-
-	mutex_unlock(&fpga_lock);
-}
-
-static int __init evm_init_leds(void);
-
-static void evm_fpga_work(struct work_struct *work)
-{
-	/* Disable NOR write protect */
-	evm_fpga_set(0, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_NOR_WP);
-
-	/* Disable NAND write protect */
-	evm_fpga_set(1, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_NAND_WP);
-
-	/* Disable EEPROM write protect */
-	evm_fpga_set(0, EVM_FPGA_MISC_REG, EVM_FPGA_MISC_EEPROM_WP);
-
-	/* Initialize LEDs support */
-	(void) evm_init_leds();
-}
-
-static int __devinit evm_fpga_probe(struct spi_device *spi)
-{
-	fpga_spi_client = spi;
-
-	INIT_WORK(&fpga_work, evm_fpga_work);
-
-	mutex_init(&fpga_lock);
-
- 	schedule_work(&fpga_work);
-
-	return 0;
-}
-
-static struct spi_driver evm_fpga_driver = {
-	.driver = {
-		.name	= "FPGA",
-		.bus	= &spi_bus_type,
-		.owner	= THIS_MODULE,
-	},
-	.probe	        = evm_fpga_probe,
-};
-
-static int __init evm_init_fpga(void)
-{
-	return spi_register_driver(&evm_fpga_driver);
-}
-device_initcall(evm_init_fpga);
-
-/*
- * LEDs management
- */
-static struct work_struct leds_work;
-static char               evm_leds_state[4]    = { -1, -1, -1, -1 };
-static u8                 evm_leds_started     = 0;
-static u8                 evm_leds_initialized = 0;
-
-static void evm_leds_work(struct work_struct *work)
-{
-	if (unlikely(!evm_leds_initialized)) {
-		/* Set initial LED settings */
-		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED1);
-		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED2);
-		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED3);
-		evm_fpga_set(EVM_LED_ON, EVM_FPGA_LED_REG, EVM_FPGA_LED4);
-
-		/* Intialization finished */
-		evm_leds_initialized = 1;
-
-	} else {
-		/* Set hw LEDs status */
-		if (evm_leds_state[0] != -1)
-			evm_fpga_set(evm_leds_state[0], EVM_FPGA_LED_REG, EVM_FPGA_LED1);
-
-		if (evm_leds_state[1] != -1)
-			evm_fpga_set(evm_leds_state[1], EVM_FPGA_LED_REG, EVM_FPGA_LED2);
-		
-		if (evm_leds_state[2] != -1)
-			evm_fpga_set(evm_leds_state[2], EVM_FPGA_LED_REG, EVM_FPGA_LED3);
-
-		if (evm_leds_state[3] != -1)
-			evm_fpga_set(evm_leds_state[3], EVM_FPGA_LED_REG, EVM_FPGA_LED4);
-	}
-}
-
-#ifdef CONFIG_IDLE_LED
-#include <linux/timer.h>
-static struct timer_list leds_timer;
-
-/*
- * Timer LED
- */
-static void evm_leds_timer(unsigned long dummy) 
-{
-	static unsigned char leds = 0;
-
-	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
-
-	leds = (~leds) & 1;
-
-	if (leds)
-		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_ON;
-	else
-		evm_leds_state[EVM_LED_TIMER_NUM] = EVM_LED_OFF;
-
-	if (likely(evm_leds_started))
-		schedule_work(&leds_work);
-}
-
-/*
- * Idle LED blink: LEDs are async due to SPI thus this feature cannot be impemented
- */
-void c6x_arch_idle_led(int state) {}
-
-#endif /* CONFIG_IDLE_LED */
-
-static int __init evm_init_leds(void)
-{
-	INIT_WORK(&leds_work, evm_leds_work);
-
-	/* LEDs can be used now  */
-	evm_leds_started = 1;
-
-#ifdef CONFIG_IDLE_LED
-	init_timer(&leds_timer);
-	leds_timer.function = evm_leds_timer;
-	mod_timer(&leds_timer, jiffies + msecs_to_jiffies(250));
-#endif
-	return 0;
-}
-
-/*
  * SPI NOR Flash support
  */
 static struct mtd_partition n25q128_evm_partitions[] = {
-	{
-		.name		= "test",
-		.offset		= 0,
-		.size		= MTDPART_SIZ_FULL,
-		.mask_flags	= 0,
-	}
+    {
+        .name           = "kernel",
+        .offset         = 0,
+        .size           = 0xA00000,
+        .mask_flags     = 0,
+    },
+    {
+        .name		= "filesystem",
+        .offset		= MTDPART_OFS_APPEND,
+        .size		= MTDPART_SIZ_FULL,
+        .mask_flags	= 0,
+    }
 };
 
 static const struct flash_platform_data n25q128 = {
-	.type           = "n25q128",
+    .type       = "n25q128",
 	.name		= "spi_flash",
 	.parts		= n25q128_evm_partitions,
 	.nr_parts	= ARRAY_SIZE(n25q128_evm_partitions),
@@ -571,21 +550,20 @@ static const struct flash_platform_data n25q128 = {
  * SPI
  */
 static struct spi_board_info evm_spi_info[] __initconst = {
-#ifndef CONFIG_IDLE_LED
 	/*
 	 * SPI access to the FPGA for LED blinking is today incompatible 
 	 * with the NOR flash access. So set them exclusive.
 	 */
 	{
-		.modalias	= "m25p80",
-		.platform_data	= &n25q128,
-		.max_speed_hz	= 25000000,
+        .modalias = "m25p80",
+        .platform_data = &n25q128,
+        .max_speed_hz = 25000000,
 		.bus_num	= 0,
-		.chip_select	= 0,
-		.mode		= SPI_MODE_0,
-		.bits_per_word  = 8,
+        .chip_select = 0,
+        .mode = SPI_MODE_0,
+        .bits_per_word = 8,
 	},
-#endif
+#if 0
 	{
 		.modalias	= "FPGA",
 		.platform_data	= NULL,
@@ -595,6 +573,7 @@ static struct spi_board_info evm_spi_info[] __initconst = {
 		.mode		= SPI_MODE_1,
 		.bits_per_word  = 16,
 	},
+#endif
 };
 
 static struct resource evm_spi0_resources[] = {
@@ -625,12 +604,12 @@ static struct davinci_spi_platform_data evm_spi0_pdata = {
 	.version 	= SPI_VERSION_1,
 	.num_chipselect = 2,
 	.clk_internal	= 1,
-	.cs_hold	= 0,
-	.intr_level	= 0,
-	.poll_mode	= 0, /* 0 -> interrupt mode, 1-> polling mode */
+    .cs_hold	= 0,
+    .intr_level	= 0,
+    .poll_mode	= 1, /* 0 -> interrupt mode, 1-> polling mode */
 	.c2tdelay	= 0,
 	.t2cdelay	= 0,
-	.use_dma        = 0, /* do not use EDMA */
+    .use_dma    = 0, /* do not use EDMA */
 };
 
 static struct platform_device evm_spi0_device = {
@@ -645,12 +624,24 @@ static struct platform_device evm_spi0_device = {
 
 static int __init board_setup_spi(void)
 {
-	platform_device_register(&evm_spi0_device);
+    int res;
 
-	return spi_register_board_info(evm_spi_info, ARRAY_SIZE(evm_spi_info));
+    res = platform_device_register(&evm_spi0_device);
+    if(res < 0) {
+        printk("<0>%s(): Error in platform_device_register()\n", __FUNCTION__);
+        return res;
+    }
+
+    res = spi_register_board_info(evm_spi_info, ARRAY_SIZE(evm_spi_info));
+    if(res < 0) {
+        printk("<0>%s(): Error in spi_register_board_info()\n", __FUNCTION__);
+    }
+
+    printk("<0>%s() - SUCCESS\n", __FUNCTION__);
+
+    return res;
 }
 core_initcall(board_setup_spi);
-#endif /* CONFIG_SPI */
 
 #ifdef CONFIG_I2C
 #ifdef CONFIG_EEPROM_AT24
@@ -666,12 +657,13 @@ static struct i2c_board_info evm_i2c_info[] = {
 	{ I2C_BOARD_INFO("24c1024", 0x50),
 	  .platform_data = &at24_eeprom_data,
 	},
+    { I2C_BOARD_INFO("tca9548apw", 0x70), },
 #endif
 };
 
 static int __init board_setup_i2c(void)
 {
-	return i2c_register_board_info(1, evm_i2c_info, ARRAY_SIZE(evm_i2c_info));
+    return i2c_register_board_info(1, evm_i2c_info, ARRAY_SIZE(evm_i2c_info));
 }
 core_initcall(board_setup_i2c);
 #endif /* CONFIG_I2C */
@@ -814,8 +806,8 @@ static int __init evm_init_rio(void)
 core_initcall(evm_init_rio);
 #endif /* CONFIG_TI_KEYSTONE_RAPIDIO */
 
-static void dummy_print_dummy(char *s, unsigned long hex) { printk(KERN_WARNING "c6x: %s 0x%lx\n", s, hex); }
-static void dummy_progress(unsigned int step, char *s) { printk(KERN_WARNING "c6x: %s\n", s); }
+static void dummy_print_dummy(char *s, unsigned long hex) { printk("<0>c6x: %s 0x%lx\n", s, hex); }
+static void dummy_progress(unsigned int step, char *s) { printk("<0>c6x: %s\n", s); }
 
 /* Called from arch/kernel/setup.c */
 void c6x_board_setup_arch(void)
