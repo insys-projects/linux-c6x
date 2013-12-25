@@ -499,7 +499,7 @@ static struct resource c6x_pcie_resources[] = {
 		/* Inbound memory window */
 		.name		= "pcie-inbound0",
 		.start		= PLAT_PHYS_OFFSET,
-		.end		= PLAT_PHYS_OFFSET + SZ_512M - 1,
+        .end		= PLAT_PHYS_OFFSET + SZ_1G - 1,
 		.flags		= IORESOURCE_MEM,
 	},
 	{
