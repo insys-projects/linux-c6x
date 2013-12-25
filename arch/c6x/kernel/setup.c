@@ -439,7 +439,7 @@ void __init setup_arch(char **cmdline_p)
 	get_cpuinfo();
 
 	/* Memory management */
-	printk("Initializing kernel\n");
+    printk("<0>Initializing kernel\n");
 	mach_progress(2, "Initialize memory");
 
 #if defined(CONFIG_RAM_ATTACHED_ROMFS)
@@ -456,6 +456,9 @@ void __init setup_arch(char **cmdline_p)
 
 	memory_end   = PAGE_ALIGN(TEXT_START + BOARD_RAM_SIZE);
 	memory_size  = (memory_end - memory_start);
+
+    printk("<0>_bss_start = 0x%x\n", _bss_start);
+    printk("<0>_bss_end = 0x%x\n", _bss_end);
 
 	mach_print_value("memory_start:", memory_start);
 	mach_print_value("memory_end  :", memory_end);
@@ -488,9 +491,26 @@ void __init setup_arch(char **cmdline_p)
 
 	strcpy(boot_command_line, *cmdline_p);
 	parse_cmdline_early(cmdline_p);
-
+/*
+    dma_memory_size = 0x400000;
+    dma_memory_start = 0x8FFFFFFF - dma_memory_size + 1;
+*/
+    dma_memory_size = 4*0x400000;
+    dma_memory_start = 0x8FFFFFFF - dma_memory_size + 1;
+/*
+    dma_memory_size = 0x20000000;
+    dma_memory_start = 0xA0000000;
+*/
+    printk("<0>DMA memory start: 0x%x\n", dma_memory_start);
+    printk("<0>DMA memory size:  0x%x\n", dma_memory_size);
+/*
+    printk("<0>PAGE_OFFSET = 0x%x\n", PAGE_OFFSET);
+    printk("<0>RAM_MEMORY_START = 0x%x\n", RAM_MEMORY_START);
+    printk("<0>BOARD_RAM_SIZE = 0x%x\n", BOARD_RAM_SIZE);
+*/
 	/* Set caching of external RAM used by Linux */
 	cache_set(PAGE_OFFSET, memory_end);
+
 
 	/* Initialize the coherent memory */
 	coherent_mem_init();
