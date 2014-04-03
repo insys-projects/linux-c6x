@@ -2041,8 +2041,8 @@ int rio_hw_add_inb_buffer(struct rio_mport *mport, int mbox, void *buffer)
 	QM_DESC_DINFO_SET_PSINFO_LOC(hd->desc_info, 0);
 	QM_DESC_TINFO_SET_S_TAG_LO(hd->tag_info, 0);
 
-	hd->buff_len	  = KEYSTONE_RIO_MSG_BUFFER_SIZE;
-	hd->orig_buff_len = KEYSTONE_RIO_MSG_BUFFER_SIZE;
+	hd->buff_len	  = KEYSTONE_RIO_MSG_MAX_BUFFER_SIZE;
+	hd->orig_buff_len = KEYSTONE_RIO_MSG_MAX_BUFFER_SIZE;
 	hd->buff_ptr	  = paddr;
 	hd->next_bdptr    = 0;
 	hd->orig_buff_ptr = paddr;
