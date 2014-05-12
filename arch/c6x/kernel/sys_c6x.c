@@ -118,6 +118,13 @@ sys_set_tls (unsigned long tls_value)
 	if (unlikely(!__user_helper_addr))
 		return -ENOMEM;
 	*((unsigned long *) __user_helper_addr) = tls_value;
+
+	/*
+	 * Normally thread.tls is updated during resume() but it needs to be set 
+	 * there too for the vfork() special case.
+	 */
+	current->thread.tls = tls_value;
+
 	return 0;
 }
 
