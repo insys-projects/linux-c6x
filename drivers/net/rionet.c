@@ -47,14 +47,12 @@ MODULE_LICENSE("GPL");
 
 #define RIONET_TX_RING_SIZE	CONFIG_RIONET_TX_SIZE
 #define RIONET_RX_RING_SIZE	CONFIG_RIONET_RX_SIZE
-
-#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
-#include <asm/rio.h>
-#define RIONET_MSG_SIZE         MACH_RIO_MAX_MSG_SIZE
-#else 
 #define RIONET_MSG_SIZE         RIO_MAX_MSG_SIZE
-#endif
-
+#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
+#define RIONET_MAX_MTU          (RIONET_MSG_SIZE - 52) /* need some padding for alignment */
+#else
+#define RIONET_MAX_MTU          (RIONET_MSG_SIZE - ETH_HLEN)
+#endif 
 static LIST_HEAD(rionet_peers);
 static LIST_HEAD(ndev_list);
 
@@ -472,6 +470,16 @@ static void rionet_set_msglevel(struct net_device *ndev, u32 value)
 	rnet->msg_enable = value;
 }
 
+static int rionet_change_mtu(struct net_device *ndev, int new_mtu)
+{
+	if ((new_mtu < 68) || (new_mtu > RIONET_MAX_MTU)) {
+		printk(KERN_ERR "%s: Invalid MTU size %d\n", ndev->name, new_mtu);
+		return -EINVAL;
+	}
+	ndev->mtu = new_mtu;
+	return 0;
+}
+
 static const struct ethtool_ops rionet_ethtool_ops = {
 	.get_drvinfo = rionet_get_drvinfo,
 	.get_msglevel = rionet_get_msglevel,
@@ -483,7 +491,7 @@ static const struct net_device_ops rionet_netdev_ops = {
 	.ndo_open		= rionet_open,
 	.ndo_stop		= rionet_close,
 	.ndo_start_xmit		= rionet_start_xmit,
-	.ndo_change_mtu		= eth_change_mtu,
+	.ndo_change_mtu		= rionet_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_mac_address	= eth_mac_addr,
 };
@@ -528,11 +536,7 @@ static int rionet_setup_netdev(struct rio_mport *mport)
 	ndev->dev_addr[5] = device_id & 0xff;
 
 	ndev->netdev_ops = &rionet_netdev_ops;
-#if defined(CONFIG_RAPIDIO_TCI648X) || defined(CONFIG_TI_KEYSTONE_RAPIDIO)
-	ndev->mtu = ETH_FRAME_LEN - 14;
-#else
-	ndev->mtu = RIONET_MSG_SIZE - 14;
-#endif
+	ndev->mtu = RIONET_MAX_MTU;
 	ndev->features = NETIF_F_LLTX;
 	SET_ETHTOOL_OPS(ndev, &rionet_ethtool_ops);
 

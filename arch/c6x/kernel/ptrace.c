@@ -402,7 +402,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 	}
 
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 
