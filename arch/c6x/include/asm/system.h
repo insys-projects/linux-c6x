@@ -24,7 +24,7 @@
  * (We just respect the C call convention...)
  */
 
-#define prepare_to_switch()    do { } while(0)
+#define arch_start_context_switch(prev)	do {} while (0)
 
 asmlinkage void * resume(void *prev, void *next, int thread, char shared);
 
@@ -109,28 +109,6 @@ extern cregister volatile unsigned int DNUM;    /* Core number */
 unsigned int _extu(unsigned int, unsigned int, unsigned int);
 
 #else /* CONFIG_TI_C6X_COMPILER */
-
-#if 0
-extern cregister volatile unsigned int IRP;     /* Interrupt Return Pointer */
-extern cregister volatile unsigned int NRP;     /* NMI Return Pointer */
-extern cregister volatile unsigned int CSR;     /* Control Status Register */
-extern cregister volatile unsigned int IER;     /* Interrupt Enable Register */
-extern cregister volatile unsigned int IFR;     /* Interrupt Flag Register */
-extern cregister volatile unsigned int ISR;     /* Interrupt Set Register */
-extern cregister volatile unsigned int ICR;     /* Interrupt Clear Register */
-extern cregister volatile unsigned int ISTP;    /* Interrupt Service Table Pointer */
-#ifdef __TMS320C6XPLUS__
-extern cregister volatile unsigned int IERR;    /* Internal Exception Report Register */
-extern cregister volatile unsigned int ECR;     /* Exception Clear Register */
-extern cregister volatile unsigned int EFR;     /* Exception Flag Register */
-extern cregister volatile unsigned int TSR;     /* Task State Register */
-extern cregister volatile unsigned int ITSR;    /* Interrupt Task State Register */
-extern cregister volatile unsigned int NTSR;    /* NMI/exception Task State Register */
-extern cregister volatile unsigned int TSCL;    /* Time Stamp Counter Register - Low Half  */
-extern cregister volatile unsigned int TSCH;    /* Time Stamp Counter Register - High Half */
-extern cregister volatile unsigned int DNUM;    /* Core number */
-#endif
-#endif
 
 #define get_creg(reg) \
 	({ unsigned int __x; asm volatile (" mvc .s2 " #reg ",%0\n" : "=b"(__x)); __x; })

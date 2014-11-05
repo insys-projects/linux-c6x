@@ -65,6 +65,4 @@ extern unsigned long get_fb_unmapped_area(struct file *, unsigned long,
 
 #define get_videoin_unmapped_area get_fb_unmapped_area
 
-#define arch_start_context_switch(prev)	do {} while (0)
-
 #endif /* __ASM_C6X_PGTABLE_H */
