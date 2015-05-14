@@ -2597,6 +2597,9 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	 */
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
 
+    chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
+    printk("<0>%s(): 0x%x 0x%x 0x%x 0x%x\n", __FUNCTION__, chip->read_byte(mtd), chip->read_byte(mtd), chip->read_byte(mtd), chip->read_byte(mtd));
+
 	/* Send the command for reading device ID */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
 

@@ -14,7 +14,7 @@
 /* 
  * Board memory
  */
-#define BOARD_RAM_SIZE	0x40000000
+#define BOARD_RAM_SIZE	0x20000000
 
 /* 
  * PLL settings

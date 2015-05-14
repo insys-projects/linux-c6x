@@ -18,6 +18,9 @@
  *  membase is an 'ioremapped' cookie.
  */
 
+#define CONFIG_INSYS_FM408C
+//#define CONFIG_INSYS_FMC114V
+
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
@@ -1251,7 +1254,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 
  out:
 	spin_unlock_irqrestore(&up->port.lock, flags);
-	DEBUG_AUTOCONF("type=%s\n", uart_config[up->port.type].name);
+       DEBUG_AUTOCONF("type=%s\n", uart_config[up->port.type].name);
 }
 
 static void autoconfig_irq(struct uart_8250_port *up)
@@ -1831,7 +1834,11 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 
 	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
 
-	serial_out(up, UART_MCR, mcr);
+#if defined(CONFIG_INSYS_FMC114V) || defined(CONFIG_INSYS_FM408C)
+    serial_out(up, UART_MCR, 0);
+#else
+    serial_out(up, UART_MCR, mcr);
+#endif
 }
 
 static void serial8250_break_ctl(struct uart_port *port, int break_state)

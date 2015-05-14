@@ -484,7 +484,7 @@ static void __init nand_dm6446evm_flash_init(struct davinci_nand_info *info)
 		;
 	a1cr = davinci_nand_readl(info, A1CR_OFFSET);
 	if (a1cr != regval) {
-		dev_dbg(info->dev, "Warning: NAND config: Set A1CR " \
+        dev_dbg(&info->dev, "Warning: NAND config: Set A1CR " \
 		       "reg to 0x%08x, was 0x%08x, should be done by " \
 		       "bootloader.\n", regval, a1cr);
 		davinci_nand_writel(info, A1CR_OFFSET, regval);

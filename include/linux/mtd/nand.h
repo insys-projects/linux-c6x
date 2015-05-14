@@ -80,7 +80,12 @@ extern void nand_wait_ready(struct mtd_info *mtd);
 #define NAND_CMD_RNDIN		0x85
 #define NAND_CMD_READID		0x90
 #define NAND_CMD_ERASE2		0xd0
+#define NAND_CMD_PARAM		0xec
 #define NAND_CMD_RESET		0xff
+
+#define NAND_CMD_LOCK		0x2a
+#define NAND_CMD_UNLOCK1	0x23
+#define NAND_CMD_UNLOCK2	0x24
 
 /* Extended commands for large page devices */
 #define NAND_CMD_READSTART	0x30
@@ -124,6 +129,7 @@ typedef enum {
 	NAND_ECC_HW,
 	NAND_ECC_HW_SYNDROME,
 	NAND_ECC_HW_OOB_FIRST,
+	NAND_ECC_SOFT_BCH,
 } nand_ecc_modes_t;
 
 /*
@@ -133,19 +139,20 @@ typedef enum {
 #define NAND_ECC_READ		0
 /* Reset Hardware ECC for write */
 #define NAND_ECC_WRITE		1
-/* Enable Hardware ECC before syndrom is read back from flash */
+/* Enable Hardware ECC before syndrome is read back from flash */
 #define NAND_ECC_READSYN	2
 
 /* Bit mask for flags passed to do_nand_read_ecc */
 #define NAND_GET_DEVICE		0x80
 
 
-/* Option constants for bizarre disfunctionality and real
-*  features
-*/
+/*
+ * Option constants for bizarre disfunctionality and real
+ * features.
+ */
 /* Chip can not auto increment pages */
 #define NAND_NO_AUTOINCR	0x00000001
-/* Buswitdh is 16 bit */
+/* Buswidth is 16 bit */
 #define NAND_BUSWIDTH_16	0x00000002
 /* Device supports partial programming without padding */
 #define NAND_NO_PADDING		0x00000004
@@ -153,22 +160,36 @@ typedef enum {
 #define NAND_CACHEPRG		0x00000008
 /* Chip has copy back function */
 #define NAND_COPYBACK		0x00000010
-/* AND Chip which has 4 banks and a confusing page / block
- * assignment. See Renesas datasheet for further information */
+/*
+ * AND Chip which has 4 banks and a confusing page / block
+ * assignment. See Renesas datasheet for further information.
+ */
 #define NAND_IS_AND		0x00000020
-/* Chip has a array of 4 pages which can be read without
- * additional ready /busy waits */
+/*
+ * Chip has a array of 4 pages which can be read without
+ * additional ready /busy waits.
+ */
 #define NAND_4PAGE_ARRAY	0x00000040
-/* Chip requires that BBT is periodically rewritten to prevent
+/*
+ * Chip requires that BBT is periodically rewritten to prevent
  * bits from adjacent blocks from 'leaking' in altering data.
- * This happens with the Renesas AG-AND chips, possibly others.  */
+ * This happens with the Renesas AG-AND chips, possibly others.
+ */
 #define BBT_AUTO_REFRESH	0x00000080
-/* Chip does not require ready check on read. True
+/*
+ * Chip does not require ready check on read. True
  * for all large page devices, as they do not support
- * autoincrement.*/
+ * autoincrement.
+ */
 #define NAND_NO_READRDY		0x00000100
 /* Chip does not allow subpage writes */
 #define NAND_NO_SUBPAGE_WRITE	0x00000200
+
+/* Device is one of 'new' xD cards that expose fake nand command set */
+#define NAND_BROKEN_XD		0x00000400
+
+/* Device behaves just like nand, but is readonly */
+#define NAND_ROM		0x00000800
 
 /* Options valid for Samsung large page devices */
 #define NAND_SAMSUNG_LP_OPTIONS \
@@ -425,6 +446,7 @@ struct nand_chip {
 #define NAND_MFR_HYNIX		0xad
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
+#define NAND_MFR_MACRONIX	0xc2
 
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure

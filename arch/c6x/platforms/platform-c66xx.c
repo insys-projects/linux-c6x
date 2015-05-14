@@ -364,7 +364,7 @@ core_initcall(setup_qmss);
 struct netcp_platform_data netcp_data_sgmii0 = {
 	.rx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_RX_IDX,
 	.tx_irq            = IRQ_QMH + DEVICE_QM_ETH_ACC_TX_IDX,
-        .pa_pdsp_num       = 6,
+    .pa_pdsp_num       = 6,
 	.pa_pdsp           = {
 		{
 			.pdsp              = 0, /* PA PDSP 0 */
@@ -433,12 +433,12 @@ static int __init setup_netcp(void)
 	if (err != 0) {
 		goto do_exit;
 	}
-
+/*
 	err = platform_device_register(&netcp_dev1);
 	if (err != 0) {
 		goto do_unreg;
 	}
-
+*/
 	return err;
 	
 do_unreg:
@@ -499,7 +499,7 @@ static struct resource c6x_pcie_resources[] = {
 		/* Inbound memory window */
 		.name		= "pcie-inbound0",
 		.start		= PLAT_PHYS_OFFSET,
-        .end		= PLAT_PHYS_OFFSET + SZ_1G - 1,
+		.end		= PLAT_PHYS_OFFSET + SZ_512M - 1,
 		.flags		= IORESOURCE_MEM,
 	},
 	{

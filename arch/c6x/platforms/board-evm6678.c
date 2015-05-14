@@ -43,6 +43,9 @@
 
 #include <mach/board.h>
 
+#define CONFIG_INSYS_FM408C
+//#define CONFIG_INSYS_FMC114V
+
 SOC_CLK_DEF(100000000); /* SYSCLK is a 100 MHz clock */
 
 static struct clk_lookup evm_clks[] = {
@@ -280,29 +283,24 @@ static int __init evm_init_edma(void)
 arch_initcall(evm_init_edma);
 #endif /* CONFIG_EDMA3 */
 
+#if defined(CONFIG_INSYS_FM408C) || defined(CONFIG_INSYS_FMC114V)
 #if defined(CONFIG_MTD_NAND_DAVINCI) || defined(CONFIG_MTD_NAND_DAVINCI_MODULE)
 #include <mach/emif.h>
 #include <mach/nand.h>
 
 static struct mtd_partition evm6678_nand_parts[] = {
-	{
-		.name		= "bootconfig",
-		.offset		= 0,
-		.size		= 0x4000,
-		.mask_flags	= 0,
-	},
-	{
-		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= 0x00FFC000,
-		.mask_flags	= 0,
-	},
-	{
-		.name		= "filesystem",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= MTDPART_SIZ_FULL,
-		.mask_flags	= 0,
-	}
+    {
+        .name		= "kernel",
+        .offset		= 0,
+        .size		= 0x800000,
+        .mask_flags	= 0,
+    },
+    {
+        .name		= "filesystem",
+        .offset		= MTDPART_OFS_APPEND,
+        .size		= MTDPART_SIZ_FULL,
+        .mask_flags	= 0,
+    }
 };
 
 static struct davinci_nand_pdata evmc6678_nand_data = {
@@ -311,8 +309,8 @@ static struct davinci_nand_pdata evmc6678_nand_data = {
 	.parts			= evm6678_nand_parts,
 	.nr_parts		= ARRAY_SIZE(evm6678_nand_parts),
 	.ecc_mode		= NAND_ECC_HW,
-	.ecc_bits               = 4,
-	.options	        = 0,
+    .ecc_bits       = 4,
+    .options	    = 0,
 };
 
 static struct resource evmc6678_nand_resources[] = {
@@ -330,9 +328,9 @@ static struct resource evmc6678_nand_resources[] = {
 
 static struct platform_device evmc6678_nand_device = {
 	.name			= "davinci_nand",
-	.id			= 0,
+    .id			    = 0,
 
-	.num_resources		= ARRAY_SIZE(evmc6678_nand_resources),
+    .num_resources	= ARRAY_SIZE(evmc6678_nand_resources),
 	.resource		= evmc6678_nand_resources,
 
 	.dev			= {
@@ -346,6 +344,7 @@ static int __init evm_init_nand(void)
 }
 core_initcall(evm_init_nand);
 #endif
+#endif //CONFIG_INSYS_FM408C
 
 /*
  * LEDs management
@@ -357,7 +356,13 @@ core_initcall(evm_init_nand);
 #define PIN_E       4
 #define PIN_F       7
 #define PIN_G       8
+
+#if !defined(CONFIG_INSYS_FM408C)
 #define PIN_DOT     9
+#else
+#define PIN_NAND_WP     2
+#define PIN_DOT         12
+#endif
 
 #define GPIO_OUT    0
 #define GPIO_IN     1
@@ -389,6 +394,7 @@ static void hwGpioClearOutput( u32 uiNumber)
 
 static void LED_init(void)
 {
+#if !defined(CONFIG_INSYS_FM408C)
     hwGpioSetDirection(PIN_A, GPIO_OUT);
     hwGpioSetDirection(PIN_B, GPIO_OUT);
     hwGpioSetDirection(PIN_C, GPIO_OUT);
@@ -397,10 +403,17 @@ static void LED_init(void)
     hwGpioSetDirection(PIN_F, GPIO_OUT);
     hwGpioSetDirection(PIN_G, GPIO_OUT);
     hwGpioSetDirection(PIN_DOT, GPIO_OUT);
+#else
+    hwGpioSetDirection(PIN_A, GPIO_OUT);
+    hwGpioSetDirection(PIN_DOT, GPIO_OUT);
+    hwGpioSetDirection(PIN_NAND_WP, GPIO_OUT);
+    hwGpioSetOutput(PIN_NAND_WP); // WP# - pull up
+#endif
 }
 
 static void LED_off(void)
 {
+#if !defined(CONFIG_INSYS_FM408C)
     hwGpioSetOutput(PIN_A);
     hwGpioSetOutput(PIN_B);
     hwGpioSetOutput(PIN_C);
@@ -409,10 +422,15 @@ static void LED_off(void)
     hwGpioSetOutput(PIN_F);
     hwGpioSetOutput(PIN_G);
     hwGpioSetOutput(PIN_DOT);
+#else
+    hwGpioSetOutput(PIN_A);
+    hwGpioSetOutput(PIN_DOT);
+#endif
 }
 
 static void LED_on(void)
 {
+#if !defined(CONFIG_INSYS_FM408C)
     hwGpioClearOutput(PIN_A);
     hwGpioClearOutput(PIN_B);
     hwGpioClearOutput(PIN_C);
@@ -421,12 +439,19 @@ static void LED_on(void)
     hwGpioClearOutput(PIN_F);
     hwGpioClearOutput(PIN_G);
     hwGpioClearOutput(PIN_DOT);
+#else
+    hwGpioClearOutput(PIN_A);
+    hwGpioClearOutput(PIN_DOT);
+#endif
 }
 
 static void LED_smart(int symbol)
 {
     unsigned char   code = 0;
 
+    LED_off();
+
+#if !defined(CONFIG_INSYS_FM408C)
     switch(symbol) {
     case '0':	code = 0x3F; break;
     case '1':	code = 0x06; break;
@@ -456,8 +481,6 @@ static void LED_smart(int symbol)
     case 'S':	code = 0xED; break;
     }
 
-    LED_off();
-
     if((code>>0)&1) hwGpioClearOutput(PIN_A);   // LED ON
     if((code>>1)&1) hwGpioClearOutput(PIN_B);   // LED ON
     if((code>>2)&1) hwGpioClearOutput(PIN_C);   // LED ON
@@ -466,6 +489,13 @@ static void LED_smart(int symbol)
     if((code>>5)&1) hwGpioClearOutput(PIN_F);   // LED ON
     if((code>>6)&1) hwGpioClearOutput(PIN_G);   // LED ON
     if((code>>7)&1) hwGpioClearOutput(PIN_DOT); // LED ON
+#else
+    switch(symbol) {
+    case '0': { hwGpioClearOutput(PIN_A); } break;
+    case '1': { hwGpioClearOutput(PIN_DOT); } break;
+    case '2': { hwGpioClearOutput(PIN_A); hwGpioClearOutput(PIN_DOT); } break;
+    }
+#endif
 }
 
 #include <linux/timer.h>
@@ -498,7 +528,9 @@ static int __init board_init_leds(void)
 
     LED_init();
     LED_off();
+#if !defined(CONFIG_INSYS_FM408C)
     LED_smart('L');
+#endif
 
     counter = (u32*)kmalloc(4,GFP_ATOMIC);
 

@@ -511,7 +511,6 @@ void __init setup_arch(char **cmdline_p)
 	/* Set caching of external RAM used by Linux */
 	cache_set(PAGE_OFFSET, memory_end);
 
-
 	/* Initialize the coherent memory */
 	coherent_mem_init();
 
