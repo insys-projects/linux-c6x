@@ -77,22 +77,15 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 	return -ENOSYS;
 }
 
-/* sys_cacheflush -- flush (part of) the processor cache.  */
+/* 
+ * sys_cacheflush -- flush (part of) the processor cache.
+ */
 asmlinkage int
-sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
+sys_cacheflush  (unsigned long addr, unsigned long bytes, unsigned int cache)
 {
-	return 0;
-}
-
-/* sys_cache_sync -- sync caches over given range */
-asmlinkage int
-sys_cache_sync (unsigned long s, unsigned long e)
-{
-	if (s >= e)
-		return -1;
-
-	L1D_cache_block_writeback_invalidate(s, e);
-	L1P_cache_block_invalidate(s, e);
+	/* Sync caches over given range */
+	L1D_cache_block_writeback_invalidate(addr, addr + bytes);
+	L1P_cache_block_invalidate(addr, addr + bytes);
 
 	return 0;
 }

@@ -1422,6 +1422,6 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_rt_tgsigqueueinfo
 	SYSCALL_ENTRY	sys_perf_event_open
 	SYSCALL_ENTRY	sys_recvmmsg
-	SYSCALL_ENTRY	sys_cache_sync		; 330
+	SYSCALL_NI
 	SYSCALL_ENTRY	sys_get_user_helper
 	SYSCALL_ENTRY	sys_set_tls
