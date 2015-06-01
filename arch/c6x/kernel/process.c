@@ -63,6 +63,7 @@ struct task_struct init_task = INIT_TASK(init_task);
 EXPORT_SYMBOL(init_task);
 
 extern asmlinkage void ret_from_fork(void);
+extern asmlinkage void ret_from_kernel_thread(void);
 extern void remove_bkpt(void);
 
 /*
@@ -261,9 +262,9 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.r.a6 = (unsigned long) fn;
 	regs.r.pc = (unsigned long) kernel_thread_helper;
 	local_save_flags(regs.r.csr);
-	regs.r.csr |= 1;
+	regs.r.csr = (regs.r.csr & ~0x3) | 0x2;
 #if defined(CONFIG_TMS320C64XPLUS) || defined(CONFIG_TMS320C66X)
-	regs.r.tsr = 0xd; /* Set GEE, XEN and GIE in TSR */
+	regs.r.tsr = 0xe; /* Set GEE, XEN and SGIE in TSR */
 #endif
 
 	/* Ok, create the new process.. */
@@ -359,15 +360,19 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	*childregs = *regs;
 	childregs->a4 = 0;
 
-	/* Set the return PC of the child */
-	childstack->retpc = (unsigned int) ret_from_fork;
-
-	if (usp == -1)
-		/* case of  __kernel_thread: we return to supervisor space */
+	if (usp == -1) {
+		/* case of __kernel_thread: we return to supervisor space */
 		childregs->sp = (unsigned long)(childregs + 1);
-	else
+
+		/* Set the return PC of the child */
+		childstack->retpc = (unsigned int) ret_from_kernel_thread;
+	} else {
 		/* Otherwise use the given stack */
 		childregs->sp = usp;
+
+		/* Set the return PC of the child */
+		childstack->retpc = (unsigned int) ret_from_fork;
+	}
 
 	if (clone_flags & CLONE_SETTLS)
 		p->thread.tls = regs->a8;
@@ -375,6 +380,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	/* Set usp/ksp */
 	p->thread.usp = childregs->sp;
 	p->thread.ksp = (unsigned long)childstack - 8;
+
 	return 0;
 }
 

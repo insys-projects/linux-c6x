@@ -198,7 +198,7 @@ _DEFINE_MACRO(SAVE_ALL,__rp,__tsr)
 	STW	.D2T2	A4,*SP--[2]		; orig A4
 #else
 	STDW	.D2T2	B11:B10,*SP--[1]	; save RILC and ILC
- ||     OR	.S1     0xc,A5,A5 		; set GEE and XEN in TSR		
+ ||	OR	.S1     0xc,A5,A5		; set GEE and XEN in TSR
 	STDW	.D2T1	A5:A4,*SP--[1]		; save TSR and orig A4
 #endif
 
@@ -260,7 +260,6 @@ _DEFINE_MACRO(RESTORE_ALL,__rp,__tsr)
 	LDDW	.D1T1	*++A15[1],A31:A30
  ||	LDDW	.D2T2	*++SP[1],B31:B30
 #endif
-
 	LDDW	.D1T1	*++A15[1],A1:A0
  ||	LDDW	.D2T2	*++SP[1],B1:B0
 
@@ -343,6 +342,7 @@ _DEFINE_MACRO(MASK_INT,reg)
 	MVC	.S2	CSR,reg
 	CLR	.S2	reg,0,0,reg
 	MVC	.S2	reg,CSR
+	NOP
 	.endm
 
 	;; Enable interrupts
@@ -350,6 +350,7 @@ _DEFINE_MACRO(UNMASK_INT,reg)
 	MVC	.S2	CSR,reg
 	SET	.S2	reg,0,0,reg
 	MVC	.S2	reg,CSR
+	NOP
 	.endm
 
 #if !defined(CONFIG_TMS320C64XPLUS) && !defined(CONFIG_TMS320C66X)
@@ -484,14 +485,13 @@ ret_from_syscall_trace:
 	BNOP	.S2	B0,5			; branch to syscall handler
  ||	LDW	.D2T1	*+SP(REGS_ORIG_A4+8),A4
 
+	;; A2 contains the thread_info_flags
 syscall_exit_work:
 	AND	.D1	_TIF_SYSCALL_TRACE,A2,A0
  [!A0]	BNOP	.S1	work_pending,5
  [A0]	B	.S2	syscall_trace_exit
 	ADDKPC	.S2	resume_userspace,B3,1
-	MVC	.S2	CSR,B1
-	SET	.S2	B1,0,0,B1
-	MVC	.S2	B1,CSR		; enable ints
+	UNMASK_INT B1
 
 work_pending:
 	AND	.D1	_TIF_NEED_RESCHED,A2,A0
@@ -506,8 +506,8 @@ work_rescheduled:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
-	GET_THREAD_INFO A12
-	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	GET_THREAD_INFO A2
+	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	MVK	.S1	_TIF_WORK_MASK,A1
 	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
@@ -568,8 +568,8 @@ resume_userspace:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
-	GET_THREAD_INFO A12
-	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	GET_THREAD_INFO A2
+	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	MVK	.S1	_TIF_WORK_MASK,A1
 	MVK	.S1	_TIF_NEED_RESCHED,A3
 	NOP	2
@@ -615,8 +615,8 @@ system_call_saved_noack:
 	LDW	.D2T2	*+B1[B0],B0		; B0 = _sys_call_table[__NR_*]
 
 	;; Check for ptrace
-	GET_THREAD_INFO A12
-	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
+	GET_THREAD_INFO A2
+	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	NOP	4
 	AND	.D1	_TIF_SYSCALL_TRACE,A2,A2 ; check for TIF_SYSCALL_TRACE flag
  [A2]	BNOP	.S1	tracesys_on,5		 ; call syscall_trace_entry before syscall function
@@ -632,11 +632,9 @@ syscall_exit:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
-	LDW	.D1T1	*+A12(THREAD_INFO_FLAGS),A2
-	MVKL	.S1	syscall_exit_work,A0
-	MVKH	.S1	syscall_exit_work,A0
+	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	MVK	.S1	_TIF_ALLWORK_MASK,A1
-	NOP
+	NOP	3
 	AND	.D1	A1,A2,A2 ; check for work to do
  [A2]	BNOP	.S1	syscall_exit_work,5
 
@@ -655,11 +653,29 @@ ret_from_fork:
 	ADDKPC	.S2	ret_from_fork_2,B3,4
 ret_from_fork_2:
 	;; return 0 for child process
-	GET_THREAD_INFO A12
+	GET_THREAD_INFO A2
 	MVK	.L2	0,B0
  ||	MVKL	.S2	syscall_exit,B1
 	STW	.D2T2	B0,*+SP(REGS_A4+8)
  ||	MVKH	.S2	syscall_exit,B1
+	BNOP	.S2	B1,5
+
+	;;
+	;; After a kernel_thread then fork we jump here directly from resume
+	;; because we are returning to kernel we skip resched and signals
+	;;
+	.global	ret_from_kernel_thread
+ret_from_kernel_thread:
+	MVKL	.S1	schedule_tail,A0
+	MVKH	.S1	schedule_tail,A0
+	B	.S2X	A0
+	ADDKPC	.S2	ret_from_kernel_thread_2,B3,4
+ret_from_kernel_thread_2:
+	;; return 0 for child process
+	MVK	.L2	0,B0
+ ||	MVKL	.S2	restore_all,B1
+	STW	.D2T2	B0,*+SP(REGS_A4+8)
+ ||	MVKH	.S2	restore_all,B1
 	BNOP	.S2	B1,5
 
 	;;
@@ -798,8 +814,8 @@ irq_reschedule:
 	NOP	3
 
 resume_kernel:
-	GET_THREAD_INFO A12
-	LDW	.D1T1	*+A12(THREAD_INFO_PREEMPT_COUNT),A1
+	GET_THREAD_INFO A2
+	LDW	.D1T1	*+A2(THREAD_INFO_PREEMPT_COUNT),A1
 	MVKL	.S1	restore_all,A0
 	MVKH	.S1	restore_all,A0
 	NOP	2
@@ -992,7 +1008,7 @@ resume:
  ||	MVKL	.S2	__user_helper_addr,B8
 	MVKH	.S2	__user_helper_addr,B8
 	LDW	.D2T2	*B8,B0
-	
+
 	;; Save non-scratch registers on stack
 	SAVE_SWITCH_STACK
 
@@ -1005,7 +1021,7 @@ resume:
  ||	LDW	.D2T2	*+B4(THREAD_TLS),B9 ; Load new TLS
 	;; Save current kernel stack pointer
 	STW	.D1T1	A2,*+A0(THREAD_KSP)
-	
+
 	;; Restore the kernel stack pointer
  ||	LDW	.D2T2	*+B4(THREAD_KSP),B2
 	MVKL	.S2	current_ksp,B1
@@ -1013,7 +1029,7 @@ resume:
 	NOP	2
 	MV	.S2	B2,SP
  ||	STW	.D2T2	B2,*B1
-	
+
 	;; Save old TLS in thread
  ||[B0]	STW	.D1T1   A8, *+A0(THREAD_TLS)
 
@@ -1024,9 +1040,9 @@ resume:
 	LDW	.D2T2	*+B4(THREAD_CSR),B2
 	BNOP	.S2	B3,3		; return in next E1
 	MVC	.S2	B2,CSR
-	
-	;; Save new TLS value in user helper		
- [B0]	STW	.D2T2	B9, *B0	
+
+	;; Save new TLS value in user helper
+ [B0]	STW	.D2T2	B9, *B0
 
 #ifdef CONFIG_TI_C6X_COMPILER
 	;;
