@@ -632,6 +632,7 @@ syscall_exit:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
+	GET_THREAD_INFO A2
 	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	MVK	.S1	_TIF_ALLWORK_MASK,A1
 	NOP	3
