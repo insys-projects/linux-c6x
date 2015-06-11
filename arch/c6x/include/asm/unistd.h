@@ -345,6 +345,7 @@
 #define __NR_perf_event_open	328
 #define __NR_recvmmsg		329
 /* C6x special syscalls */
+#define __NR_dsbt_idx_alloc     330
 #define __NR_get_user_helper	331
 #define __NR_set_tls		332
 
