@@ -632,6 +632,7 @@ syscall_exit:
 	;; make sure we don't miss an interrupt setting need_resched or
 	;; sigpending between sampling and the rti
 	MASK_INT B2
+	GET_THREAD_INFO A2
 	LDW	.D1T1	*+A2(THREAD_INFO_FLAGS),A2
 	MVK	.S1	_TIF_ALLWORK_MASK,A1
 	NOP	3
@@ -1421,6 +1422,6 @@ _sys_call_table:
 	SYSCALL_ENTRY	sys_rt_tgsigqueueinfo
 	SYSCALL_ENTRY	sys_perf_event_open
 	SYSCALL_ENTRY	sys_recvmmsg
-	SYSCALL_ENTRY	sys_cache_sync		; 330
+	SYSCALL_ENTRY   sys_dsbt_idx_alloc      ; 330
 	SYSCALL_ENTRY	sys_get_user_helper
 	SYSCALL_ENTRY	sys_set_tls

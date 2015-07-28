@@ -23,6 +23,7 @@
 #include <linux/shm.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
+#include <linux/mutex.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -77,22 +78,15 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 	return -ENOSYS;
 }
 
-/* sys_cacheflush -- flush (part of) the processor cache.  */
+/* 
+ * sys_cacheflush -- flush (part of) the processor cache.
+ */
 asmlinkage int
-sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
+sys_cacheflush  (unsigned long addr, unsigned long bytes, unsigned int cache)
 {
-	return 0;
-}
-
-/* sys_cache_sync -- sync caches over given range */
-asmlinkage int
-sys_cache_sync (unsigned long s, unsigned long e)
-{
-	if (s >= e)
-		return -1;
-
-	L1D_cache_block_writeback_invalidate(s, e);
-	L1P_cache_block_invalidate(s, e);
+	/* Sync caches over given range */
+	L1D_cache_block_writeback_invalidate(addr, addr + bytes);
+	L1P_cache_block_invalidate(addr, addr + bytes);
 
 	return 0;
 }
@@ -131,6 +125,143 @@ sys_set_tls (unsigned long tls_value)
 asmlinkage int sys_getpagesize(void)
 {
 	return PAGE_SIZE;
+}
+
+/* 
+ * Syscall for DSBT index management
+ */
+#define DSBT_IDX_MAX        128
+#define LIBRARY_NAME_LENGTH 64
+
+struct dsbt_idx {
+	struct list_head list;
+	char             name[LIBRARY_NAME_LENGTH];
+	unsigned long    idx;
+};
+
+static DEFINE_MUTEX(__dsbt_idx_mutex);
+static unsigned long  __dsbt_idx[DSBT_IDX_MAX >> 5];
+static struct list_head *__dsbt_idx_list = NULL;
+
+asmlinkage int sys_dsbt_idx_alloc(const char   *name,
+	                          unsigned long start,
+				  unsigned long end,
+				  unsigned long op)
+{
+	int res;
+	unsigned long idx;
+	unsigned long n_idx = 0;
+	struct list_head *pos;
+	struct dsbt_idx *entry = NULL;
+
+	if ((start >= DSBT_IDX_MAX) || (end >= DSBT_IDX_MAX))
+		return -EINVAL;
+
+	mutex_lock(&__dsbt_idx_mutex);
+
+	if (__dsbt_idx_list == NULL) {
+		/* Initialize list */
+		pos = kmalloc(sizeof(struct list_head), GFP_KERNEL);
+		if (pos == NULL) {
+			printk(KERN_ALERT "Cannot allocate memory for dsbt_idx_alloc\n");
+			res = -ENOMEM;
+			goto error;
+		}
+
+		__dsbt_idx_list = pos;
+		INIT_LIST_HEAD(__dsbt_idx_list);
+	} else {
+		/* Find an already allocated library */
+		list_for_each(pos, __dsbt_idx_list) {
+			entry = list_entry(pos, struct dsbt_idx, list);
+			if (strncmp(name, entry->name,
+				    LIBRARY_NAME_LENGTH - 1) == 0)
+				goto found;
+		}
+	}
+
+	/* If no library is found, allocate a new index entry */
+	entry = kmalloc(sizeof(struct dsbt_idx), GFP_KERNEL);
+	if (entry == NULL) {
+		printk(KERN_ALERT "Cannot allocate memory for dsbt_idx_alloc\n");
+		res = -ENOMEM;
+		goto error;
+	}
+
+	strncpy(entry->name, name,  LIBRARY_NAME_LENGTH - 1);
+	entry->name[ LIBRARY_NAME_LENGTH - 1] = 0;
+
+	switch(op) {
+	case 0:
+		/* Alloc */
+		if (end < start) {
+			kfree(entry);
+			res = -EINVAL;
+			goto error;
+		}
+
+		/* Allocate from the end to avoid collision with static index */
+		idx = end;
+		n_idx = start;
+		while (1) {
+			n_idx = find_next_zero_bit(&__dsbt_idx[0], end, n_idx);
+			if (n_idx == end) {
+				break;
+			}
+			idx = n_idx;
+			n_idx++;
+		}
+
+		if (idx >= end) {
+			kfree(entry);
+			res = -EBUSY;
+			goto error;
+		}
+
+		if (test_and_set_bit(idx, &__dsbt_idx[0])) {
+			kfree(entry);
+			res = -EBUSY;
+			goto error;
+		}
+		break;
+	case 1:
+		/* Reserve, end is not used */
+		idx = start;
+		if (test_and_set_bit(idx, &__dsbt_idx[0])) {
+			kfree(entry);
+			res = -EBUSY;
+			goto error;
+		}
+		break;
+	default:
+		res = -EINVAL;
+		goto error;
+	}
+
+	/* Set the new idx */
+	entry->idx = idx;
+	list_add(&(entry->list), __dsbt_idx_list);
+
+found:
+	if (op == 2) {
+		/* Free */
+		if (!(test_and_clear_bit(start, &__dsbt_idx[0]))) {
+			res = -EBUSY;
+			goto error;
+		}
+
+		if (entry) {
+			/* Remove this entry from the list */
+			list_del(&(entry->list));
+			kfree(entry);
+		}
+	} 
+
+	res = (int) entry->idx;
+error:
+	mutex_unlock(&__dsbt_idx_mutex);
+
+	return res;
 }
 
 asmlinkage long old_mmap(unsigned long addr, unsigned long len,
